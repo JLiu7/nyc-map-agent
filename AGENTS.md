@@ -9,7 +9,7 @@ For where the work stands right now (what merged, what is in flight, which workt
 <!-- acs:boot:start -->
 ## Agent stack boot (ACS hot-loader, installed 2026-10-21)
 
-This repo runs the agent stack: ACS (Agent Custom Setup, coordination), PCM (Project Continuity Modules, checkpoints and PR gates), CGM (Content Generation Modules, writing rules) and OIO (Observational Issue Ops, issue logs). The pinned versions are in `stack-manifest.json`. The checkouts live in the ACS cache at `~/.cache/acs/deps/<repo>`. Every agent (Claude Code, Codex, Grok, or a person scripting one) follows these steps; nothing else delivers them.
+This repo runs the agent stack: ACS (Agent Custom Setup, coordination), PCM (Project Continuity Modules, checkpoints and PR gates), CGM (Content Generation Modules, writing rules) and OIO (Observational Issue Ops, issue logs). All four ship together from one repository, [Pukujan/agent-stack-train](https://github.com/Pukujan/agent-stack-train), and `stack-manifest.json` follows its certified release. The checkout lives in the ACS cache at `~/.cache/acs/deps/agent-stack-train`, one folder per component (`acs/`, `pcm/`, `cgm/`, `oio/`). Every agent (Claude Code, Codex, Grok, or a person scripting one) follows these steps; nothing else delivers them.
 
 **At session start**
 1. Run `scripts/agent-hygiene.sh --yes`. It stops this repo's dev servers and test browsers that were left running for more than six hours, and reports any dev-root clutter.
@@ -19,13 +19,13 @@ This repo runs the agent stack: ACS (Agent Custom Setup, coordination), PCM (Pro
 **While working**
 - **Worktrees, clones and scratch** go under `~/.cache/acs/{worktrees,deps,scratch}`, never in the projects folder or inside this repo. For example: `git worktree add ~/.cache/acs/worktrees/nyc-map-agent-<task> -b <branch>`. Remove a worktree once its branch is pushed and clean.
 - **Dev servers and test browsers:** stop every one you start as soon as you are done with it. Never stop another project's processes.
-- **Writing rules (CGM, always on):** before any human-facing writing, load and apply `~/.cache/acs/deps/content-generation-modules/modules/human-sounding-writing/SKILL.md`. That covers PR, issue and commit prose, docs and HTML reports. README and product pages use `modules/writing-direction/SKILL.md` instead; generated file names use `modules/human-output-naming/SKILL.md`. If the file can't be loaded, stop and say so.
+- **Writing rules (CGM, always on):** before any human-facing writing, load and apply `~/.cache/acs/deps/agent-stack-train/cgm/modules/human-sounding-writing/SKILL.md`. That covers PR, issue and commit prose, docs and HTML reports. README and product pages use `modules/writing-direction/SKILL.md` instead; generated file names use `modules/human-output-naming/SKILL.md`. If the file can't be loaded, stop and say so.
 
 **At session end**
 1. Update `checkpoints/CURRENT.md` with what changed and the next step (PCM continuity).
 2. Stop your dev servers. Run `scripts/agent-hygiene.sh` once more.
 
-Details: `~/.cache/acs/deps/agent-custom-setup/modules/coordination/multi-agent-hotload/v0.1.0/HOTLOAD.md`. Why this block exists: Pukujan/agent-custom-setup#112.
+Details: `~/.cache/acs/deps/agent-stack-train/acs/modules/coordination/multi-agent-hotload/v0.1.0/HOTLOAD.md`. Why this block exists: Pukujan/agent-custom-setup#112.
 <!-- acs:boot:end -->
 
 <!-- oio:issue-log-guidance:start -->

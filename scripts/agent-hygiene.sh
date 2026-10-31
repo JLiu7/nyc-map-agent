@@ -68,7 +68,7 @@ done < <(ps -Ao pid=,etime=,command= | awk '{
 
 [ "$yes" = 1 ] && [ "$stopped" -gt 0 ] && echo "agent-hygiene: stopped $stopped leftover dev process(es) older than ${max_min} min"
 
-check="${ACS_CACHE_DIR:-$HOME/.cache/acs}/deps/agent-custom-setup/modules/coordination/multi-agent-hotload/v0.1.0/scripts/dev_root_check.py"
+check="${ACS_CACHE_DIR:-$HOME/.cache/acs}/deps/agent-stack-train/acs/modules/coordination/multi-agent-hotload/v0.1.0/scripts/dev_root_check.py"
 if [ -f "$check" ] && command -v python3 >/dev/null; then
   report=$({ python3 "$check" --dev-root "$(dirname "$main_root")" 2>/dev/null || true; } | python3 -c 'import json,sys; d=json.load(sys.stdin); print("clean" if d["ok"] else "%d item(s) outside the rule; run dev_root_check.py --clean to review" % len(d["findings"]))' 2>/dev/null || echo "check failed")
   say "agent-hygiene: dev root: $report"

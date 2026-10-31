@@ -13,25 +13,25 @@ jobs:
     name: Validate ontology and classify issue log
     concurrency:
       group: oio-issue-triage-${{ github.event.issue.number }}
-      # A newer event on the same issue re-validates the whole issue, so a
-      # queued/running older triage is superseded and can be dropped.
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container: { image: "python:3.12-slim" }
+      cancel-in-progress: false
+    # Set the repository variable OIO_RUNS_ON to a JSON runner, such as
+    # ["self-hosted","org-pool"], to run on your own runners. Editing this file
+    # instead blocks the next OIO upgrade.
+    runs-on: ${{ fromJSON(vars.OIO_RUNS_ON || '"ubuntu-latest"') }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install pinned OIO validator dependency
         run: |
           requirements="requirements.txt"
           if [ -f .oio/requirements.txt ]; then requirements=".oio/requirements.txt"; fi
-          python -m pip install --no-cache-dir --requirement "$requirements"
+          python -m pip install --requirement "$requirements"
 
       - name: Validate and label issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python .github/scripts/oio_triage.py
-      - name: Clean workspace (persistent runner)
-        if: always()
-        run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
