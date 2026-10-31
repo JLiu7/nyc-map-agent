@@ -15,7 +15,11 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  force pushes, worktrees outside
                                  <project>/worktrees/<TASK-ID>, issue logs not
                                  in the OIO form's shape, pull requests that
-                                 name no issue, and edits that remove this guard
+                                 name no issue, changes made straight through
+                                 GitHub (`gh api` writes, repo, variable,
+                                 secret, release, label and workflow changes)
+                                 that name no issue, and edits that remove
+                                 this guard
     acs_guard.py stop            Stop: block ending a turn with unpushed commits,
                                  or pushed without a PCM checkpoint
     acs_guard.py link <N>        record issue N (or owner/repo#N) as the current
@@ -23,7 +27,8 @@ Claude Code's own defaults and loses often enough to matter (#37).
 
 A branch's owning issue is the one recorded by ``link`` or the number in its
 name (``fix/37-enforce-rules``); either is checked on GitHub once and cached in
-``git config branch.<name>.acs-issue``.
+``git config branch.<name>.acs-issue``. A GitHub-side change can instead name
+its issue with an ``ACS_ISSUE=<owner/repo>#N`` prefix on the command (#41).
 
 The guard acts only in repositories that adopt the stack (``.coord/hotload.lock.json``
 or ``stack-releases.json`` at the top level). The owner can turn it off for a
@@ -49,6 +54,20 @@ BRANCH_ISSUE_RE = re.compile(r"(?:^|[/_-])(?:issue-?|gh-?)?(\d{1,7})(?=[/_-]|$)"
 LINK_RE = re.compile(r"^(?:([\w.-]+/[\w.-]+))?#?(\d{1,7})$")
 CHECKPOINT_PREFIX = "PCM "
 SEPARATORS = set(";&|()\n")
+ISSUE_ENV = "ACS_ISSUE"
+# gh subcommands that change GitHub state outside a pull request (#41).
+GH_CHANGES = {
+    "repo": {"create", "edit", "delete", "rename", "archive", "unarchive"},
+    "variable": {"set", "delete"},
+    "secret": {"set", "delete"},
+    "release": {"create", "edit", "delete", "upload", "delete-asset"},
+    "label": {"create", "edit", "delete", "clone"},
+    "workflow": {"enable", "disable"},
+}
+GH_API_FIELDS = {"-f", "-F", "--field", "--raw-field", "--input"}
+GH_API_SWITCHES = {"-i", "--include", "--paginate", "--silent", "--slurp", "--verbose"}
+# Recording a decision is never blocked: comments on issues and pull requests.
+GH_API_COMMENT_RE = re.compile(r"^/?repos/[^/]+/[^/]+/(?:issues|pulls)/(?:\d+/comments|comments/\d+)$")
 
 
 # ---------------------------------------------------------------- git / gh
@@ -113,9 +132,19 @@ def owning_issue(top: Path, branch: str) -> str | None:
 
 def segments(command: str) -> list[list[str]]:
     """Split a shell command into simple commands (best effort)."""
+    return [args for _env, args in segments_with_env(command)]
+
+
+def segments_with_env(command: str) -> list[tuple[dict[str, str], list[str]]]:
+    """Each simple command with its leading ``VAR=value`` assignments."""
     try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        # A newline ends a command, as `;` does; shlex would read the next line as more arguments.
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&\n")
+        lexer.whitespace = " \t\r"
         lexer.whitespace_split = True
+        # shlex would drop everything after any `#`, hiding `ACS_ISSUE=o/r#37 gh ...` and the rest of
+        # a command. A real comment then reads as a command named `#`, which no rule matches.
+        lexer.commenters = ""
         tokens = list(lexer)
     except ValueError:
         return []
@@ -127,10 +156,13 @@ def segments(command: str) -> list[list[str]]:
             parts[-1].append(token)
     out = []
     for args in parts:
+        env: dict[str, str] = {}
         while args and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", args[0]):
-            args = args[1:]  # leading VAR=value assignments
+            name, value = args[0].split("=", 1)  # leading VAR=value assignments
+            env[name] = value
+            args = args[1:]
         if args:
-            out.append(args)
+            out.append((env, args))
     return out
 
 
@@ -257,12 +289,65 @@ def check_git(sub: str, args: list[str], cwd: Path) -> str | None:
     return None
 
 
-def check_gh(args: list[str], cwd: Path) -> str | None:
+def github_change(args: list[str]) -> str | None:
+    """A name for the GitHub-side change ``gh`` would make, or None for a read."""
+    group, sub = args[1], args[2]
+    if sub in GH_CHANGES.get(group, ()):
+        return f"gh {group} {sub}"
+    if group != "api":
+        return None
+    method, endpoint, fields = "", "", []
+    i = 2
+    while i < len(args):
+        a = args[i]
+        name, eq, value = a.partition("=")
+        if name in ("-X", "--method"):
+            method = (value if eq else (args[i + 1] if i + 1 < len(args) else "")).upper()
+        elif name in GH_API_FIELDS:
+            fields.append(value if eq else (args[i + 1] if i + 1 < len(args) else ""))
+        elif not a.startswith("-") and not endpoint:
+            endpoint = a
+        if a.startswith("-") and not eq and a not in GH_API_SWITCHES:
+            i += 1  # skip the flag's value
+        i += 1
+    if endpoint == "graphql":
+        return "gh api graphql mutation" if any("mutation" in f for f in fields) else None
+    if method == "GET" or (not method and not fields):
+        return None
+    if GH_API_COMMENT_RE.match(endpoint):
+        return None
+    return f"gh api {method or 'POST'} {endpoint}".rstrip()
+
+
+def env_issue(top: Path, env: dict[str, str]) -> str | None:
+    """The ``ACS_ISSUE=<owner/repo>#N`` a command names, if that issue exists."""
+    match = LINK_RE.match(env.get(ISSUE_ENV, "").strip())
+    if match and issue_exists(top, match.group(1), match.group(2)):
+        return env[ISSUE_ENV]
+    return None
+
+
+def check_gh(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> str | None:
     if len(args) < 3 or args[0] != "gh":
         return None
     top = top_level(cwd)
     if top is None or not is_adopter(top):
-        return None
+        project = os.environ.get("CLAUDE_PROJECT_DIR")
+        top = top_level(Path(project)) if project else None
+        if top is None or not is_adopter(top):
+            return None
+    change = github_change(args)
+    if change:
+        if env_issue(top, env or {}):
+            return None
+        branch = current_branch(top)
+        if branch and branch != default_branch(top) and owning_issue(top, branch):
+            return None
+        return (
+            f"{change}: this changes GitHub outside a pull request, so it needs an issue log that records "
+            f"the decision. Prefix the command with `{ISSUE_ENV}=<owner/repo>#N` naming that issue (file it "
+            "first with `gh issue create`), or run it from a task branch with an owning issue."
+        )
     if args[1:3] == ["issue", "create"]:
         repo = flag_value(args, "--repo", "-R")
         if repo:  # another repository has its own form; check this one's only
@@ -295,12 +380,12 @@ def check_gh(args: list[str], cwd: Path) -> str | None:
 
 
 def check_bash(command: str, cwd: Path) -> str | None:
-    for args in segments(command):
+    for env, args in segments_with_env(command):
         if args[0] == "cd" and len(args) > 1:
             cwd = (cwd / args[1]).expanduser()
             continue
         call = git_call(args, cwd)
-        reason = check_git(*call) if call else check_gh(args, cwd)
+        reason = check_git(*call) if call else check_gh(args, cwd, env)
         if reason:
             return reason
     return None
