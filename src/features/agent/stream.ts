@@ -1,5 +1,6 @@
 import { gapLeft, markAsked, QUESTION_GAP_MS, RETRY_WITHIN_S, waitFor } from "./askSpacing";
 import { streamEvent, type AgentRequest, type StreamEvent } from "./schema";
+import { SESSION_ID } from "../../lib/sessionId";
 
 /** Parse an NDJSON body into validated events; bad lines are dropped. */
 export async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
@@ -48,7 +49,7 @@ export async function* askAgent(req: AgentRequest, signal?: AbortSignal, onWait?
     }
     onWait?.(false);
     markAsked();
-    res = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req), signal });
+    res = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", "x-session-id": SESSION_ID }, body: JSON.stringify(req), signal });
     if (res.status !== 429 || tries >= 2) break;
     const j = (await res.clone().json().catch(() => null)) as { retryAfterSeconds?: unknown } | null;
     const after = typeof j?.retryAfterSeconds === "number" ? j.retryAfterSeconds : Number(res.headers.get("retry-after"));

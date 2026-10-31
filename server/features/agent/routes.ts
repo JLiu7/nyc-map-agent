@@ -18,6 +18,7 @@ import { ActionCollector } from "./mapActions";
 import { contextLine, systemPrompt } from "./prompt";
 import { AnswerAudit } from "./audit";
 import { RunLog } from "./runLog";
+import { sessionFrom } from "../../lib/tracing";
 
 export const INFERHUB_BASE_URL = process.env.INFERHUB_BASE_URL ?? "https://api.inferhub.dev/v1";
 /** Cheap, fast, good at tool calls: ~$0.075 in / $0.30 out per M tokens (InferHub market max ask). */
@@ -63,6 +64,7 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
       const send = (e: StreamEvent) => controller.enqueue(enc.encode(`${JSON.stringify(e)}\n`));
       // Timings for this request: one log line and one core.agent_runs row (no question text).
       const run = new RunLog(modelId);
+      run.session = sessionFrom(request.headers);
       let finished = false;
       // Buttons under the answer, from the tool results (#371); one "actions" line before "done".
       const actions = new ActionCollector();
@@ -77,11 +79,13 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
       const tools = makeTools({ location, now: clock, emit: (command) => send({ type: "command", command }), actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
       // Restrooms and line status still get a real answer with no model (#199).
       const lastAsked = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+      run.input = lastAsked;
       const answerAlone = async (fast = false): Promise<boolean> => {
         const q = { text: lastAsked, hasLocation: location !== null, now: clock };
         const text = await answerWithoutModel(q, tools, fast ? fastIntent(lastAsked) : undefined);
         if (!text) return false;
         answerText = text;
+        run.text(text);
         audit.text(text);
         send({ type: "text", text });
         flushActions();
@@ -128,7 +132,7 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
           },
         });
         for await (const part of result.fullStream) {
-          if (part.type === "text-delta") { run.text(); audit.text(part.text); answerText += part.text; send({ type: "text", text: part.text }); }
+          if (part.type === "text-delta") { run.text(part.text); audit.text(part.text); answerText += part.text; send({ type: "text", text: part.text }); }
           else if (part.type === "tool-call") {
             // "tool" stays for older clients; "step" pairs a start with its end (#370).
             send({ type: "tool", name: part.toolName });

@@ -8,6 +8,7 @@
  * picked) Whisper detects the spoken language and we return it with the text.
  */
 import { clientIp } from "../../lib/clientIp";
+import { exportTrace, sessionFrom } from "../../lib/tracing";
 import { createLimiter } from "./fair-use";
 
 const BASE = "https://api.groq.com/openai/v1";
@@ -59,13 +60,17 @@ export async function transcribe(form: FormData, headers: Headers, fetchImpl: ty
   out.set("response_format", auto ? "verbose_json" : "json");
   const lang = auto ? null : whisperLang(raw);
   if (lang) out.set("language", lang);
+  const started = Date.now();
+  const span = (ok: boolean, text = "") => exportTrace({ name: "speech to text", kind: "CHAIN", start: started, end: Date.now(), error: !ok, attributes: { "llm.model_name": model, "output.value": text } }, sessionFrom(headers));
   try {
     const r = await fetchImpl(url, { method: "POST", headers: { authorization: `Bearer ${key}` }, body: out, signal: AbortSignal.timeout(20_000) });
-    if (!r.ok) return json({ error: "stt_failed" }, 502);
+    if (!r.ok) { span(false); return json({ error: "stt_failed" }, 502); }
     const d = (await r.json()) as { text?: string; language?: string };
     const heard = auto ? detectedLang(d.language) : null;
+    span(true, (d.text ?? "").trim());
     return json({ text: (d.text ?? "").trim(), ...(heard ? { lang: heard } : {}) });
   } catch {
+    span(false);
     return json({ error: "stt_failed" }, 502);
   }
 }

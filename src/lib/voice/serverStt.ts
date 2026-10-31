@@ -4,6 +4,8 @@
  * the microphone, end it after a short silence, and transcribe it on our
  * server (/api/stt). Nothing is kept: the clip is sent once and dropped.
  */
+import { SESSION_ID } from "../sessionId";
+
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
 /** Loudness above which a frame counts as speech (RMS of -1..1 samples). Pure, for tests. */
@@ -112,7 +114,7 @@ export async function transcribeTurn(blob: Blob, lang: string | null): Promise<S
   form.set("audio", blob, blob.type.includes("mp4") ? "turn.m4a" : "turn.webm");
   form.set("lang", lang ?? "auto");
   try {
-    const r = await fetch(`${API_BASE}/api/stt`, { method: "POST", body: form });
+    const r = await fetch(`${API_BASE}/api/stt`, { method: "POST", headers: { "x-session-id": SESSION_ID }, body: form });
     if (r.status === 503) return { error: "unavailable" };
     if (r.status === 429) return { error: "busy" };
     if (!r.ok) return { error: "failed" };

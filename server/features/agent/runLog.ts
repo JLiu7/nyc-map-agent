@@ -3,16 +3,18 @@
  * how long each tool took, which model answered and how it ended. Written as one
  * "[agent-run]" JSON log line and one core.agent_runs row (migration 20261024010000).
  * A request still running after STUCK_MS is written as "stuck" straight away, so a
- * hang shows up even if it never finishes. Never records the question, the answer
- * or a location.
+ * hang shows up even if it never finishes. The log and the row never record the
+ * question, the answer or a location; the finished turn also goes to Phoenix as a
+ * trace (server/lib/tracing.ts), with the question and answer masked.
  */
 import { randomUUID } from "node:crypto";
 import { octoQuery } from "../../../api/_lib/octo";
+import { exportTrace, type SpanSpec } from "../../lib/tracing";
 
 const STUCK_MS = 45_000;
 
 type RunOutcome = "done" | "error" | "stuck" | "aborted";
-interface RunStep { name: string; ms: number; status: "done" | "error" | "running" }
+interface RunStep { name: string; ms: number; status: "done" | "error" | "running"; atMs?: number }
 export interface RunRecord {
   id: string;
   startedAt: string;
@@ -54,6 +56,10 @@ export class RunLog {
   private readonly notes: string[] = [];
   private ended = false;
   private readonly stuckTimer: ReturnType<typeof setTimeout>;
+  /** For the trace only: the conversation id, the question and the answer so far. */
+  session: string | null = null;
+  input = "";
+  private output = "";
 
   constructor(
     private model: string,
@@ -77,11 +83,12 @@ export class RunLog {
     const s = this.open.get(id);
     if (!s) return;
     this.open.delete(id);
-    this.steps.push({ name: s.name, ms: this.now() - s.at, status: ok ? "done" : "error" });
+    this.steps.push({ name: s.name, ms: this.now() - s.at, status: ok ? "done" : "error", atMs: s.at - this.started });
   }
 
-  text(): void {
+  text(chunk = ""): void {
     this.firstText ??= this.now() - this.started;
+    this.output += chunk;
   }
 
   /** A model fallback or slow start; the message names models only. */
@@ -98,6 +105,24 @@ export class RunLog {
     this.ended = true;
     clearTimeout(this.stuckTimer);
     this.emit(outcome, usage);
+    this.trace(outcome, usage);
+  }
+
+  private trace(outcome: RunOutcome, usage: { inputTokens: number; outputTokens: number } | null): void {
+    const r = this.record(outcome, usage);
+    const end = this.started + r.totalMs;
+    const tools: SpanSpec[] = r.steps.map((s) => {
+      const start = this.started + (s.atMs ?? 0);
+      return { name: s.name, kind: "TOOL", start, end: start + s.ms, error: s.status === "error", attributes: { "tool.name": s.name } };
+    });
+    const llm: SpanSpec[] = r.model === "none" ? [] : [{
+      name: "model", kind: "LLM", start: this.started, end,
+      attributes: { "llm.model_name": r.model, "llm.token_count.prompt": r.inputTokens ?? 0, "llm.token_count.completion": r.outputTokens ?? 0, "output.value": this.output },
+    }];
+    exportTrace({
+      name: "agent turn", kind: "CHAIN", start: this.started, end, error: outcome !== "done", children: [...llm, ...tools],
+      attributes: { "input.value": this.input, "output.value": this.output, outcome, "first_text_ms": r.firstTextMs ?? -1, notes: r.notes.join("; ") },
+    }, this.session);
   }
 
   record(outcome: RunOutcome, usage: { inputTokens: number; outputTokens: number } | null): RunRecord {
