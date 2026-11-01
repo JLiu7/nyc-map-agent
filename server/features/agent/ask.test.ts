@@ -89,14 +89,14 @@ describe("the model's own closing offer gives way to the app's", () => {
 const usage = { inputTokens: { total: 100, noCache: 100, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 20, text: 20, reasoning: 0 } };
 const finish = (reason: "tool-calls" | "stop") => ({ type: "finish", finishReason: { unified: reason, raw: reason }, usage }) as const;
 
-/** Step 1 calls transit_plan with what the model read; step 2 writes `reply`. */
-function model(input: Record<string, unknown>, reply: string) {
+/** Step 1 calls `toolName` with what the model read; step 2 writes `reply`. */
+function model(input: Record<string, unknown>, reply: string, toolName = "transit_plan") {
   let step = 0;
   return new MockLanguageModelV4({
     doStream: () => {
       step += 1;
       const chunks = step === 1
-        ? [{ type: "tool-call", toolCallId: "c1", toolName: "transit_plan", input: JSON.stringify(input) }, finish("tool-calls")]
+        ? [{ type: "tool-call", toolCallId: "c1", toolName, input: JSON.stringify(input) }, finish("tool-calls")]
         : [{ type: "text-start", id: "t" }, { type: "text-delta", id: "t", delta: reply }, { type: "text-end", id: "t" }, finish("stop")];
       return Promise.resolve({ stream: convertArrayToReadableStream(chunks as never[]) });
     },
@@ -105,7 +105,7 @@ function model(input: Record<string, unknown>, reply: string) {
 
 async function chat(messages: Array<{ role: "user" | "assistant"; content: string }>, m: MockLanguageModelV4, planned: string[] = []) {
   const fairUse = { limiter: createLimiter({ windowMax: 100, windowMs: 60_000, burstMax: 100, burstMs: 60_000 }), budget: createDailyBudget({ softCap: 0, hardCap: 0, capModel: null }), now: Date.now };
-  const deps = { otp: { plan: () => { planned.push("otp"); return Promise.resolve([]); } }, planner: { plan: () => Promise.resolve(null) }, changes: [], entrances: { stations: () => Promise.resolve([]) } };
+  const deps = { otp: { plan: () => { planned.push("otp"); return Promise.resolve([]); } }, planner: { plan: () => Promise.resolve(null) }, changes: [], entrances: { stations: () => Promise.resolve([]) }, alerts: () => Promise.resolve([]), alertEntities: () => Promise.resolve([]), outages: () => Promise.resolve([]), vehicles: () => Promise.resolve([]), now: () => Date.parse("2026-11-01T14:00:00Z") };
   const res = await POST(new Request("http://x/api/agent", { method: "POST", body: JSON.stringify({ messages, location: { lon: -73.99, lat: 40.735 } }) }), { model: m, deps: deps as never, fairUse });
   const events = (await res.text()).trim().split("\n").map((l): StreamEvent => streamEvent.parse(JSON.parse(l)));
   const text = events.filter((e) => e.type === "text").map((e) => (e as { text: string }).text).join("");
@@ -149,6 +149,15 @@ describe("POST /api/agent asks before it plans (#625)", () => {
     expect(JSON.stringify(second?.prompt.filter((p) => p.role === "tool"))).not.toContain("needsAnswer");
     // The offer is the app's, said after the answer in place of the model's own "Want to start?".
     expect(text).toBe("Walk to Grand Central, about 20 min. Want the return trip?");
+    vi.restoreAllMocks();
+  });
+
+  it("drops the model's own Want to start? when no trip was planned (#629)", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    // A line status answer plans nothing, so the offer to start a trip has nothing to start.
+    const m = model({ lines: ["A"] }, "The A is running with delays downtown. Want to start?", "line_status");
+    const { text } = await chat([{ role: "user", content: "Is the A train running near Times Square right now?" }], m);
+    expect(text).toBe("The A is running with delays downtown.");
     vi.restoreAllMocks();
   });
 

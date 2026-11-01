@@ -20,13 +20,16 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 | Pull request | What it is | State |
 |---|---|---|
-| #628 | The chat no longer sends riders to change trains at stops a line skips, and restates a delay's direction and place as the MTA gives them (#627) | Open, auto-merge on |
-| #630 | A repeatable eval for line status answers: replayed MTA feeds, ten rule checks, a loop and handoff for DeepSeek (#629) | Open, auto-merge on |
+| #632 | The chat stops offering to start a trip after a line status answer, which cut the trials that failed that check from 92 to 5 (#629) | Open, auto-merge on |
 | #625 | The trip chat asks one short question when a request is vague (a whole borough, no start, a day with no hour, a hint about stairs or walking) and ends a planned trip with one follow-up offer, in the rider's language | Open, checks green |
 | #602 | The agent reads an unclear place back before answering ("86 St" has six stations) | Open, checks green |
 | #378 | Docs: realign the project, hackathon writeup and research sources | Open for review |
 | #232 | The release bot's release pull request | Left to the bot |
 | branch `feat/place-readback` (not pushed) | The agent picked one of six "86 St" stations without asking. Now a place several stations share, a near spelling, or a turn speech-to-text was unsure of is read back before any answer; the plan for porting the website copilot's other safety rules is `docs/PLAN-copilot-port.md` | Committed locally, 2026-10-31 |
+
+## Completed recently
+
+#628, #630 and #631 merged on 2026-11-01. The A train answer no longer sends riders to stops it skips (#627); line status answers are scored on replayed MTA feeds with ten rule checks, a loop and a handoff for DeepSeek (#629); and the baseline on LFM3 is in `docs/eval/line-status/LEDGER.md` (14.6% of training trials clean, 25.5% of held-out ones). The first iteration of that loop is #632. The phrase the route holds back is one exact sentence, so the next iteration is its shape, not another prompt rule.
 
 #416 (app text follows the asked language), #415 (held trains and feed-skipped stops), #359 (Live View camera scaffold) and #417 (menu row language) merged on 2026-10-25.
 

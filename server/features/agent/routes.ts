@@ -199,12 +199,13 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
           }
           else if (part.type === "finish") {
             fair.budget.record((part.totalUsage.inputTokens ?? 0) + (part.totalUsage.outputTokens ?? 0));
-            // The model's own "Want to start?" gives way to the app's one follow-up offer.
+            // The model's own "Want to start?" gives way to the app's one follow-up offer, and goes
+            // when no trip set one: a line status or restroom answer has no trip to start (#629).
             const line = closing.line;
             // A question the model already worded (a language without phrases) is not said twice.
             const asking = !!line && isQuestion(line) && closing.lang !== null;
             const following = !!line && !isQuestion(line) && !!answerText;
-            const own = hold.rest(following).trimEnd();
+            const own = hold.rest(following || line === null).trimEnd();
             const ours = line && (asking || following) ? (say(line, closing.lang) ?? (following ? say(line, "en") : null)) : null;
             const close = `${own}${ours ? `${answerText || own ? " " : ""}${ours}` : ""}`;
             if (close) { run.text(close); audit.text(close); answerText += close; send({ type: "text", text: close }); }

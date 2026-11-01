@@ -122,6 +122,29 @@ Blocked/uncertain:
 Next:
 - DeepSeek runs the loop in docs/eval/line-status/PROGRAM.md; owner sets DEEPSEEK_API_KEY and approves the PRIVACY.md change
 
+### 2026-11-01 10:49:18 UTC — workbuddy
+
+<!-- continuity:checkpoint {"agent":"workbuddy","blocked":["none"],"changed":["server/features/agent/routes.ts, ask.test.ts, docs/eval/line-status/LEDGER.md, checkpoints/CURRENT.md"],"completed":["Dropped the model's own Want to start? when no trip set a follow-up; the eval moved train trials clean from 14.6% to 43.9% and held-out from 25.5% to 39.2%; opened #632"],"decisions":["The unwanted offer was the app letting the model's close through, not the prompt, so the fix belongs in routes.ts"],"evidence":["npx vitest run server/features/agent: 298 passed; tsc and eslint clean; eval-line-status-compare printed keep over 174 trials per run on LFM3"],"evidence_class":"observed","next_action":"iteration 2 on the 5 remaining offer trials: the route holds one exact sentence, so widen what it holds back","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0005","timestamp":"2026-11-01T10:49:18Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"df128786f8af48d5886b8dcef876ae8d6660a7addab9498253aa7a10cc1b0f3c","request_id":"d69b027154794a2ca4d9c3579194714c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0005"} -->
+
+Completed:
+- Dropped the model's own Want to start? when no trip set a follow-up; the eval moved train trials clean from 14.6% to 43.9% and held-out from 25.5% to 39.2%; opened #632
+
+Evidence:
+- npx vitest run server/features/agent: 298 passed; tsc and eslint clean; eval-line-status-compare printed keep over 174 trials per run on LFM3
+
+Decisions:
+- The unwanted offer was the app letting the model's close through, not the prompt, so the fix belongs in routes.ts
+
+Changed:
+- server/features/agent/routes.ts, ask.test.ts, docs/eval/line-status/LEDGER.md, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- iteration 2 on the 5 remaining offer trials: the route holds one exact sentence, so widen what it holds back
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
