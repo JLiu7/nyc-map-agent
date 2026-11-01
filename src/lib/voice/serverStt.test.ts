@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SPEECH_RMS, nextFloor, rms, shouldStop, speechLevel } from "./serverStt";
+import { SPEECH_RMS, encodeWav, nextFloor, rms, shouldStop, speechLevel } from "./serverStt";
 
 describe("recording one voice turn", () => {
   it("measures loudness", () => {
@@ -38,5 +38,17 @@ describe("recording one voice turn", () => {
     let floor = 0.05;
     for (let i = 0; i < 30; i += 1) floor = nextFloor(floor, 0.005, false);
     expect(floor).toBeLessThan(0.01);
+  });
+});
+
+describe("the clip sent to the speech server", () => {
+  it("is a 16 kHz mono 16-bit WAV a speech server can read", async () => {
+    const bytes = new DataView(await encodeWav(new Float32Array([0, 0.5, -0.5, 2]), 16_000).arrayBuffer());
+    const tag = (at: number) => String.fromCharCode(...[0, 1, 2, 3].map((i) => bytes.getUint8(at + i)));
+    expect([tag(0), tag(8), tag(12), tag(36)]).toEqual(["RIFF", "WAVE", "fmt ", "data"]);
+    expect(bytes.byteLength).toBe(44 + 8);
+    expect(bytes.getUint32(24, true)).toBe(16_000);
+    expect(bytes.getUint16(22, true)).toBe(1);
+    expect([bytes.getInt16(46, true), bytes.getInt16(48, true), bytes.getInt16(50, true)]).toEqual([16384, -16383, 32767]);
   });
 });

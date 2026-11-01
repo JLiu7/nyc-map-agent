@@ -8,7 +8,7 @@ The map agent hands every question that the fast path cannot answer to one langu
 The website copilot (a separate project, `chatbots/copilot-engine`, a step-by-step voice guide for forms and manuals) already solved this class of problem and proved it with test sets the code was never tuned on (holdout sets). Its rule: **code decides, the model only reads free text.**
 
 ## What the agent does today (read from the code on 2026-10-31)
-1. The browser records a turn. The built-in recognizer is used where it works; otherwise the clip goes to `POST /api/stt` (`server/features/agent/stt.ts`), which calls Whisper on Groq and returns text. No confidence is kept.
+1. The browser records a turn. The built-in recognizer is used where it works; otherwise the clip goes to `POST /api/stt` (`server/features/agent/stt.ts`), which calls the Whisper server named by `STT_BASE_URL` and returns text (no hosted default; unset means voice is off). No confidence is kept.
 2. The text goes to `POST /api/agent` (`server/features/agent/routes.ts`) with the earlier messages. The server keeps no conversation state.
 3. Plain restroom, line, exit and trip asks are answered in code from the app's own feeds (`noModel.ts`, "the fast path").
 4. Everything else goes to the main model (DeepSeek through InferHub) with tools. Places are resolved inside the `geocode` tool (`services.ts`): curated landmarks, then the first station whose name matches exactly, then OpenStreetMap shop names, then NYC GeoSearch.
@@ -51,7 +51,7 @@ The same steps as a list:
 The server stays stateless: on the next turn it rebuilds the same read-back question from the earlier message and only treats the reply as an answer if the question in the history matches word for word. A reply that is really a new question (it has a question mark, more than eight words, or is itself a plain ask) drops the read-back.
 
 ## Shared voice model host (proposal)
-Both agents (this one and the copilot) need speech-to-text and text-to-speech. Today this app rents Whisper on Groq per clip and the browser speaks; the copilot plans its own Whisper and ElevenLabs. Loading the same models twice wastes the one GPU host and doubles the work.
+Both agents (this one and the copilot) need speech-to-text and text-to-speech. Today this app has no speech server of its own, so voice only works in browsers with a built-in recognizer, and the browser speaks; the copilot plans its own Whisper and ElevenLabs. Loading the same models twice wastes the one GPU host and doubles the work.
 
 Proposal: one small speech service, run on the MacBook Pro (the deploy machine), that both apps call.
 - **Interface.** Two streaming endpoints that LiveKit Agents (the recorded voice stack) can use as its speech plugins: `stt` takes 16 kHz audio frames over a WebSocket and streams partial and final text with a confidence per final segment; `tts` takes text and streams audio chunks as they are made. One HTTP fallback each (`POST /v1/audio/transcriptions`, `POST /v1/audio/speech`, OpenAI-shaped), so this app's existing `STT_BASE_URL` setting can point at it with no code change.
@@ -60,7 +60,7 @@ Proposal: one small speech service, run on the MacBook Pro (the deploy machine),
 - **Streaming.** Speech-to-text runs on short chunks with a voice-activity detector so partial text arrives while the person is still talking; text-to-speech starts speaking the first sentence while the rest is still being made.
 - **Confidence out.** Every final transcript carries a 0-1 confidence (mean per-token probability), which feeds the read-back trigger above.
 - **Tenants and limits.** Each app has its own key and per-minute cap, so a busy copilot cannot starve the map agent. Audio is never stored or logged (same rule as `stt.ts` today).
-- **Fallback.** If the host is down, this app falls back to Groq Whisper and browser speech, as now.
+- **Fallback.** If the host is down, voice is off for browsers without a built-in recognizer, and this app falls back to browser speech.
 - **Dev and tests** on the Windows RTX 4060 laptop; it is never a deploy target.
 
 ## What is left, in order

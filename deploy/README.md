@@ -23,6 +23,18 @@ The env file's `OCTO_WORKSPACE_ID` must be the **nyc-neighbourhood** workspace (
 an `OCTO_API_KEY` bound to it. Until 2026-11-01 it named another project's workspace, so neighbourhood
 areas, segment times and block tiles failed with "relation does not exist" or 404 (#614).
 
+### Voice (speech-to-text)
+
+The mic in Brave, Firefox and on phones records a turn in the browser, converts it to a 16 kHz WAV and posts it to `/api/stt`. The server sends it to the copilot speech server on the Pro (launchd `com.pukujan.copilot-speech`, port 8799, repository `chatbots`), which runs Whisper large-v3-turbo on the Apple GPU for many languages. The Pro's `copilot-speech-tunnel` forwards it to the VPS's `127.0.0.1:18799`, and a socat bridge re-offers that on the Docker gateway, so the app reaches it at `http://host.docker.internal:18799`. The env file sets:
+
+```
+STT_BASE_URL=http://host.docker.internal:18799
+STT_PROTOCOL=speech
+STT_STACK=multilingual
+```
+
+Nothing goes to an outside service. Two things to know: the speech server holds one voice stack at a time, so the first voice turn after the copilot used another stack waits about 30 seconds while Whisper loads; and if the Pro sleeps or the tunnel drops, voice says it is unavailable while typing keeps working. Check it from the VPS with `curl -s http://127.0.0.1:18799/health`.
+
 ### Public route
 
 Cloudflare tunnel A (the `octo-cloudflared` container) reaches the app as
