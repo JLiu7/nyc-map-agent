@@ -5,8 +5,8 @@
       "keywords": [],
       "path": "AGENTS.md",
       "related": [],
-      "reviewed_commit": "uncommitted",
-      "reviewed_sha256": "17f5f43f3be0bfc49dd178bf8536002ec528e1b5376cf925f69aeb7ffe689419",
+      "reviewed_commit": "0cb74693be464440fda1b05ac84304b38c3ba589",
+      "reviewed_sha256": "679d2bcc7f2e2247eb301c50721267f3f95af03bd2aa4ceca1ea458318ed6eb8",
       "summary": "How agents work in this repo: issue to PR to green CI, filing rules, issue-log format.",
       "tasks": [],
       "title": "Agent rules"
