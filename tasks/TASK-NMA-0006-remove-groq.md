@@ -98,6 +98,29 @@ Blocked/uncertain:
 Next:
 - after #635 deploys, set STT_BASE_URL, STT_PROTOCOL and STT_STACK in the VPS env file, redeploy and test /api/stt on the live site; add the audio path to docs/PRIVACY.md
 
+### 2026-11-01 11:37:03 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":["none"],"changed":[".coord/boss_claim.json"],"completed":["Committed the boss seat handover to dsh@air that the seat protocol wrote to .coord/boss_claim.json"],"decisions":["no new decisions"],"evidence":["git diff showed only the handover entries and a new heartbeat at 2026-11-01T11:35:56Z"],"evidence_class":"observed","next_action":"owner tries the mic on the live site; add the audio path to docs/PRIVACY.md","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0006","timestamp":"2026-11-01T11:37:03Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"63535d29e97e9505ff3d3a41026e037793869c58e140f4b3ad2790cf54e391ad","request_id":"d9a60a6826714e55ab0887280dc83d2f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0006"} -->
+
+Completed:
+- Committed the boss seat handover to dsh@air that the seat protocol wrote to .coord/boss_claim.json
+
+Evidence:
+- git diff showed only the handover entries and a new heartbeat at 2026-11-01T11:35:56Z
+
+Decisions:
+- no new decisions
+
+Changed:
+- .coord/boss_claim.json
+
+Blocked/uncertain:
+- none
+
+Next:
+- owner tries the mic on the live site; add the audio path to docs/PRIVACY.md
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
