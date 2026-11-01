@@ -18,3 +18,8 @@ test-results/
 
 # Build output (vite build); never committed
 dist/
+
+# Line status eval (#629): recorded feeds, run output, generated cases. Re-creatable, not committed.
+eval-runs/
+eval-snapshots/
+eval-cases/
