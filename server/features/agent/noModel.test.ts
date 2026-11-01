@@ -129,6 +129,8 @@ describe("fast trip checks", () => {
   it("trusts a found place only when it carries the asked name", () => {
     expect(foundAsAsked("Brooklyn Museum", "Brooklyn Museum, 200 Eastern Parkway")).toBe(true);
     expect(foundAsAsked("Grand Central", "Grand Central Terminal, 89 E 42nd St")).toBe(true);
+    // A read-back pick names the trains; the station found carries the name, not the trains.
+    expect(foundAsAsked("86 St (4 5 6 trains)", "86 St station")).toBe(true);
     expect(foundAsAsked("Brooklyn Museum", "Spark Brooklyn Children's Museum Annex, 1 John Street, Dumbo")).toBe(false);
     expect(foundAsAsked("Macy's", "Macy's Herald Square, 151 W 34th St")).toBe(true);
     expect(foundAsAsked("Met", undefined)).toBe(false);

@@ -18,6 +18,14 @@ describe("geocode landmarks and stations", () => {
     expect(matchStation("Grand", stations)).toBeNull();
   });
 
+  it("a read-back pick with its trains finds that one of several same-name stations", () => {
+    const six = [st("86 St", [-73.97, 40.79]), { ...st("86 St", [-73.95, 40.78]), id: "b", routes: ["4", "5", "6"] }, { ...st("86 St", [-74.03, 40.62]), id: "c", routes: ["R"] }];
+    six[0].routes = ["1"];
+    expect(matchStation("86 St (4 5 6 trains)", six)?.id).toBe("b");
+    expect(matchStation("86 St (R train) station", six)?.id).toBe("c");
+    expect(matchStation("86 St (Q train)", six)).toBeNull();
+  });
+
   it("Grand Central beats GeoSearch's Esplanade Gardens", async () => {
     const geosearch = vi.fn().mockResolvedValue([esplanade]);
     const p = await geocode("Grand Central", { stations: () => Promise.resolve(stations), geosearch });

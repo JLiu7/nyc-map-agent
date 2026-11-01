@@ -19,6 +19,8 @@ import { contextLine, requestFacts, stablePrompt } from "./prompt";
 import { AnswerAudit } from "./audit";
 import { RunLog } from "./runLog";
 import { sessionFrom } from "../../lib/tracing";
+import { mayReadBack, planReadBack } from "./readback";
+import { openDataEntrances, type Station } from "./transit";
 
 export const INFERHUB_BASE_URL = process.env.INFERHUB_BASE_URL ?? "https://api.inferhub.dev/v1";
 /** Cheap, fast, good at tool calls: ~$0.075 in / $0.30 out per M tokens (InferHub market max ask). */
@@ -56,7 +58,8 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
   const limit = fair.limiter.take(`ip:${clientIp(request.headers)}`);
   if (!limit.ok) return limitedResponse(limit.retryAt, limit.reason, fair.now());
   const budget = fair.budget.tier();
-  const { messages, now, mode, context, lang, memory, underground } = parsed.data;
+  const { now, mode, context, lang, memory, underground, heard } = parsed.data;
+  let messages = parsed.data.messages;
   // In street view, "here" is the spot on screen (the prompt says so); otherwise the shared location.
   const location = context ? { lon: context.lon, lat: context.lat } : parsed.data.location ?? null;
   const enc = new TextEncoder();
@@ -72,6 +75,21 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
       const run = new RunLog(modelId);
       run.session = sessionFrom(request.headers);
       let finished = false;
+      // A place several stations share, or one speech-to-text was unsure of, is read back first (readback.ts).
+      if (mayReadBack(messages)) {
+        const stations = await (opts.deps?.entrances ?? openDataEntrances).stations().catch(() => [] as Station[]);
+        const rb = planReadBack(messages, stations, heard);
+        if (rb?.kind === "rewrite") messages = [...messages.slice(0, -1), { role: "user", content: rb.question }];
+        else if (rb) {
+          run.input = messages.at(-1)?.content ?? "";
+          run.text(rb.text);
+          send({ type: "text", text: rb.text });
+          run.finish("done", { inputTokens: 0, outputTokens: 0 });
+          send({ type: "done", model: "none", usage: { inputTokens: 0, outputTokens: 0 } });
+          controller.close();
+          return;
+        }
+      }
       // Buttons under the answer, from the tool results (#371); one "actions" line before "done".
       const actions = new ActionCollector();
       let answerText = "";

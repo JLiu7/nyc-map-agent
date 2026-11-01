@@ -51,7 +51,7 @@ const placeOk = (p: string | undefined): p is string => !!p && p.length >= 2 && 
 const bare = (p: string) => p.replace(/^the\s+/i, "");
 const norm = (p: string) => p.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 /** The place found carries the asked name, so the lookup did not land on some other place. */
-export const foundAsAsked = (asked: string, found: string | undefined) => !!found && norm(found.split(",")[0]).includes(norm(bare(asked)));
+export const foundAsAsked = (asked: string, found: string | undefined) => !!found && norm(found.split(",")[0]).includes(norm(bare(asked.replace(/\s*\([^)]*\)/, ""))));
 
 /** The plain exit or trip ask, or null. English only, like the rest of the fast path. */
 function placeIntent(text: string): NoModelIntent | null {

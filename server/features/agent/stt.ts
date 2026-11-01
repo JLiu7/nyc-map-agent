@@ -43,6 +43,18 @@ export function detectedLang(raw: unknown): string | null {
   return /^[a-z]{2}$/.test(v) ? v : WHISPER_NAMES[v] ?? null;
 }
 
+/**
+ * How sure Whisper was, 0-1: the mean per-token probability over its segments (exp of avg_logprob).
+ * Null when it sent none. The agent reads a place back when this is low. Pure, for tests.
+ */
+export function whisperConfidence(segments: unknown): number | null {
+  if (!Array.isArray(segments) || !segments.length) return null;
+  const p = segments.map((s) => (s as { avg_logprob?: unknown }).avg_logprob);
+  if (!p.every((x): x is number => typeof x === "number" && Number.isFinite(x))) return null;
+  const mean = p.reduce((a, x) => a + Math.min(1, Math.exp(x)), 0) / p.length;
+  return Math.round(mean * 100) / 100;
+}
+
 export async function transcribe(form: FormData, headers: Headers, fetchImpl: typeof fetch = fetch): Promise<Response> {
   const { key, url, model } = sttConfig();
   if (!key) return json({ error: "stt_unavailable" }, 503);
@@ -56,8 +68,8 @@ export async function transcribe(form: FormData, headers: Headers, fetchImpl: ty
   out.set("model", model);
   const raw = typeof form.get("lang") === "string" ? (form.get("lang") as string) : null;
   const auto = raw === "auto";
-  // verbose_json carries the language Whisper heard; plain json is enough when we told it.
-  out.set("response_format", auto ? "verbose_json" : "json");
+  // verbose_json carries the language Whisper heard and its per-segment confidence.
+  out.set("response_format", "verbose_json");
   const lang = auto ? null : whisperLang(raw);
   if (lang) out.set("language", lang);
   const started = Date.now();
@@ -65,10 +77,11 @@ export async function transcribe(form: FormData, headers: Headers, fetchImpl: ty
   try {
     const r = await fetchImpl(url, { method: "POST", headers: { authorization: `Bearer ${key}` }, body: out, signal: AbortSignal.timeout(20_000) });
     if (!r.ok) { span(false); return json({ error: "stt_failed" }, 502); }
-    const d = (await r.json()) as { text?: string; language?: string };
+    const d = (await r.json()) as { text?: string; language?: string; segments?: unknown };
     const heard = auto ? detectedLang(d.language) : null;
+    const confidence = whisperConfidence(d.segments);
     span(true, (d.text ?? "").trim());
-    return json({ text: (d.text ?? "").trim(), ...(heard ? { lang: heard } : {}) });
+    return json({ text: (d.text ?? "").trim(), ...(heard ? { lang: heard } : {}), ...(confidence !== null ? { confidence } : {}) });
   } catch {
     span(false);
     return json({ error: "stt_failed" }, 502);

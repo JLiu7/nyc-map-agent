@@ -166,3 +166,39 @@ describe("POST /api/agent: agent steps and language (#370)", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("POST /api/agent: place read-back before the model", () => {
+  const st = (id: string, name: string, routes: string[]) => ({ id, complexId: id, name, routes, structure: "Subway", at: [-73.95, 40.78] as [number, number] });
+  const entrances = { stations: () => Promise.resolve([st("1", "86 St", ["1"]), st("2", "86 St", ["4", "5", "6"]), st("3", "Bedford Av", ["L"])]), entrances: () => Promise.resolve([]) };
+  const ask = async (body: unknown, m = model()) => {
+    const res = await POST(new Request("http://x/api/agent", { method: "POST", body: JSON.stringify(body) }), { model: m, deps: { entrances } });
+    const events = (await res.text()).trim().split("\n").map((l) => streamEvent.parse(JSON.parse(l)));
+    return { events, said: events.filter((e) => e.type === "text").map((e) => (e as { text: string }).text).join(""), m };
+  };
+
+  it("asks which 86 St in code, with no model call", async () => {
+    const { said, events, m } = await ask({ messages: [{ role: "user", content: "how do I get to 86 St" }] });
+    expect(said).toBe("Just to check: did you mean 86 St (1 train), or 86 St (4 5 6 trains)?");
+    expect(m.doStreamCalls).toHaveLength(0);
+    expect(events.at(-1)).toMatchObject({ type: "done", model: "none" });
+  });
+
+  it("hands the model the question with the place the person picked", async () => {
+    const { m } = await ask({
+      messages: [
+        { role: "user", content: "how do I get to 86 St" },
+        { role: "assistant", content: "Just to check: did you mean 86 St (1 train), or 86 St (4 5 6 trains)?" },
+        { role: "user", content: "the 4 5 6" },
+      ],
+    });
+    const prompt = JSON.stringify(m.doStreamCalls[0]?.prompt);
+    expect(prompt).toContain("how do I get to 86 St (4 5 6 trains)");
+  });
+
+  it("reads back a clear place only when speech-to-text was unsure", async () => {
+    const sure = await ask({ messages: [{ role: "user", content: "how do I get to Bedford Av" }], heard: { confidence: 0.92 } });
+    expect(sure.said).not.toMatch(/Just to check/);
+    const unsure = await ask({ messages: [{ role: "user", content: "how do I get to Bedford Av" }], heard: { confidence: 0.41 } });
+    expect(unsure.said).toBe("Just to check: did you mean Bedford Av (L train)?");
+  });
+});

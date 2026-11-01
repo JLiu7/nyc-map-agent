@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAX_BYTES, detectedLang, transcribe, whisperLang } from "./stt";
+import { MAX_BYTES, detectedLang, transcribe, whisperConfidence, whisperLang } from "./stt";
 
 const form = (bytes: number, lang?: string) => {
   const f = new FormData();
@@ -40,6 +40,24 @@ describe("server speech-to-text", () => {
     expect(await r.json()).toEqual({ text: "¿Dónde está el baño?", lang: "es" });
     expect(sent!.get("language")).toBeNull();
     expect(sent!.get("response_format")).toBe("verbose_json");
+  });
+
+  it("returns how sure Whisper was, so the agent can read a place back", async () => {
+    vi.stubEnv("GROQ_API_KEY", "k");
+    let sent: FormData | null = null;
+    const segments = [{ avg_logprob: Math.log(0.5) }, { avg_logprob: Math.log(0.7) }];
+    const fake = ((_url: string, init: RequestInit) => { sent = init.body as FormData; return Promise.resolve(Response.json({ text: "how do I get to Bedford", segments })); }) as unknown as typeof fetch;
+    const r = await transcribe(form(100, "en-US"), new Headers({ "cf-connecting-ip": "203.0.113.9" }), fake);
+    expect(await r.json()).toEqual({ text: "how do I get to Bedford", confidence: 0.6 });
+    expect(sent!.get("response_format")).toBe("verbose_json");
+  });
+
+  it("reads confidence as 0-1 from Whisper's segments, or none", () => {
+    expect(whisperConfidence([{ avg_logprob: 0 }])).toBe(1);
+    expect(whisperConfidence([{ avg_logprob: -10 }])).toBe(0);
+    expect(whisperConfidence([])).toBeNull();
+    expect(whisperConfidence(undefined)).toBeNull();
+    expect(whisperConfidence([{ avg_logprob: "x" }])).toBeNull();
   });
 
   it("reads Whisper's language as a name or a code", () => {

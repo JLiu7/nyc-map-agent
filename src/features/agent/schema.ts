@@ -289,6 +289,8 @@ export const requestBody = z.object({
    * is on. Never a history, and never coordinates.
    */
   memory: z.string().max(240).optional(),
+  /** How sure speech-to-text was (0-1) about the last message, when it was spoken. Low confidence makes the agent read a place back. */
+  heard: z.object({ confidence: z.number().min(0).max(1) }).optional(),
   /** Where the person is in the underground helper (riding, or at a station finding an exit). Never stored. */
   underground: z.object({ stage: z.enum(["riding", "at-station"]), station: z.string().max(200), exit: z.string().max(200).nullable() }).optional(),
 });

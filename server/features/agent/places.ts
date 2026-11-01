@@ -9,7 +9,7 @@ import type { Station } from "./transit";
 
 interface Landmark { label: string; at: LngLatTuple; aliases: string[] }
 
-const LANDMARKS: Landmark[] = [
+export const LANDMARKS: readonly Landmark[] = [
   { label: "Grand Central Terminal", at: [-73.9772, 40.7527], aliases: ["grand central", "grand central terminal", "grand central station", "gct"] },
   { label: "Penn Station", at: [-73.9935, 40.7506], aliases: ["penn station", "penn", "pennsylvania station", "moynihan train hall", "moynihan"] },
   { label: "Port Authority Bus Terminal", at: [-73.9903, 40.7570], aliases: ["port authority", "port authority bus terminal", "pabt"] },
@@ -53,7 +53,7 @@ const LANDMARKS: Landmark[] = [
 ];
 
 /** Lowercase, "&"→"and", drop punctuation, collapse spaces, drop a trailing ", NY…". */
-function norm(s: string): string {
+export function norm(s: string): string {
   return s
     .toLowerCase()
     .replace(/,?\s*(new york|nyc|ny|manhattan|brooklyn|queens|bronx)\s*$/g, "")
@@ -70,11 +70,18 @@ export function matchLandmark(text: string): Landmark | null {
   return LANDMARKS.find((l) => l.aliases.some((a) => norm(a) === q)) ?? null;
 }
 
-/** Exact (normalized) station name match, ignoring a trailing " station". "34 St-Herald Sq" also matches "34 st herald sq". */
+/** "86 St (4 5 6 trains)" → the name and the trains; the form a place read-back writes back into the question. */
+const TRAINS = /\s*\(([1-7A-Z ]+?) trains?\)/;
+
+/**
+ * Exact (normalized) station name match, ignoring a trailing " station". "34 St-Herald Sq" also matches "34 st herald sq".
+ * Trains in brackets ("86 St (4 5 6 trains)", from a read-back) pick the one of several same-name stations that serves them.
+ */
 export function matchStation(text: string, stations: Station[]): Station | null {
-  const q = norm(text).replace(/ (station|stop|subway station)$/, "");
+  const trains = TRAINS.exec(text)?.[1].split(" ").filter(Boolean) ?? [];
+  const q = norm(text.replace(TRAINS, "")).replace(/ (station|stop|subway station)$/, "");
   if (q.length < 3) return null;
-  return stations.find((s) => norm(s.name) === q) ?? null;
+  return stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r))) ?? null;
 }
 
 export interface GeoCandidate { label: string; at: LngLatTuple; confidence: number }

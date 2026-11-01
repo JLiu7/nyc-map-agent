@@ -23,6 +23,7 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 | #602 | The agent reads an unclear place back before answering ("86 St" has six stations) | Open, checks green |
 | #378 | Docs: realign the project, hackathon writeup and research sources | Open for review |
 | #232 | The release bot's release pull request | Left to the bot |
+| branch `feat/place-readback` (not pushed) | The agent picked one of six "86 St" stations without asking. Now a place several stations share, a near spelling, or a turn speech-to-text was unsure of is read back before any answer; the plan for porting the website copilot's other safety rules is `docs/PLAN-copilot-port.md` | Committed locally, 2026-10-31 |
 
 #416 (app text follows the asked language), #415 (held trains and feed-skipped stops), #359 (Live View camera scaffold) and #417 (menu row language) merged on 2026-10-25.
 
