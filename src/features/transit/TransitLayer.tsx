@@ -329,6 +329,8 @@ export default function TransitLayer() {
   const history = useSegmentHistory(subwayRoutes);
   const buses = useBuses(busOn, show.routes);
   const alerts = useAlerts(rail.length > 0 || panelOpen);
+  // Routes with an active delay or detour: their trains may really be held, so the vehicle report is trusted there.
+  const troubleRoutes = useMemo(() => alertedRoutes(alerts.data?.alerts), [alerts.data]);
   const stars = useStarred();
   // The panel owns what is open; a vehicle stays "selected" while its panel is up.
   const selectedKey = content?.id.startsWith("transit:vehicle:") ? content.id.slice(16) : undefined;
@@ -750,7 +752,7 @@ export default function TransitLayer() {
         if (!st || !lv) continue;
         const held = s === "subway" ? heldTrains(lv) : undefined;
         for (const trip of lv.trips) {
-          const est = estimateTrain(st, trip, now, liveProgress, s === "subway" ? history : undefined);
+          const est = estimateTrain(st, trip, now, liveProgress, s === "subway" ? history : undefined, { troubled: troubleRoutes.has(trip.route) || !!held?.has(trip.id) });
           const h = held?.get(trip.id);
           const v = est && s !== "subway" ? { ...est, grade: "grade" as const } : est && h ? { ...est, held: { since: h.since, stop: h.stop, stopped: h.stopped } } : est;
           if (v && (inView(v) || v.key === selectedKey || v.key === followedKey)) out.push(v);
@@ -767,7 +769,7 @@ export default function TransitLayer() {
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [map, rail.join(","), data, buses.data, selectedKey, followedKey, history, walking, show.routes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [map, rail.join(","), data, buses.data, selectedKey, followedKey, history, walking, show.routes, troubleRoutes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // What the draw loop needs from the latest render; assigned on every render below.
   const frame = useRef<FrameInputs | null>(null);
@@ -902,7 +904,7 @@ export default function TransitLayer() {
     map.on("mousemove", move);
     return () => { map.off("mousemove", move); };
   }, [map]);
-  const alerted = useMemo(() => alertedRoutes(alerts.data?.alerts), [alerts.data]);
+  const alerted = troubleRoutes;
   // The selected bus's route comes from the feed, not the animated positions, so it changes only with data.
   const busKey = followedKey?.startsWith("bus:") ? followedKey : selectedKey;
   const selBusId = show.routes.length && busKey?.startsWith("bus:") ? busKey.slice(4) : "";

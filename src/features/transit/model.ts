@@ -96,7 +96,14 @@ function bearingOf(a: [number, number], b: [number, number]) {
  * stop we extrapolate back from the first leg (capped). Null when unplaceable.
  * One function drives 2D bullets, 3D models and the follow camera.
  */
-export function estimateTrain(sys: StaticSystem, trip: LiveTrip, now: number, tracker?: ProgressTracker, hist?: SegmentLookup): Vehicle | null {
+/**
+ * The longest the vehicle report alone holds a train at a station. The feed keeps saying "stopped at X" until the
+ * next report, which can be a minute or more old, while a real subway stops 30 seconds to a minute. Past this the
+ * timetable's motion is used, unless the line is in trouble (a held train, or an active delay).
+ */
+export const MAX_PIN_S = 60;
+
+export function estimateTrain(sys: StaticSystem, trip: LiveTrip, now: number, tracker?: ProgressTracker, hist?: SegmentLookup, opts: { troubled?: boolean } = {}): Vehicle | null {
   const shape = sys.shapes[trip.route];
   const sm = sys.stopM[trip.route];
   if (!shape || !sm) return null;
@@ -123,7 +130,7 @@ export function estimateTrain(sys: StaticSystem, trip: LiveTrip, now: number, tr
       const fwd = pts.length > 1 ? Math.sign(pts[1].m - pts[0].m) || 1 : 1;
       mo = { phase: "moving", i: 0, m: pts[0].m - fwd * Math.min(APPROACH_HOLD_M, Math.abs((pts[1]?.m ?? pts[0].m) - pts[0].m) / 2 || APPROACH_HOLD_M), f: 0 };
     }
-  } else if (atI >= 0 && mo.phase !== "origin" && (mo.phase === "moving" ? mo.i >= atI : mo.i > atI)) {
+  } else if (atI >= 0 && mo.phase !== "origin" && (mo.phase === "moving" ? mo.i >= atI : mo.i > atI) && (opts.troubled || now - (trip.vt ?? now) <= MAX_PIN_S)) {
     mo = trip.st === 1 || atI === 0
       ? { phase: "dwell", i: atI, m: pts[atI].m, departs: Math.max(now, pts[atI].dep ?? pts[atI].arr) }
       : { phase: "moving", i: atI - 1, m: pts[atI].m, f: 1 };

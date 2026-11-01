@@ -38,6 +38,13 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    test("home with the live trains moving", async ({ page }) => {
+      await open(page);
+      await expect(page.getByTestId("agent-bar")).toBeVisible();
+      await page.waitForTimeout(1500); // a few ticks of the live train layer (#643)
+      await expectLayout(page);
+    });
+
     test("a text answer", async ({ page }) => {
       await open(page, [{ type: "text", text: "Bryant Park has the nearest public restroom, about 6 minutes on foot." }]);
       await ask(page, "Nearest restroom?");
