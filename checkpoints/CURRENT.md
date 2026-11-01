@@ -2,7 +2,7 @@
 
 <!-- continuity:current {"active_task": null, "active_task_file": null, "protocol_version": "0.1.0-draft", "schema": "project-continuity.current.v1"} -->
 
-Older state: [`history/2026-10.md`](history/2026-10.md) and earlier months in `history/`.
+Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `history/`.
 
 ## Current projection
 
@@ -11,10 +11,6 @@ Older state: [`history/2026-10.md`](history/2026-10.md) and earlier months in `h
 GitHub Issues own task scope and progress; this file is a projection of them, not task authority. No Project Continuity Modules (PCM) task file is active, so `tasks/` is still empty. The build plan is [`docs/PDD.md`](../docs/PDD.md) (the product design document): what is built, what remains, how to check it and how to ship it. The design rules every screen must follow are in [`docs/DESIGN_RULES.md`](../docs/DESIGN_RULES.md).
 
 **What the project is now.** An agent-first map of New York City: a chat and voice assistant over a clean map that helps people get around (restrooms, landmarks, subway exits, readable MTA disruptions). The realignment is described in [`PROJECT.md`](../PROJECT.md). Work from before the realignment (3D city, street view extras, datasets) was closed on 2026-10-25; those pull requests keep their branches on GitHub if any of it comes back (#376).
-
-## Completed recently
-
-Everything completed up to 2026-10-31 is in [`history/2026-10.md`](history/2026-10.md) under "Completed recently". Add new items here as pull requests merge.
 
 ## In flight
 
@@ -37,7 +33,3 @@ After pulling main, run `pnpm install`: main now needs `xstate`, and #349 change
 1. **Finish the remaining-work list in `docs/PDD.md`** (items 1 to 9: menu row, the dropdowns, quick bar, memory summary, task-screen restyle, dead ends). Item 10, the screen-space rules, is done.
 2. **Underground help that never lets you miss your exit or get lost inside a station:** count stops from the saved trip and timetable when there is no signal, and keep exit guidance ready before going down (#373).
 3. **Refresh the document index:** `docs/CONTINUITY_INDEX.md` marks `AGENTS.md` and `docs/ARCHITECTURE.md` as changed since their last review. Review them, then regenerate the index with the `continuity docs render` command once the tool is installed; the index is generated, so don't edit it by hand.
-
-## Keeping this file current
-
-PCM is a protocol and a writing standard, not a background service: no workflow or hook updates this file (the Checkpoint Reminder workflow only warns on a pull request that changes app code without touching it), and the `continuity` command-line tool is not installed here. The agent that merges a piece of work updates "Completed recently", "In flight" and "Next" in the same pull request, as `AGENTS.md` now asks.
