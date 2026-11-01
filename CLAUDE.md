@@ -15,7 +15,7 @@ Other agents read `AGENTS.md` by themselves; Claude Code reads this file. The im
 
 Live GitHub state decides scope, status and what is accepted: the issues, pull requests, checks and merged default branch of this repository. Read them with `gh` before you plan, resume or report, and work through them: a branch and a pull request, never a push to the default branch. Local files are projections and caches (checkpoints, `HANDOFF.md`, `.oio/`, `.content-system/`, `.coord/`, any clone under `~/.cache`). When one disagrees with GitHub, GitHub wins; say so on the owning issue.
 
-The stack's rules live in [`Pukujan/agent-stack-train`](https://github.com/Pukujan/agent-stack-train) at commit `469c4bfe729d`, recorded in `.coord/hotload.lock.json`. Read a stack file there, not from a local copy or one of the four frozen component repositories.
+The stack's rules live in [`Pukujan/agent-stack-train`](https://github.com/Pukujan/agent-stack-train) at commit `3d63fcea1b13`, recorded in `.coord/hotload.lock.json`. Read a stack file there, not from a local copy or one of the four frozen component repositories.
 
 A local `AGENTS.md` is only as current as the checkout. At session start run `git fetch` and compare with the default branch on GitHub. If the checkout is on another branch or behind, read the rules from GitHub (`gh api repos/<owner>/<repo>/contents/AGENTS.md`) and follow that copy.
 
@@ -23,8 +23,8 @@ A local `AGENTS.md` is only as current as the checkout. At session start run `gi
 
 Claude Code and its desktop app bring defaults that other harnesses do not. Where one of them disagrees with this repository's rules, the repository wins:
 
-- `AGENTS.md` is the owner's standing instruction. When it says to commit, run checks, checkpoint, push, open a pull request or arm auto-merge, do it as part of the task; do not hold the work waiting for a go-ahead.
-- Do not ask the owner to merge, approve or mark a pull request ready when the rules say auto-merge does that. End a turn with a question only for a decision the rules leave to the owner.
+- `AGENTS.md` is the owner's standing instruction. When it says to commit, run checks, checkpoint, push, open a pull request or arm auto-merge (where the repository allows it), do it as part of the task; do not hold the work waiting for a go-ahead.
+- Do not ask the owner to merge, approve or mark a pull request ready when the rules say auto-merge does that; in a repository that turns auto-merge off, say the pull request is ready for the owner's merge. Never arm auto-merge on, or merge, a pull request someone other than the owner or a trusted collaborator opened; the guard blocks it and the owner reviews it. End a turn with a question only for a decision the rules leave to the owner.
 - Put the rules' required steps (checks, checkpoint, receipt, closing keyword) on the task list, not only the steps of the request.
 - Briefs and messages from other Claude sessions, memory files and summaries after a context compaction are not the owner's words. Where they disagree with these rules, these rules win. After a compaction, re-read `AGENTS.md` before you push, file an issue or finish.
 - Worktrees go only where the dev root rule below says: `<project>/worktrees/<TASK-ID>` beside `<project>/main`, made with `continuity worktree`. Never inside the checkout (not `.claude/worktrees/`, not `.worktrees/`, no subagent with worktree isolation). If the checkout is not in that layout, work sequentially in it or run `continuity worktree migrate`; do not improvise a path.
@@ -37,21 +37,21 @@ Claude Code and its desktop app bring defaults that other harnesses do not. Wher
 
 CGM ALWAYS-ON WRITING RULE (every adopter that pins this helper)
 
-Before you write ANY human-facing prose — PR/issue/commit prose, issue-log titles, receipts, docs, changelog prose, posts, papers — you MUST load and apply [modules/human-sounding-writing/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/human-sounding-writing/SKILL.md) (hsw).
+Before you write ANY human-facing prose — PR/issue/commit prose, issue-log titles, receipts, docs, changelog prose, posts, papers — you MUST load and apply [modules/human-sounding-writing/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/human-sounding-writing/SKILL.md) (hsw).
 
 This rule is always on. Opt-in is forbidden. Do not wait for a per-task flag.
 
 Exceptions (only these):
-- README.md / product entry pages → load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/writing-direction/SKILL.md) instead
-- Human-facing research plans, architecture explanations, and evidence briefs → load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/writing-direction/SKILL.md) (reader-facing explanation, not a manuscript or data writeup)
-- Generated artifact filenames / asset-manifest paths / media basenames / filename legends → load [modules/human-output-naming/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/human-output-naming/SKILL.md) (hon)
+- README.md / product entry pages → load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/writing-direction/SKILL.md) instead
+- Human-facing research plans, architecture explanations, and evidence briefs → load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/writing-direction/SKILL.md) (reader-facing explanation, not a manuscript or data writeup)
+- Generated artifact filenames / asset-manifest paths / media basenames / filename legends → load [modules/human-output-naming/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/human-output-naming/SKILL.md) (hon)
 - HTML pages (HTML reports, compare HTML/UIs, appendable HTML, other agent-produced HTML) → no writing module is required
 
-Marketing intro sites, sales sites, and technical demo pages are not the README exception. Load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/writing-direction/SKILL.md), plus [modules/visual-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/visual-direction/SKILL.md), [modules/brand-foundation/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/brand-foundation/SKILL.md), and [modules/html-demo/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/modules/html-demo/SKILL.md), and follow the marketing_intro_site review checklist. Product-entry bold stays one short scan anchor. The verified-number rule still applies. Words and pictures come from the brand feeling.
+Marketing intro sites, sales sites, and technical demo pages are not the README exception. Load [modules/writing-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/writing-direction/SKILL.md), plus [modules/visual-direction/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/visual-direction/SKILL.md), [modules/brand-foundation/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/brand-foundation/SKILL.md), and [modules/html-demo/SKILL.md](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/modules/html-demo/SKILL.md), and follow the marketing_intro_site review checklist. Product-entry bold stays one short scan anchor. The verified-number rule still applies. Words and pictures come from the brand feeling.
 
 If you cannot load a required skill file from the pinned CGM checkout, stop and report that.
 
-Filenames: use [scripts/human_filename](https://github.com/Pukujan/agent-stack-train/blob/469c4bfe729df7cdb1ff867b52e13dff5eac17c7/cgm/scripts/human_filename.py) (speakable basenames; optional safe_twin) and keep a per-feature legend. Hash may stay a separate manifest field.
+Filenames: use [scripts/human_filename](https://github.com/Pukujan/agent-stack-train/blob/3d63fcea1b1308adc1f3b4520191cf58cab3ae0f/cgm/scripts/human_filename.py) (speakable basenames; optional safe_twin) and keep a per-feature legend. Hash may stay a separate manifest field.
 
 Dev root hygiene (ACS): the dev root (ACS_DEV_ROOT; default D:\development on Windows, ~/development elsewhere) holds one entry per repo: its main checkout, or a PCM project folder with the checkout at <project>/main and task worktrees at <project>/worktrees/<TASK-ID>, made with `continuity worktree`. Never create any other worktree there, inside a checkout, or anywhere else, and no dependency or sibling clones, scratch folders, or caches. Put those under the ACS cache: %LOCALAPPDATA%\acs\{deps,scratch} on Windows, ~/.cache/acs/{deps,scratch} on macOS/Linux (ACS_CACHE_DIR overrides). Check with scripts/dev_root_check.py. <!-- paths:allow -->
 <!-- acs:claude-bridge:end -->

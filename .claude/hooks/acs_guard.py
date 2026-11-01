@@ -21,7 +21,9 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  name no issue, changes made straight through
                                  GitHub (`gh api` writes, repo, variable,
                                  secret, release, label and workflow changes)
-                                 that name no issue, and edits that remove
+                                 that name no issue, `gh pr merge` on a pull
+                                 request whose author is not trusted (#91),
+                                 and edits that remove
                                  this guard
     acs_guard.py stop            Stop: block ending a turn while work is not on
                                  GitHub, in every stack checkout the session
@@ -29,7 +31,8 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  tracked changes, files it wrote that git does
                                  not track, unpushed commits, a push without a
                                  PCM checkpoint, or a pushed branch with no open
-                                 pull request or no auto-merge armed
+                                 pull request, or no auto-merge armed where the
+                                 repository allows auto-merge
     acs_guard.py link <N>        record issue N (or owner/repo#N) as the current
                                  branch's owning issue, after checking it exists
 
@@ -80,6 +83,9 @@ GH_CHANGES = {
 }
 GH_API_FIELDS = {"-f", "-F", "--field", "--raw-field", "--input"}
 GH_API_SWITCHES = {"-i", "--include", "--paginate", "--silent", "--slurp", "--verbose"}
+# `gh pr merge` flags that take a value, so the pull request can be told from them.
+GH_MERGE_VALUE_FLAGS = {"-R", "--repo", "-b", "--body", "-F", "--body-file", "-t", "--subject", "-A", "--author-email", "--match-head-commit"}
+TRUSTED_VAR = "AUTO_MERGE_AUTHORS"
 # Recording a decision is never blocked: comments on issues and pull requests.
 GH_API_COMMENT_RE = re.compile(r"^/?repos/[^/]+/[^/]+/(?:issues|pulls)/(?:\d+/comments|comments/\d+)$")
 
@@ -335,6 +341,51 @@ def github_change(args: list[str]) -> str | None:
     return f"gh api {method or 'POST'} {endpoint}".rstrip()
 
 
+def merge_target(args: list[str]) -> tuple[str | None, list[str]]:
+    """(pull request selector or None for the current branch's, ``-R`` args) of a ``gh pr merge``."""
+    repo = flag_value(args, "--repo", "-R")
+    selector, i = None, 3
+    while i < len(args):
+        a = args[i]
+        if a in GH_MERGE_VALUE_FLAGS:
+            i += 2
+            continue
+        if not a.startswith("-") and selector is None:
+            selector = a
+        i += 1
+    return selector, (["-R", repo] if repo else [])
+
+
+def untrusted_merge(args: list[str], top: Path) -> str | None:
+    """Why ``gh pr merge`` must not run: its pull request's author is not trusted (#91).
+
+    Trusted means an admin of the repository (the owner, and the owner's agents,
+    which act as the owner) or a login listed in the repository variable
+    AUTO_MERGE_AUTHORS. Anything GitHub can't answer lets the command through:
+    ``gh`` would fail on it too.
+    """
+    selector, repo = merge_target(args)
+    code, out = run(["gh", "pr", "view", *([selector] if selector else []), *repo,
+                     "--json", "author,number,url", "-q", '.author.login+" "+(.number|tostring)+" "+.url'], top, timeout=10)
+    parts = out.split() if code == 0 else []
+    if len(parts) != 3:
+        return None
+    login, number, url = parts
+    name = "/".join(url.split("/")[3:5])
+    code, out = run(["gh", "variable", "get", TRUSTED_VAR, "-R", name], top, timeout=10)
+    listed = {x.strip().lower() for x in re.split(r"[,\s]+", out) if x.strip()} if code == 0 else set()
+    if login.lower() in listed:
+        return None
+    code, out = run(["gh", "api", f"repos/{name}/collaborators/{login}/permission", "-q", ".permission"], top, timeout=10)
+    if code != 0 or out.strip() == "admin":
+        return None
+    return (
+        f"gh pr merge: pull request #{number} in {name} was opened by `{login}`, who is not trusted to merge "
+        f"without review (only the repository's admins and logins in its `{TRUSTED_VAR}` variable are). "
+        "Leave it for the owner to review and merge; do not arm auto-merge on it."
+    )
+
+
 def env_issue(top: Path, env: dict[str, str]) -> str | None:
     """The ``ACS_ISSUE=<owner/repo>#N`` a command names, if that issue exists."""
     match = LINK_RE.match(env.get(ISSUE_ENV, "").strip())
@@ -352,6 +403,8 @@ def check_gh(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
         top = top_level(Path(project)) if project else None
         if top is None or not is_adopter(top):
             return None
+    if args[1:3] == ["pr", "merge"]:
+        return untrusted_merge(args, top)
     change = github_change(args)
     if change:
         if env_issue(top, env or {}):
@@ -542,7 +595,12 @@ def names(paths: list[str], limit: int = 5) -> str:
 
 
 def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None]:
-    """(problem, note) for the branch's open pull request: missing, a draft, or without auto-merge."""
+    """(problem, note) for the branch's open pull request: missing, a draft, or without auto-merge.
+
+    Auto-merge is only asked for when the repository allows it (#89); a
+    repository that turns it off merges by hand, so an open, ready pull
+    request is all an agent can do there.
+    """
     code, out = run(
         ["gh", "pr", "list", "--head", branch, "--state", "open", "--json", "number,isDraft,autoMergeRequest", "--limit", "1"],
         top, timeout=10,
@@ -567,8 +625,16 @@ def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None
     if pr.get("isDraft"):
         return f"Pull request #{number} for `{branch}` is a draft, so nothing will merge it. Mark it ready (`gh pr ready {number}`) and arm auto-merge.", None
     if not pr.get("autoMergeRequest"):
+        if not auto_merge_allowed(top):
+            return None, f"This repository turns auto-merge off, so the owner merges pull request #{number} by hand; the work is not delivered until it merges."
         return f"Pull request #{number} for `{branch}` has no auto-merge armed. Run `gh pr merge {number} --auto --squash`.", None
     return None, None
+
+
+def auto_merge_allowed(top: Path) -> bool:
+    """False only when GitHub says the repository turns auto-merge off; unknown counts as allowed."""
+    code, out = run(["gh", "repo", "view", "--json", "autoMergeAllowed", "-q", ".autoMergeAllowed"], top, timeout=10)
+    return not (code == 0 and out.strip() == "false")
 
 
 def merged_at_tip(top: Path, branch: str) -> bool:
