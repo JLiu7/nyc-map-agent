@@ -145,6 +145,29 @@ Blocked/uncertain:
 Next:
 - iteration 2 on the 5 remaining offer trials: the route holds one exact sentence, so widen what it holds back
 
+### 2026-11-01 11:15:51 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":["none"],"changed":[".codebuddy/settings.json"],"completed":["Committed the workbuddy agent's leftover hook-timeout edit to .codebuddy/settings.json in #633 with auto-merge"],"decisions":["no new decisions"],"evidence":["git diff showed only timeouts and a no-prompt env prefix on the hook commands"],"evidence_class":"observed","next_action":"remove Groq from the speech-to-text endpoint as the owner asked","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0005","timestamp":"2026-11-01T11:15:51Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c5c12e640680b9379644ec2c78e141451d6df10b1747ec87741dd0fbc8d0fc50","request_id":"39cd4d17465240e0982eb1c33f58b2d3","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0005"} -->
+
+Completed:
+- Committed the workbuddy agent's leftover hook-timeout edit to .codebuddy/settings.json in #633 with auto-merge
+
+Evidence:
+- git diff showed only timeouts and a no-prompt env prefix on the hook commands
+
+Decisions:
+- no new decisions
+
+Changed:
+- .codebuddy/settings.json
+
+Blocked/uncertain:
+- none
+
+Next:
+- remove Groq from the speech-to-text endpoint as the owner asked
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
