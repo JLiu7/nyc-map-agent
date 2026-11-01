@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$GEMINI_PROJECT_DIR/.claude/hooks/acs_guard.py\" --harness gemini session-start",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command|write_file|replace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$GEMINI_PROJECT_DIR/.claude/hooks/acs_guard.py\" --harness gemini pre-tool",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$GEMINI_PROJECT_DIR/.claude/hooks/acs_guard.py\" --harness gemini stop",
+            "timeout": 60000
+          }
+        ]
+      }
+    ]
+  },
+  "context": {
+    "fileName": [
+      "AGENTS.md",
+      "GEMINI.md"
+    ]
+  }
+}

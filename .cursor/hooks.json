@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "python3 \".claude/hooks/acs_guard.py\" --harness cursor session-start",
+        "timeout": 60
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python3 \".claude/hooks/acs_guard.py\" --harness cursor pre-tool",
+        "timeout": 60
+      }
+    ],
+    "stop": [
+      {
+        "command": "python3 \".claude/hooks/acs_guard.py\" --harness cursor stop",
+        "timeout": 60,
+        "loop_limit": 5
+      }
+    ]
+  }
+}

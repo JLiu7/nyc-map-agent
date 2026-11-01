@@ -33,6 +33,10 @@ Claude Code's own defaults and loses often enough to matter (#37).
     acs_guard.py link <N>        record issue N (or owner/repo#N) as the current
                                  branch's owning issue, after checking it exists
 
+Other harnesses run the same checks with ``--harness codex|cursor|gemini``
+before the hook name (#83): their hook input is read into the event shape
+above, and the answer goes back in each harness's own form.
+
 A branch's owning issue is the one recorded by ``link`` or the number in its
 name (``fix/37-enforce-rules``); either is checked on GitHub once and cached in
 ``git config branch.<name>.acs-issue``. A GitHub-side change can instead name
@@ -53,6 +57,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -310,6 +315,8 @@ def github_change(args: list[str]) -> str | None:
     while i < len(args):
         a = args[i]
         name, eq, value = a.partition("=")
+        if len(a) > 2 and a[0] == "-" and a[1] != "-" and a[2] != "=":
+            name, eq, value = a[:2], "=", a[2:]  # a short flag with its value glued on: -XPOST, -fname=x
         if name in ("-X", "--method"):
             method = (value if eq else (args[i + 1] if i + 1 < len(args) else "")).upper()
         elif name in GH_API_FIELDS:
@@ -337,7 +344,7 @@ def env_issue(top: Path, env: dict[str, str]) -> str | None:
 
 
 def check_gh(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> str | None:
-    if len(args) < 3 or args[0] != "gh":
+    if len(args) < 3 or Path(args[0]).name != "gh":
         return None
     top = top_level(cwd)
     if top is None or not is_adopter(top):
@@ -437,6 +444,7 @@ def pre_tool(event: dict) -> str | None:
 TRANSCRIPT_TAIL = 4 * 1024 * 1024
 MAX_CHECKOUTS = 15
 MAX_LOOKUPS = 60
+MAX_STOP_RETRIES = 5  # blocked retried stops per session before the guard lets one through
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
 
@@ -547,6 +555,8 @@ def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None
         # gh is missing, signed out or offline: say so, but don't block on it.
         return None, f"Could not check `{branch}`'s pull request on GitHub (gh failed or is offline); make sure it has an open pull request with auto-merge armed."
     if not pulls:
+        if merged_at_tip(top, branch):
+            return None, None  # its pull request merged with this exact tip; nothing is left to do here
         return (
             f"Branch `{branch}` is pushed but has no open pull request. Open one (`gh pr create` with `Refs #N`, "
             "or `Closes #N` when the merge finishes the issue) and arm auto-merge (`gh pr merge <N> --auto --squash`).",
@@ -561,8 +571,56 @@ def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None
     return None, None
 
 
-def checkout_problems(top: Path, written: list[Path]) -> tuple[list[str], list[str]]:
-    """(problems, notes) that keep one checkout's work off GitHub."""
+def merged_at_tip(top: Path, branch: str) -> bool:
+    """True when a merged pull request for the branch has the branch's tip as its head.
+
+    A squash merge leaves the branch's own commits off the default branch, so ancestry can't tell.
+    """
+    code, out = run(["gh", "pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--limit", "5"], top, timeout=10)
+    try:
+        pulls = json.loads(out) if code == 0 else []
+    except ValueError:
+        pulls = []
+    tip = git(top, "rev-parse", "HEAD")
+    return bool(tip) and isinstance(pulls, list) and any(isinstance(p, dict) and p.get("headRefOid") == tip for p in pulls)
+
+
+def session_began(event: dict) -> float | None:
+    """When the session's transcript starts (seconds since the epoch), or None without one."""
+    for entry in transcript_events(event.get("transcript_path") or ""):
+        stamp = entry.get("timestamp")
+        if isinstance(stamp, str):
+            try:
+                return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                continue
+    return None
+
+
+def unpushed_branches(top: Path, branch: str | None, since: float | None) -> list[tuple[str, int]]:
+    """(branch, count) for local branches with commits no remote branch has.
+
+    The checked-out branch always counts; another branch, the default one included, counts when its
+    tip was committed during this session, so old local branches (squash-merged, remote deleted)
+    don't block every session.
+    """
+    found = []
+    for line in (git(top, "for-each-ref", "--format=%(refname:short) %(committerdate:unix)", "refs/heads") or "").splitlines():
+        name, _, when = line.rpartition(" ")
+        if name != branch and (since is None or not when.isdigit() or int(when) < since):
+            continue
+        count = git(top, "rev-list", "--count", f"refs/heads/{name}", "--not", "--remotes")
+        if count and int(count) > 0:
+            found.append((name, int(count)))
+    return found
+
+
+def checkout_problems(top: Path, written: list[Path], local_only: bool = False, since: float | None = None) -> tuple[list[str], list[str]]:
+    """(problems, notes) that keep one checkout's work off GitHub.
+
+    ``local_only`` keeps to work that exists only on this machine and skips the checkpoint and
+    pull-request checks, which an agent may not be able to fix.
+    """
     problems: list[str] = []
     notes: list[str] = []
     branch = current_branch(top)
@@ -586,17 +644,24 @@ def checkout_problems(top: Path, written: list[Path]) -> tuple[list[str], list[s
                 f"{len(untracked)} file(s) this session wrote are not in git ({names(untracked)}): `git add` them, "
                 f"then {fix}; or delete them if they were scratch."
             )
-    if branch is None or branch == default:
+    unpushed = unpushed_branches(top, branch, since)
+    for name, count in unpushed:
+        fix = (f"move them to a task branch (`git switch -c <type>/<N>-<slug> {name}`), then push it and open a pull request"
+               if name == default else "checkpoint and push them (and open or update the pull request)")
+        problems.append(
+            f"Branch `{name}` has {count} commit(s) that are not on GitHub. The rules say work is not "
+            f"done while it exists only locally: {fix}."
+        )
+    if branch is None and not unpushed:
+        ahead = git(top, "rev-list", "--count", "HEAD", "--not", "--remotes")
+        if ahead and int(ahead) > 0:
+            problems.append(
+                f"The detached HEAD has {ahead} commit(s) that no branch or remote holds: "
+                "put them on a task branch (`git switch -c <type>/<N>-<slug>`), then push it."
+            )
+    if local_only or unpushed or branch is None or branch == default:
         return problems, notes
     upstream = git(top, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    base = upstream or f"origin/{default}"
-    ahead = git(top, "rev-list", "--count", f"{base}..HEAD")
-    if ahead and int(ahead) > 0:
-        problems.append(
-            f"Branch `{branch}` has {ahead} commit(s) that are not on GitHub. The rules say work is not "
-            "done while it exists only locally: checkpoint and push them (and open or update the pull request)."
-        )
-        return problems, notes
     on_branch = git(top, "rev-list", "--count", f"origin/{default}..HEAD")
     if not (upstream and on_branch and int(on_branch) > 0):
         return problems, notes
@@ -614,19 +679,42 @@ def checkout_problems(top: Path, written: list[Path]) -> tuple[list[str], list[s
     return problems, notes
 
 
+def retries(event: dict) -> int:
+    """How many retried stops this session has had blocked, counting this one."""
+    session = re.sub(r"[^\w.-]", "_", str(event.get("session_id") or "unknown"))[:80]
+    path = Path(tempfile.gettempdir()) / "acs-guard" / f"stop-{session}"
+    try:
+        count = int(path.read_text(encoding="utf-8").strip() or 0) + 1
+    except (OSError, ValueError):
+        count = 1
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(count), encoding="utf-8")
+    except OSError:
+        pass
+    return count
+
+
 def stop(event: dict) -> str | None:
-    if event.get("stop_hook_active"):
-        return None
+    # A retried stop (Claude Code sets stop_hook_active once a Stop hook has blocked) still blocks on
+    # work that is only local, but skips the checkpoint and pull-request checks so the agent can finish.
+    retry = bool(event.get("stop_hook_active"))
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or os.getcwd())
     tops, written = session_checkouts(project, event)
+    since = session_began(event)
     problems: list[str] = []
     notes: list[str] = []
     for top in tops:
-        found, noted = checkout_problems(top, written)
+        found, noted = checkout_problems(top, written, local_only=retry, since=since)
         problems += [f"- `{top}`: {p}" for p in found]
         notes += [f"- `{top}`: {n}" for n in noted]
     if not problems:
         return None  # a check gh couldn't make is not a reason to block
+    if retry and retries(event) > MAX_STOP_RETRIES:
+        # Give up rather than loop forever when the agent truly can't push (offline, no permission).
+        sys.stderr.write(f"acs guard: letting the stop through after {MAX_STOP_RETRIES} blocked retries; work is still only local:\n"
+                         + "\n".join(problems) + "\n")
+        return None
     return "\n".join([
         "Work is not done while it is not on GitHub with a pull request that will merge itself. Before you stop:",
         *problems, *notes,
@@ -826,33 +914,89 @@ def link(arg: str) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- other harnesses (#83)
+
+HARNESSES = ("claude", "codex", "cursor", "gemini")
+# Gemini CLI's tool names, as the Claude Code tools the checks know.
+GEMINI_TOOLS = {"run_shell_command": "Bash", "write_file": "Write", "replace": "Edit"}
+
+
+def normalize(harness: str, hook: str, event: dict) -> dict:
+    """The harness's hook input in the shape pre_tool, stop and session_start take."""
+    if harness in ("claude", "codex"):  # Codex sends Claude Code's fields; its shell tool is `Bash`
+        return event
+    event = dict(event)
+    if harness == "cursor":
+        roots = event.get("workspace_roots") or []
+        if not event.get("cwd"):  # stop and sessionStart send no cwd
+            event["cwd"] = os.environ.get("CURSOR_PROJECT_DIR") or (roots[0] if roots else None)
+        if hook == "pre-tool" and "command" in event:  # beforeShellExecution
+            event.update(tool_name="Bash", tool_input={"command": event["command"]})
+        if hook == "stop":
+            event["stop_hook_active"] = bool(event.get("loop_count"))
+        event.setdefault("session_id", event.get("conversation_id"))
+    elif harness == "gemini" and event.get("tool_name") in GEMINI_TOOLS:
+        event["tool_name"] = GEMINI_TOOLS[event["tool_name"]]
+    return event
+
+
+def answer(harness: str, hook: str, text: str | None) -> int:
+    """Give the harness the guard's verdict (a reason to block, or context) in its own form."""
+    def out(data: dict) -> int:
+        print(json.dumps(data))
+        return 0
+
+    if hook == "session-start":
+        if not text:
+            return 0
+        if harness == "cursor":
+            return out({"additional_context": text})
+        return out({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}})
+    if harness == "cursor" and hook == "pre-tool":
+        # A permission hook must answer; empty output is not an allow.
+        if not text:
+            return out({"permission": "allow"})
+        return out({"permission": "deny", "agent_message": f"[stack guard] {text}", "user_message": f"[stack guard] {text}"})
+    if not text:
+        return 0
+    if harness == "cursor":
+        return out({"followup_message": f"[stack guard] {text}"})
+    if harness == "gemini":
+        return out({"decision": "deny", "reason": f"[stack guard] {text}"})
+    if harness == "codex" and hook == "stop":
+        return out({"decision": "block", "reason": f"[stack guard] {text}"})
+    print(f"[stack guard] {text}", file=sys.stderr)
+    return 2
+
+
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    argv = list(sys.argv[1:] if argv is None else argv)
+    harness = "claude"
+    if "--harness" in argv:
+        i = argv.index("--harness")
+        harness = argv[i + 1] if i + 1 < len(argv) else ""
+        del argv[i:i + 2]
+        if harness not in HARNESSES:
+            print(f"unknown harness {harness!r}; one of {', '.join(HARNESSES)}", file=sys.stderr)
+            return 2
     if not argv:
         print(__doc__)
         return 2
     if argv[0] == "link":
         return link(argv[1] if len(argv) > 1 else "")
+    known = argv[0] in ("session-start", "pre-tool", "stop")
     if os.environ.get("ACS_GUARD", "").lower() == "off":
-        return 0
+        return answer(harness, argv[0], None) if known else 0
+    if not known:
+        print(f"unknown hook {argv[0]!r}", file=sys.stderr)
+        return 2
     try:
         event = json.load(sys.stdin)
     except ValueError:
         event = {}
-    if argv[0] == "session-start":
-        context = session_start(event)
-        if context:
-            print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}))
-        return 0
-    check = {"pre-tool": pre_tool, "stop": stop}.get(argv[0])
-    if check is None:
-        print(f"unknown hook {argv[0]!r}", file=sys.stderr)
-        return 2
-    reason = check(event)
-    if reason:
-        print(f"[stack guard] {reason}", file=sys.stderr)
-        return 2
-    return 0
+    event = normalize(harness, argv[0], event if isinstance(event, dict) else {})
+    check = {"session-start": session_start, "pre-tool": pre_tool, "stop": stop}[argv[0]]
+    return answer(harness, argv[0], check(event))
 
 
 if __name__ == "__main__":
