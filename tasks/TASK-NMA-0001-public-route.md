@@ -1,8 +1,8 @@
 # TASK-NMA-0001 — Make the VPS app public
 
-<!-- continuity:task {"acceptance":["https://nyc.design-bakery.com/healthz answers 200","repository variable NYC_PUBLIC_URL is set and CI's contract job runs"],"depends_on":[],"goal":"Riders reach the VPS app at nyc.design-bakery.com, and CI's contract check runs against it.","id":"NMA-0001","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/614","next_action":"owner adds nyc.design-bakery.com on Cloudflare tunnel A pointing at http://nyc-map-web:8080","owner":"claude-code","priority":"P1","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"Komodo deploys main to the VPS now, but the name answers 530 because tunnel A has no route to the app."} -->
+<!-- continuity:task {"acceptance":["https://nyc.design-bakery.com/healthz answers 200","repository variable NYC_PUBLIC_URL is set and CI's contract job runs"],"depends_on":[],"goal":"Riders reach the VPS app at nyc.design-bakery.com, and CI's contract check runs against it.","id":"NMA-0001","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/614","next_action":"none: #614 is closed. The public name answers 200 and NYC_PUBLIC_URL is set, so CI's contract job runs against the live site after each main deploy","owner":"claude-code","priority":"P1","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"completed","why":"Komodo deploys main to the VPS now, but the name answers 530 because tunnel A has no route to the app."} -->
 
-- Status: active
+- Status: completed
 - Owner: claude-code
 - Priority: P1
 - Depends on: none

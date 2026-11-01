@@ -1,8 +1,8 @@
 # TASK-NMA-0002 — Ferries without OpenTripPlanner
 
-<!-- continuity:task {"acceptance":["https://nyc.design-bakery.com/api/v1/ferry returns 200 with routes and terminals","CI's contract command reports no server errors against the public site"],"depends_on":[],"goal":"The ferry layer shows routes, piers and boats on the VPS without a trip planner.","id":"NMA-0002","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/618","next_action":"after the fix deploys, check /api/v1/ferry publicly, then set NYC_PUBLIC_URL under #614","owner":"claude-code","priority":"P1","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"On the VPS /api/v1/ferry returned 502 because it asked an OpenTripPlanner that only ran on gravebuster."} -->
+<!-- continuity:task {"acceptance":["https://nyc.design-bakery.com/api/v1/ferry returns 200 with routes and terminals","CI's contract command reports no server errors against the public site"],"depends_on":[],"goal":"The ferry layer shows routes, piers and boats on the VPS without a trip planner.","id":"NMA-0002","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/618","next_action":"none: #618 is closed. /api/v1/ferry answers 200 on the live site with routes and vessels, with no trip planner behind it","owner":"claude-code","priority":"P1","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"completed","why":"On the VPS /api/v1/ferry returned 502 because it asked an OpenTripPlanner that only ran on gravebuster."} -->
 
-- Status: active
+- Status: completed
 - Owner: claude-code
 - Priority: P1
 - Depends on: none

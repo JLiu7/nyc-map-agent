@@ -1,8 +1,8 @@
 # TASK-NMA-0006 — Remove Groq
 
-<!-- continuity:task {"acceptance":["no Groq name, URL or key remains in shipped code, tests, env templates or docs","/api/stt answers 503 unless STT_BASE_URL is set","stt.test.ts passes"],"depends_on":[],"goal":"Voice recordings go only to a speech server the owner names, never to Groq by default.","id":"NMA-0006","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/634","next_action":"merge the pull request; the owner runs a Whisper server and sets STT_BASE_URL; add the audio path to docs/PRIVACY.md","owner":"claude-code","priority":"P2","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"The speech-to-text endpoint defaulted to Groq, which the owner did not choose (#634)."} -->
+<!-- continuity:task {"acceptance":["no Groq name, URL or key remains in shipped code, tests, env templates or docs","/api/stt answers 503 unless STT_BASE_URL is set","stt.test.ts passes"],"depends_on":[],"goal":"Voice recordings go only to a speech server the owner names, never to Groq by default.","id":"NMA-0006","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/634","next_action":"none: #634 is closed, /api/stt answers on the live site through the Pro's speech server, and docs/PRIVACY.md now describes the audio path","owner":"claude-code","priority":"P2","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"completed","why":"The speech-to-text endpoint defaulted to Groq, which the owner did not choose (#634)."} -->
 
-- Status: active
+- Status: completed
 - Owner: claude-code
 - Priority: P2
 - Depends on: none

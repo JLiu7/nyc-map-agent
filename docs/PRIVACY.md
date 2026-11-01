@@ -4,7 +4,7 @@
 
 ## The rule in one paragraph
 
-Your exact position stays on your phone unless you tap **Use my location** or ask the assistant a question that needs it. When it leaves the phone, it goes to our server for that one answer and is not written down there. Our server passes only what each outside service needs to answer: a routing service gets the two ends of the route, a weather service gets a rough area, and the language model gets words like "here" and "home" rather than numbers. Saved home and work stay on your phone until you clear them.
+Your exact position stays on your phone unless you tap **Use my location** or ask the assistant a question that needs it. When it leaves the phone, it goes to our server for that one answer and is not written down there. If you use the microphone, the recording goes to our server and then to a speech server on the owner's own machine, and neither of them keeps it. Our server passes only what each outside service needs to answer: a routing service gets the two ends of the route, a weather service gets a rough area, and the language model gets words like "here" and "home" rather than numbers. Saved home and work stay on your phone until you clear them.
 
 ## How location moves through the app
 
@@ -46,6 +46,7 @@ The web address never carries your position. The `at=` parameter is read when so
 | Request | What it carries | Kept? |
 |---|---|---|
 | Ask the assistant (`POST /api/agent`) | The conversation (up to 30 messages), your exact shared position if sharing is on (`src/features/agent/schema.ts:154`, sent at `src/features/agent/AgentOverlay.tsx:112-128`), your street view spot and heading if you asked from street view, and from the home screen one remembered line of names (`src/features/agent/memorySummary.ts`) | The question, answer and location are not stored. Two things are kept. To share the free allowance fairly, your internet address is held in server memory with the times of your recent questions, for at most 3 hours and never written to disk (`server/features/agent/fair-use.ts`, keyed at `server/features/agent/routes.ts:48`). A timing row (model, how long each step took, how it ended) goes to `core.agent_runs` for 30 days, with no question, answer, location or address (`server/features/agent/runLog.ts`). |
+| Voice question (`POST /api/stt`) | One recording of your voice, at most about a minute, turned into a 16 kHz WAV on the phone first (`src/lib/voice/serverStt.ts:122-154`), plus the language you picked or "auto" | The recording is not stored: our server hands it to the speech server and keeps no copy (`server/features/agent/stt.ts:63-98`). As with a typed question, your internet address is held in server memory with the times of your recent recordings, for at most 3 hours and never written to disk (`server/features/agent/stt.ts:28`). The words the speech server heard are sent to our trace store (see below), with email addresses, birth dates and social security numbers masked (`server/features/agent/stt.ts:81`, `server/lib/tracing.ts:20-22`). |
 | Weather for the map (`GET /api/weather`) | The map centre rounded to about 100 metres (`src/features/weather/weatherLayers.ts:37`) | Held in a memory cache for about 10 minutes, keyed by an area about 5 kilometres wide (`server/features/weather/routes.ts:66-70`) |
 | Parking rules near a place (`GET /api/parking/rules`) | The picked place to about 1 metre (`src/features/parking/StreetRules.tsx:12`) | Held in a memory cache for an hour, keyed by an area about 100 metres wide (`server/features/parking/routes.ts:166-167`) |
 
@@ -56,7 +57,32 @@ The web address never carries your position. The `at=` parameter is read when so
 - The server prints only its start-up line, model failures (status and up to 160 characters of the provider's error text, `server/features/agent/routes.ts:81-86`, `server/features/agent/model-fallback.ts:67`, `:76`) and transit feed errors (`server/features/transit/routes.ts:285`).
 - Container logs are capped at three 10 megabyte files (`deploy/docker-compose.yml:34-36`).
 
-Not checked: whether Cloudflare keeps request logs for our account, and whether our own OpenTripPlanner container logs trip searches (see gaps).
+Not checked: whether Cloudflare keeps request logs for our account, and whether our own trip planner container logs trip searches (see gaps).
+
+**Our trace store.** Every finished assistant turn and every speech-to-text call becomes one trace in a Phoenix project we run through Octo, our own database service (`server/lib/tracing.ts`, written from `server/features/agent/runLog.ts:111-123` and `server/features/agent/stt.ts:81`). A trace carries words, not just timings: the question, the answer, the steps each tool took and how long each took. Before a trace leaves our server, email addresses, birth dates and social security numbers are replaced with `[email]`, `[dob]` and `[ssn]` (`server/lib/tracing.ts:20-22`). The browser sends a session id (`x-session-id`) that groups one visit's traces together; it carries no position. Tracing is on in production today.
+
+## What happens to your voice
+
+Speaking a question takes the same road as typing one, plus one stop at the end. The recording never goes to a company: it goes to a speech server on the owner's own MacBook Pro, which runs Whisper, an open speech model, on its own graphics chip.
+
+```mermaid
+graph TD
+  P[Phone records one turn] -->|16 kHz WAV| S[Our server]
+  S -->|audio| T[Tunnel to the Pro]
+  T --> W[Whisper on the Pro]
+  W -->|words and language| S
+  S -->|words, masked| X[Our trace store]
+```
+
+The same flow as a list, in case the diagram does not render:
+
+1. The phone records one turn and stops by itself after a short silence (`src/lib/voice/serverStt.ts:37-41`). It decodes the clip and resamples it to a 16 kHz mono WAV, because the speech server reads WAV and not the format a browser records (`src/lib/voice/serverStt.ts:122-136`).
+2. The phone posts that one file to `/api/stt` on our server, with the language you picked or `auto` (`src/lib/voice/serverStt.ts:141-154`). The recording is capped at 2 megabytes, about a minute of speech (`server/features/agent/stt.ts:27`).
+3. Our server passes the file to the speech server named by `STT_BASE_URL` and keeps no copy (`server/features/agent/stt.ts:63-98`). On the live site that address is a tunnel the Pro opens to our server, so the audio goes from one of the owner's machines to another.
+4. Whisper large-v3-turbo, running on the Pro, returns the words and the language it heard. Our server sends them back to the phone, where they become the question you would otherwise have typed.
+5. The words are also written to our trace store, the same place a typed question's words go (`server/features/agent/stt.ts:81`). Email addresses, birth dates and social security numbers are replaced with `[email]`, `[dob]` and `[ssn]` before anything leaves the server (`server/lib/tracing.ts:20-22`).
+
+Two consequences worth knowing. The speech server holds one voice model at a time, so the first voice question after the owner used it for something else waits about half a minute while the model loads. And if the Pro is asleep or its tunnel is down, the microphone says voice is unavailable while typing keeps working.
 
 ## What reaches the language model
 
@@ -79,7 +105,7 @@ How long InferHub or the provider behind it keeps a request is not known; we hav
 | Address search for the assistant | Same | Place names the assistant looks up, and exact points to name a street (`server/features/agent/services.ts:29`, `:49`, used at `server/features/agent/trip.ts:36`) | Our server |
 | Walking routes (OSRM, the Open Source Routing Machine) | FOSSGIS, a German volunteer association | Both route ends to about 10 centimetres; from the phone, also your internet address | Phone (`src/lib/api/routing.ts:46-56`) and our server (`server/features/agent/services.ts:73-74`) |
 | Driving routes (OSRM car) | FOSSGIS | Both route ends | Our server (`server/features/agent/drive/router.ts:51`) |
-| Transit trip search (OpenTripPlanner) | Us, in our own container | Both trip ends | Our server (`server/features/agent/otp.ts:74`). Stays on our machine. |
+| Transit trip search (MOTIS, or OpenTripPlanner if the owner switches) | Us, in our own container | Both trip ends | Our server (`server/features/agent/plan.ts:16`). Stays on our machine. |
 | Weather forecast (Open-Meteo) | Open-Meteo | The assistant's trip start exactly (`server/features/agent/services.ts:89`, called from `server/features/agent/plan.ts:19`); the map's weather an area about 5 kilometres wide (`server/features/weather/routes.ts:44`) | Our server |
 | Weather alerts (NWS, the National Weather Service) | United States government | The trip start to about 10 metres (`server/features/agent/services.ts:99`) | Our server |
 | NYC Open Data | City of New York | A box around a driving route (`server/features/agent/drive/context.ts:59`); a circle around a picked parking place (`server/features/parking/routes.ts:183`) | Our server |
@@ -97,9 +123,11 @@ Calls our server makes do not reveal your internet address to the outside servic
 3. **Saved places go with every home-screen question** as names, even when the question is not about them. *Fix:* send the remembered line only when the question names home, work or a usual ride.
 4. **One-step clear.** Done: **Delete everything** in the menu clears every kind the phone remembers (`forgetEverything`).
 5. **Model provider retention is unknown.** *Fix:* read InferHub's terms, record how long it and its providers keep requests, and pick a no-retention option if one exists.
-6. **Cloudflare and OpenTripPlanner logging not checked.** *Fix:* check the Cloudflare account's log settings and the OpenTripPlanner container's log level, then record the answer here.
+6. **Cloudflare and trip planner logging not checked.** *Fix:* check the Cloudflare account's log settings and the trip planner container's log level, then record the answer here.
 7. **More precision than needed.** Weather alerts and forecasts for a trip get the exact start; the phone sends parking lookups to about 1 metre. *Fix:* round to about 1 kilometre for weather and alerts, about 10 metres for parking.
 8. **The policy in the app.** Done: **Your data → Data policy** in the menu states the rule in each app language. A link to this full page is still to do.
+9. **Voice and traces were not described.** Fixed with this update: the page now has a voice section and says what our trace store keeps. The voice recording itself still goes nowhere but our own two machines.
+10. **Trace retention is unknown.** *Fix:* read what Octo and Phoenix keep by default, record how long a trace lives, and pick a shorter period if the answer is longer than the 30 days we keep timing rows.
 
 ## Caveat
 
