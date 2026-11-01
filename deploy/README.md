@@ -19,6 +19,10 @@ drops, chat stops answering while maps and trips keep working.
 The checkout is `~/apps/nyc-map-agent`, the env file is `~/apps/nyc-map-agent.env`, and the MOTIS
 data lives in `~/apps/nyc-map-motis`. Everything is in `deploy/docker-compose.vps.yml`.
 
+The env file's `OCTO_WORKSPACE_ID` must be the **nyc-neighbourhood** workspace (`ce74d86f…`), with
+an `OCTO_API_KEY` bound to it. Until 2026-11-01 it named another project's workspace, so neighbourhood
+areas, segment times and block tiles failed with "relation does not exist" or 404 (#614).
+
 ### Public route
 
 Cloudflare tunnel A (the `octo-cloudflared` container) reaches the app as
@@ -73,7 +77,7 @@ variable `NYC_DEPLOY_URL` (on gravebuster that was `https://nyc.design-bakery.co
 skipped while that variable is unset, which it is for the VPS.
 The `contract` job checks the public site named by `NYC_PUBLIC_URL` (such as
 `https://nyc.design-bakery.com`) and is skipped the same way.
-Komodo deploys the app now, so `NYC_DEPLOY_URL` stays unset; set `NYC_PUBLIC_URL` once the ferry endpoint stops failing (#618), because the contract check calls it.
+Komodo deploys the app now, so `NYC_DEPLOY_URL` stays unset. `NYC_PUBLIC_URL` is `https://nyc.design-bakery.com` since 2026-11-01. The contract job runs right after CI's deploy job, before Komodo's next 5-minute check, so it tests the build that was live just before the merge.
 
 ## Previous host: gravebuster (offline since 2026-10-31)
 

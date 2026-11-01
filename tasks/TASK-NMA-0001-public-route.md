@@ -98,6 +98,29 @@ Blocked/uncertain:
 Next:
 - Fix #618, then set NYC_PUBLIC_URL and finish #614
 
+### 2026-11-01 02:54:02 UTC — claude-code (Claude Opus 5.5)
+
+<!-- continuity:checkpoint {"agent":"claude-code (Claude Opus 5.5)","blocked":[],"changed":["deploy/README.md, checkpoints; VPS env file (backed up); Octo key 785a4cad; repo variable NYC_PUBLIC_URL"],"completed":["VPS app reads the nyc-neighbourhood Octo workspace with a key bound to it; NYC_PUBLIC_URL is set"],"decisions":["Kept the legal-graph-rag key unrevoked; it may serve other projects"],"evidence":["areas, transit-segments, block-tiles and ferry answer 200 publicly; site reload makes no failing API calls; contract check: 50 test cases, no issues"],"evidence_class":"observed","next_action":"Watch the next main run's contract job","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0001","timestamp":"2026-11-01T02:54:02Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"bf4f96650f99db9c2dff1b67b7aafff16de8bb11ed03b943e76ede7424852e78","request_id":"4c35abb491464a9d89912ae00b840acc","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0001"} -->
+
+Completed:
+- VPS app reads the nyc-neighbourhood Octo workspace with a key bound to it; NYC_PUBLIC_URL is set
+
+Evidence:
+- areas, transit-segments, block-tiles and ferry answer 200 publicly; site reload makes no failing API calls; contract check: 50 test cases, no issues
+
+Decisions:
+- Kept the legal-graph-rag key unrevoked; it may serve other projects
+
+Changed:
+- deploy/README.md, checkpoints; VPS env file (backed up); Octo key 785a4cad; repo variable NYC_PUBLIC_URL
+
+Blocked/uncertain:
+- none
+
+Next:
+- Watch the next main run's contract job
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

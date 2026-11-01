@@ -33,7 +33,6 @@ After pulling main, run `pnpm install`: main now needs `xstate`, and #349 change
 
 ## Next
 
-- **Turn on CI's live contract check (#614):** set the repository variable `NYC_PUBLIC_URL` to `https://nyc.design-bakery.com` once the ferry fix (#618) is live on the VPS; before that the check failed on the ferry endpoint.
 0. **New issue logs from 2026-10-29, filed in the form's shape:** a scorecard that compares our help with Google and Apple Maps on 17 tasks (#586), reading exit signs with the camera offline (#587), the problem tour that flies spot to spot while the agent talks (#588), photos of entrances and destinations (#589), and app labels in the rider's language (#590).
 1. **Finish the remaining-work list in `docs/PDD.md`** (items 1 to 9: menu row, the dropdowns, quick bar, memory summary, task-screen restyle, dead ends). Item 10, the screen-space rules, is done.
 2. **Underground help that never lets you miss your exit or get lost inside a station:** count stops from the saved trip and timetable when there is no signal, and keep exit guidance ready before going down (#373).
