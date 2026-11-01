@@ -1,6 +1,6 @@
 # nyc-map-agent on the VPS: the app with MOTIS for trips and LFM3 for chat. See deploy/README.md.
-#   docker compose -f deploy/docker-compose.vps.yml --env-file ~/apps/nyc-map-agent.env up -d
-# The app binds loopback only; the Cloudflare tunnel reaches it on 127.0.0.1:18088.
+# The app binds loopback on 127.0.0.1:18088 and joins study-os_edge, where Cloudflare tunnel A
+# reaches it as nyc-map-web:8080. Komodo deploys it (deploy/vps/autodeploy.sh).
 # LFM3 runs on the MacBook Pro (the tax demo's llama-server). The Pro holds an SSH reverse tunnel to
 # this host's 127.0.0.1:18099 (launchd com.pukujan.lfm3-tunnel), and lfm3-bridge re-offers it on the
 # Docker gateway, because containers cannot reach the host's loopback.
@@ -33,6 +33,8 @@ services:
       - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:18088:8080
+    # edge: Cloudflare tunnel A (octo-cloudflared) reaches the app as nyc-map-web:8080.
+    networks: [default, edge]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -66,3 +68,8 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+networks:
+  edge:
+    name: study-os_edge
+    external: true

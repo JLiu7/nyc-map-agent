@@ -19,11 +19,12 @@ drops, chat stops answering while maps and trips keep working.
 The checkout is `~/apps/nyc-map-agent`, the env file is `~/apps/nyc-map-agent.env`, and the MOTIS
 data lives in `~/apps/nyc-map-motis`. Everything is in `deploy/docker-compose.vps.yml`.
 
-### Not public yet
+### Public route
 
-No Cloudflare tunnel on the VPS routes `nyc.design-bakery.com` to `127.0.0.1:18088`, so the
-public hostname still answers 530. Adding that route is a change in the Cloudflare dashboard.
-Until it exists, check the app from the VPS itself:
+Cloudflare tunnel A (the `octo-cloudflared` container) reaches the app as
+`http://nyc-map-web:8080` over the `study-os_edge` network, which `nyc-map-web` joins. The public
+hostname `nyc.design-bakery.com` needs that route added on tunnel A in the Cloudflare dashboard;
+until then it answers 530 and the app can be checked only from the VPS:
 
 ```bash
 curl -s http://127.0.0.1:18088/healthz
@@ -32,10 +33,20 @@ curl -s http://127.0.0.1:18088/healthz
 ### How it gets deployed
 
 Services on the VPS deploy from GitHub through Komodo, never from a hand-pulled branch. The plan
-for what runs where is `vps/PLAN.md` in Pukujan-lab/server-management, and the Komodo stacks are
-in that repository's `komodo/resources/stacks-vps.toml`. nyc-map-agent is in neither yet. Until it
-is, merges to main do not reach the VPS, which keeps running `nyc-map-agent:ecd8ba0`, built by hand
-from `feat/motis-planner` on 2026-10-31.
+for what runs where is `vps/PLAN.md` in Pukujan-lab/server-management, and this app's Komodo stack
+and its `nyc-map-agent-deploy-on-push` action are in that repository's
+`komodo/resources/stacks-vps.toml` (Pukujan-lab/server-management#69).
+
+Every 5 minutes the action compares GitHub's main with the image `nyc-map-web` runs. When they
+differ it deploys the stack, whose pre-deploy is `deploy/vps/autodeploy.sh`:
+
+1. Fetch `origin/main` and check it out (detached) in `~/apps/nyc-map-agent`.
+2. Build `nyc-map-agent:<12-character commit>` and swap `nyc-map-web` to it.
+3. Wait up to 150 seconds for the container's health check.
+4. On success, write the tag to `deploy/.env`, which compose reads by itself, so Komodo's own
+   `compose up` changes nothing. On failure, put the previous image back, record the commit in
+   `deploy/.deploy-failed` so it is not rebuilt every 5 minutes, and fail the Komodo run (which
+   alerts). Delete that file to retry the same commit.
 
 To see what is running:
 
@@ -44,8 +55,8 @@ docker ps --filter name=nyc-map --format '{{.Names}} {{.Image}} {{.Status}}'
 git -C ~/apps/nyc-map-agent log -1 --oneline
 ```
 
-Images are tagged with their short commit, so `docker image ls nyc-map-agent` lists the ones a
-rollback could use.
+Earlier images stay tagged, so `docker image ls nyc-map-agent` lists the ones a rollback could use.
+To roll back, revert the change on main; the action deploys the revert.
 
 ### Trip planner data
 
@@ -61,7 +72,7 @@ variable `NYC_DEPLOY_URL` (on gravebuster that was `https://nyc.design-bakery.co
 skipped while that variable is unset, which it is for the VPS.
 The `contract` job checks the public site named by `NYC_PUBLIC_URL` (such as
 `https://nyc.design-bakery.com`) and is skipped the same way.
-Set both once the VPS has a Komodo deploy and a public route.
+Komodo deploys the app now, so `NYC_DEPLOY_URL` stays unset; set `NYC_PUBLIC_URL` once the public route works.
 
 ## Previous host: gravebuster (offline since 2026-10-31)
 
