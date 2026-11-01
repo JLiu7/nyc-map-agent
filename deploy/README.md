@@ -9,15 +9,17 @@ in case it comes back.
 | Container | Role |
 | --- | --- |
 | `nyc-map-web` | the app (Vite build + Hono), on `127.0.0.1:18088` only |
-| `nyc-map-motis` | MOTIS, the trip planner (`TRIP_PLANNER=motis`) |
+| `nyc-map-otp` | OpenTripPlanner, the trip planner (subway, buses, LIRR, Metro-North, ferries) |
+| `nyc-map-valhalla` | Valhalla, the walking router |
+| `nyc-map-motis` | MOTIS, the old trip planner, kept until 2026-11-08 in case OTP has to be switched off |
 | `nyc-map-lfm3-bridge` | re-offers the LFM3 tunnel port to containers on the Docker gateway |
 
 Chat uses LFM3, which runs on the MacBook Pro. The Pro keeps an SSH reverse tunnel open to the
 VPS's `127.0.0.1:18099` (launchd job `com.pukujan.lfm3-tunnel`). If the Pro sleeps or the tunnel
 drops, chat stops answering while maps and trips keep working.
 
-The checkout is `~/apps/nyc-map-agent`, the env file is `~/apps/nyc-map-agent.env`, and the MOTIS
-data lives in `~/apps/nyc-map-motis`. Everything is in `deploy/docker-compose.vps.yml`.
+The checkout is `~/apps/nyc-map-agent` and the env file is `~/apps/nyc-map-agent.env`. Router data
+lives beside them in `~/apps/nyc-map-otp`, `~/apps/nyc-map-valhalla` and `~/apps/nyc-map-motis`. Everything is in `deploy/docker-compose.vps.yml`.
 
 The env file's `OCTO_WORKSPACE_ID` must be the **nyc-neighbourhood** workspace (`ce74d86f…`), with
 an `OCTO_API_KEY` bound to it. Until 2026-11-01 it named another project's workspace, so neighbourhood
@@ -75,11 +77,27 @@ git -C ~/apps/nyc-map-agent log -1 --oneline
 Earlier images stay tagged, so `docker image ls nyc-map-agent` lists the ones a rollback could use.
 To roll back, revert the change on main; the action deploys the revert.
 
-### Trip planner data
+### Trip planner and walking data
 
-`deploy/motis/build.sh` downloads the OSM extract and the MTA, LIRR, Metro-North and ferry GTFS
-feeds into `~/apps/nyc-map-motis` and builds the MOTIS dataset. It takes about a minute and 4 GB
-of memory. Rebuild weekly, then `docker restart nyc-map-motis`.
+Run both rebuilds weekly from the checkout on the VPS; nothing schedules them yet. Each one restarts
+its own container when it finishes.
+
+`deploy/otp/build-graph.sh` downloads the OSM extract and the MTA, LIRR, Metro-North and ferry GTFS
+feeds into `~/apps/nyc-map-otp/stage` and builds the OTP graph. On 2026-11-01 that took 4 minutes
+and the graph was 440 MB. The build gets no secrets. The script then writes `~/apps/nyc-map-otp/otp.env`
+with just `MTA_BUSTIME_KEY` from the app's env file, because the running server needs it for live bus
+times. OTP starts in under a minute and used 2.8 GB of memory on its first run (its limit is 9 GB).
+
+`deploy/valhalla/build.sh` downloads the same OSM extract and builds Valhalla's tiles in a one-shot
+container. The serving container only reads them. The server's walking routes use Valhalla when
+`VALHALLA_URL` is set and fall back to the public OSRM foot server when Valhalla fails.
+
+The OSM extract covers the five boroughs and a little around them, so a trip that starts or ends
+on Long Island past the city line found no route in the 2026-11-01 test (Penn Station to
+Hicksville, with both OTP and MOTIS). The extract's edge is the likely cause; a bigger one should fix it.
+
+To go back to MOTIS for trips, set `TRIP_PLANNER=motis` on the `web` service and redeploy.
+`deploy/motis/build.sh` still builds its data (about a minute and 4 GB of memory).
 
 ### CI
 

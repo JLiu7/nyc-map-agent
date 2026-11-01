@@ -1,4 +1,5 @@
-# nyc-map-agent on the VPS: the app with MOTIS for trips and LFM3 for chat. See deploy/README.md.
+# nyc-map-agent on the VPS: the app with OpenTripPlanner for trips, Valhalla for walking routes and
+# LFM3 for chat. MOTIS stays one more week as a fallback (TRIP_PLANNER=motis). See deploy/README.md.
 # The app binds loopback on 127.0.0.1:18088 and joins study-os_edge, where Cloudflare tunnel A
 # reaches it as nyc-map-web:8080. Komodo deploys it (deploy/vps/autodeploy.sh).
 # LFM3 runs on the MacBook Pro (the tax demo's llama-server). The Pro holds an SSH reverse tunnel to
@@ -22,7 +23,8 @@ services:
         required: false
     environment:
       PORT: "8080"
-      TRIP_PLANNER: motis
+      OTP_URL: http://nyc-map-otp:8080
+      VALHALLA_URL: http://nyc-map-valhalla:8002
       MOTIS_URL: http://nyc-map-motis:8080
       INFERHUB_BASE_URL: ${INFERHUB_BASE_URL:-http://host.docker.internal:18099/v1}
       INFERHUB_MODEL: ${INFERHUB_MODEL:-lfm3}
@@ -45,7 +47,41 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  # Data from deploy/motis/build.sh; rebuild weekly, then restart this container.
+  # Graph from deploy/otp/build-graph.sh (weekly; it restarts this container). otp.env holds only
+  # MTA_BUSTIME_KEY, which router-config.json reads for live bus times; the build writes it.
+  otp:
+    container_name: nyc-map-otp
+    image: ${OTP_IMAGE:-opentripplanner/opentripplanner:2.10.0}
+    command: ["--load", "--serve"]
+    restart: unless-stopped
+    env_file:
+      - path: ${OTP_ROOT:-/home/ubuntu/apps/nyc-map-otp}/otp.env
+        required: false
+    environment:
+      JAVA_TOOL_OPTIONS: -Xmx7g -XX:+UseG1GC
+    mem_limit: 9g
+    volumes:
+      - ${OTP_ROOT:-/home/ubuntu/apps/nyc-map-otp}/graph:/var/opentripplanner
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Tiles from deploy/valhalla/build.sh (weekly; it restarts this container). Serves only.
+  valhalla:
+    container_name: nyc-map-valhalla
+    image: ghcr.io/valhalla/valhalla-scripted:3.9.1
+    restart: unless-stopped
+    environment:
+      serve_tiles: "True"
+      use_tiles_ignore_pbf: "True"
+    mem_limit: 1g
+    volumes:
+      - ${VALHALLA_ROOT:-/home/ubuntu/apps/nyc-map-valhalla}:/custom_files
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Data from deploy/motis/build.sh. The fallback planner until 2026-11-08; then remove it.
   motis:
     container_name: nyc-map-motis
     image: debian:13-slim

@@ -14,6 +14,7 @@ import { distM, openDataEntrances, type Station } from "./transit";
 import { noteSource } from "./freshness";
 import { cached } from "../../lib/ttlCache";
 import { openAt } from "./hours";
+import { VALHALLA_URL, valhallaWalk } from "./valhalla";
 
 const UA = { "User-Agent": "nyc-map-agent (github.com/Pukujan-lab/nyc-map-agent)" };
 export const OSRM_FOOT_URL = (process.env.VITE_OSRM_URL ?? "https://routing.openstreetmap.de/routed-foot").replace(/\/$/, "");
@@ -103,7 +104,7 @@ export async function reverseGeocode([lon, lat]: LngLatTuple): Promise<string | 
   }
 }
 
-/* ---------- route_walk: OSRM foot profile (same server as src/lib/api/routing.ts) ---------- */
+/* ---------- route_walk: the self-hosted Valhalla (./valhalla), else the public OSRM foot profile (same server as src/lib/api/routing.ts) ---------- */
 const osrmSchema = z.object({
   routes: z.array(
     z.object({
@@ -116,6 +117,13 @@ const osrmSchema = z.object({
 });
 export interface WalkResult { coords: LngLatTuple[]; distanceM: number; durationS: number; turns: Array<{ at: LngLatTuple; text: string }> }
 export async function routeWalk(a: LngLatTuple, b: LngLatTuple): Promise<WalkResult> {
+  if (VALHALLA_URL) {
+    try {
+      return await valhallaWalk(a, b);
+    } catch {
+      // Valhalla down or no route: the public OSRM server below.
+    }
+  }
   const c = `${a[0].toFixed(6)},${a[1].toFixed(6)};${b[0].toFixed(6)},${b[1].toFixed(6)}`;
   const data = osrmSchema.parse(await getJson(`${OSRM_FOOT_URL}/route/v1/foot/${c}?overview=full&geometries=geojson&steps=true`));
   const r = data.routes[0];
