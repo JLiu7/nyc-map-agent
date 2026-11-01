@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { octoQuery } from "../../../api/_lib/octo";
 import { fail, json, parseQuery } from "../../../api/_lib/http";
-import { nyHourOfWeek } from "./segments";
+import { bandHours, nyHourOfWeek, scheduleDows } from "./segments";
 
 export const Query = z.object({
   route: z.string().regex(/^[A-Za-z]{1,3}\d{1,3}[A-Za-z+]{0,2}$/),
@@ -35,11 +35,13 @@ export async function GET(request: Request): Promise<Response> {
   const route = q.route.toUpperCase();
   try {
     const { rows } = await octoQuery<{ dir: number; from_stop: string; to_stop: string; kind: "travel" | "dwell"; n: number; median_s: number }>(
-      `SELECT dir, from_stop, to_stop, kind, cardinality(samples) AS n,
-              (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY x) FROM unnest(samples) x)::real AS median_s
-       FROM raw.transit_bus_segment_samples
-       WHERE route = $1 AND dow = $2 AND hour = $3 AND cardinality(samples) >= 2`,
-      [route, dow, hour],
+      // Pooled over the schedule and time-of-day band (see segments.ts): the median of every sample in the pool.
+      `SELECT dir, from_stop, to_stop, kind, count(*)::int AS n,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY x)::real AS median_s
+       FROM raw.transit_bus_segment_samples, unnest(samples) AS x
+       WHERE route = $1 AND dow = ANY($2::int[]) AND hour BETWEEN $3 AND $4
+       GROUP BY dir, from_stop, to_stop, kind HAVING count(*) >= 2`,
+      [route, scheduleDows(dow), ...bandHours(hour)],
       { rowLimit: 5000 },
     );
     const body: BusSegmentsResponse = {

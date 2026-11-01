@@ -38,6 +38,24 @@ export function nyHourOfWeek(d: Date): { dow: number; hour: number } {
   return { dow: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(wd) + 1, hour: Number(parts.find((p) => p.type === "hour")!.value) };
 }
 
+/**
+ * The MTA runs three schedules: Weekday (Monday to Friday), Saturday and Sunday (checked in its GTFS
+ * calendars, 2026-11-01). Learned times are pooled over the schedule and a time-of-day band, not kept
+ * per day of the week, so each pool collects several times the samples (#648). Night is a band inside
+ * each schedule (fewer trains and routes), not a fourth schedule. Holidays use the Sunday schedule;
+ * not handled here.
+ */
+export const BANDS = [[0, 4], [5, 6], [7, 9], [10, 15], [16, 19], [20, 23]] as const;
+/** The days of the week that share this day's schedule (ISO: 1 = Monday). */
+export const scheduleDows = (dow: number): number[] => (dow <= 5 ? [1, 2, 3, 4, 5] : [dow]);
+/** The first and last hour of the time-of-day band this hour is in. */
+export function bandHours(hour: number): [number, number] {
+  const [lo, hi] = BANDS.find(([a, b]) => hour >= a && hour <= b) ?? BANDS[BANDS.length - 1];
+  return [lo, hi];
+}
+/** Pooled over a schedule and band: counts add, medians and 80th percentiles are averaged by count (an approximation). */
+const POOLED = `SUM(n)::int AS n, (SUM(median_s * n) / SUM(n))::real AS median_s, (SUM(p80_s * n) / SUM(n))::real AS p80_s`;
+
 export async function GET(request: Request): Promise<Response> {
   const q = parseQuery(Query, request.url);
   if (q instanceof Response) return q;
@@ -45,9 +63,10 @@ export async function GET(request: Request): Promise<Response> {
   const dow = q.dow ?? now.dow, hour = q.hour ?? now.hour;
   try {
     const { rows } = await octoQuery<{ dir: number; from_stop: string; to_stop: string; kind: "travel" | "dwell"; n: number; median_s: number; p80_s: number }>(
-      `SELECT dir, from_stop, to_stop, kind, n, median_s, p80_s FROM marts.transit_segment_hourly
-       WHERE system = 'subway' AND route = $1 AND dow = $2 AND hour = $3 AND n >= 3`,
-      [q.route, dow, hour],
+      `SELECT dir, from_stop, to_stop, kind, ${POOLED} FROM marts.transit_segment_hourly
+       WHERE system = 'subway' AND route = $1 AND dow = ANY($2::int[]) AND hour BETWEEN $3 AND $4
+       GROUP BY dir, from_stop, to_stop, kind HAVING SUM(n) >= 3`,
+      [q.route, scheduleDows(dow), ...bandHours(hour)],
       { rowLimit: 5000 },
     );
     const body: SegmentsResponse = {
@@ -79,9 +98,10 @@ export async function GET_ALL(request: Request): Promise<Response> {
   const dow = q.dow ?? now.dow, hour = q.hour ?? now.hour;
   try {
     const { rows } = await octoQuery<{ route: string; dir: number; from_stop: string; to_stop: string; kind: "travel" | "dwell"; n: number; median_s: number; p80_s: number }>(
-      `SELECT route, dir, from_stop, to_stop, kind, n, median_s, p80_s FROM marts.transit_segment_hourly
-       WHERE system = 'subway' AND route = ANY($1::text[]) AND dow = $2 AND hour = $3 AND n >= 3`,
-      [routes, dow, hour],
+      `SELECT route, dir, from_stop, to_stop, kind, ${POOLED} FROM marts.transit_segment_hourly
+       WHERE system = 'subway' AND route = ANY($1::text[]) AND dow = ANY($2::int[]) AND hour BETWEEN $3 AND $4
+       GROUP BY route, dir, from_stop, to_stop, kind HAVING SUM(n) >= 3`,
+      [routes, scheduleDows(dow), ...bandHours(hour)],
       { rowLimit: 50_000 },
     );
     const body: AllSegmentsResponse = { dow, hour, routes: Object.fromEntries(routes.map((r) => [r, []])) };
