@@ -75,6 +75,29 @@ Blocked/uncertain:
 Next:
 - After the route exists, set NYC_PUBLIC_URL and close #614
 
+### 2026-11-01 02:30:41 UTC — claude-code (Claude Opus 5.5)
+
+<!-- continuity:checkpoint {"agent":"claude-code (Claude Opus 5.5)","blocked":["#618 ferry endpoint"],"changed":["checkpoints/CURRENT.md, deploy/README.md; Cloudflare tunnel A ingress and the nyc DNS record"],"completed":["nyc.design-bakery.com routes through tunnel A to nyc-map-web; DNS no longer points at the gravebuster tunnel"],"decisions":["NYC_PUBLIC_URL stays unset: CI's contract check fails on /api/v1/ferry (502, no OTP on the VPS, #618)"],"evidence":["public /healthz 200 and home page 200; acs, octodb, umami, voidfeed still 200; tunnel logged config version 5"],"evidence_class":"observed","next_action":"Fix #618, then set NYC_PUBLIC_URL and finish #614","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0001","timestamp":"2026-11-01T02:30:41Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"53c607da5af4a75df433a6f561d26662b83ac5150e8d23a0594f94ded5b5676d","request_id":"220788b3c9634d04a6143d188d13c638","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0001"} -->
+
+Completed:
+- nyc.design-bakery.com routes through tunnel A to nyc-map-web; DNS no longer points at the gravebuster tunnel
+
+Evidence:
+- public /healthz 200 and home page 200; acs, octodb, umami, voidfeed still 200; tunnel logged config version 5
+
+Decisions:
+- NYC_PUBLIC_URL stays unset: CI's contract check fails on /api/v1/ferry (502, no OTP on the VPS, #618)
+
+Changed:
+- checkpoints/CURRENT.md, deploy/README.md; Cloudflare tunnel A ingress and the nyc DNS record
+
+Blocked/uncertain:
+- #618 ferry endpoint
+
+Next:
+- Fix #618, then set NYC_PUBLIC_URL and finish #614
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

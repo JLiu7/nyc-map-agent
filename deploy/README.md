@@ -22,11 +22,12 @@ data lives in `~/apps/nyc-map-motis`. Everything is in `deploy/docker-compose.vp
 ### Public route
 
 Cloudflare tunnel A (the `octo-cloudflared` container) reaches the app as
-`http://nyc-map-web:8080` over the `study-os_edge` network, which `nyc-map-web` joins. The public
-hostname `nyc.design-bakery.com` needs that route added on tunnel A in the Cloudflare dashboard;
-until then it answers 530 and the app can be checked only from the VPS:
+`http://nyc-map-web:8080` over the `study-os_edge` network, which `nyc-map-web` joins. The tunnel's
+rule for `nyc.design-bakery.com` and the name's DNS record (a proxied CNAME to tunnel A) both live
+in Cloudflare, not in this repository. Check the app publicly, or from the VPS if the public name fails:
 
 ```bash
+curl -s https://nyc.design-bakery.com/healthz
 curl -s http://127.0.0.1:18088/healthz
 ```
 
@@ -72,7 +73,7 @@ variable `NYC_DEPLOY_URL` (on gravebuster that was `https://nyc.design-bakery.co
 skipped while that variable is unset, which it is for the VPS.
 The `contract` job checks the public site named by `NYC_PUBLIC_URL` (such as
 `https://nyc.design-bakery.com`) and is skipped the same way.
-Komodo deploys the app now, so `NYC_DEPLOY_URL` stays unset; set `NYC_PUBLIC_URL` once the public route works.
+Komodo deploys the app now, so `NYC_DEPLOY_URL` stays unset; set `NYC_PUBLIC_URL` once the ferry endpoint stops failing (#618), because the contract check calls it.
 
 ## Previous host: gravebuster (offline since 2026-10-31)
 
