@@ -84,11 +84,11 @@ describe("line_status with MTA trouble", () => {
   it("says what is wrong, where to board the shuttle, where to get the train back", async () => {
     const { run, offered } = lineStatus();
     const out = await run(["G"]);
-    const g = (out.trouble as Array<{ line: string; summary: string; otherLinesAtSkippedStations?: Record<string, string[]> }>)[0];
+    const g = (out.trouble as Array<{ line: string; summary: string; otherLinesThatStillStopAtSkippedStations?: Record<string, string[]> }>)[0];
     expect(g.summary).toContain("T403 shuttle buses run between Bedford-Nostrand Avs and Court Sq.");
     expect(g.summary).toContain("Get the G train back at Bedford-Nostrand Avs.");
     // Which train instead: the 7, E and F share the Court Sq complex.
-    expect(g.otherLinesAtSkippedStations?.["Court Sq"]).toEqual(["7", "E", "F"]);
+    expect(g.otherLinesThatStillStopAtSkippedStations?.["Court Sq"]).toEqual(["7", "E", "F"]);
     expect(out.trainsNotMoving).toBeUndefined();
     const shuttle = offered.find((a) => a.id === "trouble:shuttle:lmm:planned_work:35870");
     expect(shuttle && "points" in shuttle ? shuttle.points.map((p) => p.name) : []).toEqual([

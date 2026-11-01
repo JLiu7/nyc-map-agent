@@ -20,6 +20,7 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 | Pull request | What it is | State |
 |---|---|---|
+| #628 | The chat no longer sends riders to change trains at stops a line skips, and restates a delay's direction and place as the MTA gives them (#627) | Open, auto-merge on |
 | #625 | The trip chat asks one short question when a request is vague (a whole borough, no start, a day with no hour, a hint about stairs or walking) and ends a planned trip with one follow-up offer, in the rider's language | Open, checks green |
 | #602 | The agent reads an unclear place back before answering ("86 St" has six stations) | Open, checks green |
 | #378 | Docs: realign the project, hackathon writeup and research sources | Open for review |

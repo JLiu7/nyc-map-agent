@@ -365,7 +365,7 @@ function allTools(ctx: ToolContext) {
             line: t.route,
             kind: t.kind,
             summary: troubleSummary(t),
-            ...(t.skipped.length ? { otherLinesAtSkippedStations: Object.fromEntries(t.skipped.slice(0, 4).map((s) => [s.name, otherLinesAt(s, troubles, stations).filter((r) => r !== t.route)])) } : {}),
+            ...(t.skipped.length ? { otherLinesThatStillStopAtSkippedStations: Object.fromEntries(t.skipped.slice(0, 4).map((s) => [s.name, otherLinesAt(s, troubles, stations).filter((r) => r !== t.route)])) } : {}),
           })),
           ...(stuck.length ? { trainsNotMoving: stuck.slice(0, 5).map((s) => ({ line: s.route, toward: s.toward, station: s.station.name, stoppedAtStation: s.stopped, minutesWithoutMoving: s.stoppedMin, ...(s.tripId === followed ? { isTheTrainTheUserFollows: true } : {}) })) } : {}),
           ...(followedSeen && !stuck.some((s) => s.tripId === followed) ? { followedTrain: "moving normally per the live feed" } : {}),

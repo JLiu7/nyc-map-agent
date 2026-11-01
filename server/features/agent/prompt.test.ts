@@ -23,6 +23,19 @@ describe("system prompt: no guessing (#375)", () => {
   });
 });
 
+describe("system prompt: line status answers (#627)", () => {
+  it("keeps the delay's own direction and place, and never sends anyone to change trains at a skipped stop", () => {
+    expect(prompt).toMatch(/never widen them to both directions or to the station the user asked about/);
+    expect(prompt).toMatch(/never tell anyone to change trains or board there/);
+    expect(prompt).toMatch(/Change trains only at a station the summary names/);
+  });
+
+  it("says whether the trouble touches the station asked about, and ends without an unasked offer to start", () => {
+    expect(prompt).toMatch(/say whether the trouble touches it/);
+    expect(prompt).toMatch(/do not close it with "Want to start\?" unless you planned a trip/);
+  });
+});
+
 describe("system prompt: smarter instructions", () => {
   it("ranks the primary uses in the owner's order", () => {
     const order = ["trips", "restroom", "landmarks", "underground", "MTA trouble", "weather and traffic", "Secondary", "Third: businesses and food"];
