@@ -97,3 +97,16 @@ describe("direction-aware station skips on the 7", () => {
     expect(isSkipped(c, "7", e.flushing)).toBe(false);
   });
 });
+
+describe("the label at a suspension's end station (#647)", () => {
+  it("says where to change from train to the replacement bus", async () => {
+    const { endLabel } = await import("./alertFocus");
+    expect(endLabel("Broadway Junction", ["T426"], "A")).toBe("Transfer to the T426 bus at Broadway Junction");
+    expect(endLabel("Court Sq", ["T403", "T404"], "G")).toBe("Transfer to the T403 or T404 bus at Court Sq");
+  });
+
+  it("says no trains go past the station when no bus is named", async () => {
+    const { endLabel } = await import("./alertFocus");
+    expect(endLabel("Court Sq", [], "G")).toBe("No G past Court Sq");
+  });
+});

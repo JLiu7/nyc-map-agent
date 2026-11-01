@@ -227,6 +227,11 @@ function suspension(g: AlertGeometry, sys: StaticSystem, route: string, [from, t
   return true;
 }
 
+/** The words at a suspension's end station: where to change from train to the replacement bus. Pure, for tests. */
+export function endLabel(station: string, buses: string[], route: string): string {
+  return buses.length ? `Transfer to the ${buses.join(" or ")} bus at ${station}` : `No ${route} past ${station}`;
+}
+
 /** Line status for the Lines drawer badge. */
 export type LineStatus = "Good service" | "Delays" | "Detour" | "Planned work";
 export function lineStatus(alerts: TransitAlert[], route: string): LineStatus {

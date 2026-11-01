@@ -50,7 +50,7 @@ import { showView } from "@/lib/map/viewChange";
 import { FollowCard, SkipDetails, StationDetails, stopName } from "./TransitCard";
 import { FollowMiniMap } from "./FollowMiniMap";
 import { TransitStatusDetails } from "./TransitStatus";
-import { alertGeometry, setAlertFocus, stationChanges, useAlertFocus } from "./alertFocus";
+import { alertGeometry, endLabel, setAlertFocus, stationChanges, useAlertFocus } from "./alertFocus";
 import { LinesDrawer } from "./LinesDrawer";
 import { BusStopDetails } from "./BusStopDetails";
 import { busStopAt } from "@/lib/map/busStops";
@@ -649,7 +649,7 @@ export default function TransitLayer() {
       // Where a suspension ends: take the shuttle from here, or at least know the trains stop here.
       ends: fc((alertGeo?.ends ?? []).map((x) => {
         const bus = alertFocus?.replacement ?? [];
-        const label = bus.length ? `Take the ${bus.join(" or ")} bus here` : `No ${alertFocus?.routes[0] ?? ""} past here`;
+        const label = endLabel(x.name, bus, alertFocus?.routes[0] ?? "");
         return { type: "Feature", properties: { label }, geometry: { type: "Point", coordinates: x.coord } };
       })),
     };
@@ -1474,8 +1474,11 @@ export default function TransitLayer() {
             </Source>
           )}
           <Source id="transit-alert-ends" type="geojson" data={alertFc.ends}>
+            {/* A ring on the station itself, so the label is tied to a place and not left floating. */}
+            <Layer id="transit-alert-end-dot" type="circle"
+              paint={{ "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 5, 16, 9], "circle-color": theme.dark ? "#0b1220" : "#ffffff", "circle-stroke-color": theme.dark ? "#7dd3fc" : "#0369a1", "circle-stroke-width": 3 }} />
             <Layer id="transit-alert-end" type="symbol"
-              layout={{ "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.1], "text-allow-overlap": true, "text-max-width": 14 }}
+              layout={{ "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.4], "text-allow-overlap": true, "text-max-width": 14 }}
               paint={{ "text-color": theme.dark ? "#7dd3fc" : "#0369a1", "text-halo-color": theme.land, "text-halo-width": 2 }} />
           </Source>
           <Source id="transit-alert-reroute" type="geojson" data={alertFc.reroute}>

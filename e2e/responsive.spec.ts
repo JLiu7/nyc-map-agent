@@ -128,6 +128,13 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    test("home with the transit layers drawn", async ({ page }) => {
+      await open(page);
+      await expect(page.getByTestId("agent-bar")).toBeVisible();
+      await page.waitForTimeout(1000); // the live layers, including the alert marker layers (#647), are mounted
+      await expectLayout(page);
+    });
+
     test("a line panel", async ({ page }) => {
       await open(page, [
         { type: "text", text: "The 7 is running with delays." },
