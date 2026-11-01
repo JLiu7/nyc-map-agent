@@ -1,15 +1,13 @@
 name: transit-observe
 # Logs observed subway and bus segment and dwell times into Octo every 15 minutes.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
 permissions:
   contents: read
 concurrency: { group: transit-observe, cancel-in-progress: false }
 jobs:
   observe:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 20
     container: { image: node:22-bookworm }
     env:

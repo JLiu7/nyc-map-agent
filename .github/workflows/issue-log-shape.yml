@@ -18,7 +18,7 @@ jobs:
     concurrency:
       group: issue-log-shape-${{ github.event.issue.number || 'sweep' }}
       cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: "python:3.12-slim" }
     steps:

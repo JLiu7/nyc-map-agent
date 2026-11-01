@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 20
     container: { image: node:22-bookworm }
     steps:
@@ -29,7 +29,7 @@ jobs:
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
   size:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 20
     container: { image: node:22-bookworm }
     steps:
@@ -45,7 +45,7 @@ jobs:
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
   deps:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: node:22-bookworm }
     steps:
@@ -63,7 +63,7 @@ jobs:
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
   lint:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: node:22-bookworm }
     steps:
@@ -78,7 +78,7 @@ jobs:
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
   api:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: node:22-bookworm }
     steps:
@@ -108,7 +108,7 @@ jobs:
   migrations:
     # Round trip every migration (up, down to zero, up) on a throwaway Postgres
     # and fail on schema drift. See scripts/ci/migration-roundtrip.sh.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: postgres:16.4-bookworm }
     services:
@@ -139,7 +139,7 @@ jobs:
     # Squash merges make the PR title the commit on main, and release-please
     # reads those commits; so the title must be a Conventional Commit.
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 10
     container: { image: node:22-bookworm }
     steps:
@@ -164,7 +164,7 @@ jobs:
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 20
     container: { image: mcr.microsoft.com/playwright:v1.56.1-noble }
     env:
@@ -185,7 +185,7 @@ jobs:
   deploy:
     needs: [check, size, deps, lint, api, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 30
     concurrency:
       group: deploy-main
@@ -260,7 +260,7 @@ jobs:
     needs: [deploy]
     # Skipped until the VPS app has a public route (deploy/README.md, "CI").
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.NYC_PUBLIC_URL != ''
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, org-pool]
     timeout-minutes: 15
     container: { image: node:22-bookworm }
     steps:
