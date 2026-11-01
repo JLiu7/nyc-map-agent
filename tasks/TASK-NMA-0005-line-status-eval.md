@@ -191,6 +191,29 @@ Blocked/uncertain:
 Next:
 - Run iteration 2 of the line status loop per docs/eval/line-status/PROGRAM.md: widen what server/features/agent/routes.ts withholds so the five trials that still close with a trip offer pass, and record the result in LEDGER.md
 
+### 2026-11-01 17:34:46 UTC — dsh (the model deepseek-v4.1-flash)
+
+<!-- continuity:checkpoint {"agent":"dsh (the model deepseek-v4.1-flash)","blocked":[],"changed":["scripts/eval-line-status.ts, scripts/eval/line-status/retry.ts, retry.test.ts, docs/eval/line-status/LEDGER.md, docs/eval/line-status/PROGRAM.md, checkpoints/CURRENT.md"],"completed":["Ran the loop's baseline and one iteration on LFM3, and fixed the harness flaw those runs exposed: a dropped connection was scored as an empty reply, so the eval counted the network against the model"],"decisions":["Reject the shuttle prompt change: held-out fell 25 points and denies-trouble rose from 3 trials to 28, which is fitting the cases rather than fixing the reading"],"evidence":["baseline 45.4% train and 49.0% held-out; the shuttle prompt change 73.0% train and 23.5% held-out, which the comparer called reject, so it was dropped; 15 eval tests pass, tsc and eslint clean, and with the tunnel down the runner now exits 1 instead of writing empty-reply rows; #642 merged"],"evidence_class":"observed","next_action":"Run iteration 3: take a fresh baseline on the fixed runner, then change one prompt line at a time; do not rerun the shuttle wording","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0005","timestamp":"2026-11-01T17:34:46Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"19fb0f2a19293ef514264e9fee83c54b555654f0626831296460826baad45269","request_id":"c2f99253a9a34efd826210f16796d8c2","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0005"} -->
+
+Completed:
+- Ran the loop's baseline and one iteration on LFM3, and fixed the harness flaw those runs exposed: a dropped connection was scored as an empty reply, so the eval counted the network against the model
+
+Evidence:
+- baseline 45.4% train and 49.0% held-out; the shuttle prompt change 73.0% train and 23.5% held-out, which the comparer called reject, so it was dropped; 15 eval tests pass, tsc and eslint clean, and with the tunnel down the runner now exits 1 instead of writing empty-reply rows; #642 merged
+
+Decisions:
+- Reject the shuttle prompt change: held-out fell 25 points and denies-trouble rose from 3 trials to 28, which is fitting the cases rather than fixing the reading
+
+Changed:
+- scripts/eval-line-status.ts, scripts/eval/line-status/retry.ts, retry.test.ts, docs/eval/line-status/LEDGER.md, docs/eval/line-status/PROGRAM.md, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Run iteration 3: take a fresh baseline on the fixed runner, then change one prompt line at a time; do not rerun the shuttle wording
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
