@@ -36,9 +36,17 @@ Claude Code's own defaults and loses often enough to matter (#37).
     acs_guard.py link <N>        record issue N (or owner/repo#N) as the current
                                  branch's owning issue, after checking it exists
 
-Other harnesses run the same checks with ``--harness codex|cursor|gemini``
-before the hook name (#83): their hook input is read into the event shape
-above, and the answer goes back in each harness's own form.
+Other harnesses run the same checks with
+``--harness codex|cursor|gemini|workbuddy|dsh`` before the hook name (#83):
+their hook input is read into the event shape above, and the answer goes back
+in each harness's own form.
+
+    acs_guard.py setup-dsh       DeepSeek Harness runs hooks only through its
+                                 Claude Code bridge plugin, configured once per
+                                 user, not per repository: write
+                                 ~/.dsh/acs-hooks.json (runs the guard of
+                                 whatever stack checkout a session is in) and
+                                 add the plugin to the desktop profile
 
 A branch's owning issue is the one recorded by ``link`` or the number in its
 name (``fix/37-enforce-rules``); either is checked on GitHub once and cached in
@@ -430,6 +438,8 @@ def check_gh(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
         if body is None:
             return "gh issue create: give the issue log as `--body-file <file>` in the OIO form's shape."
         missing = [label for label in labels if not re.search(rf"^###\s+{re.escape(label)}\s*$", body, re.MULTILINE)]
+        if not missing and (problem := wrong_filer(body)):
+            return problem
         if missing:
             return (
                 "gh issue create: this issue log is not in the OIO form's shape. Missing required "
@@ -454,17 +464,77 @@ def check_bash(command: str, cwd: Path) -> str | None:
             cwd = (cwd / args[1]).expanduser()
             continue
         call = git_call(args, cwd)
-        reason = check_git(*call) if call else check_gh(args, cwd, env)
+        reason = check_git(*call) if call else check_gh(args, cwd, env) or wrong_stamp(args)
         if reason:
             return reason
     return None
+
+
+# The harness and session the hook runs for, set by main and pre_tool, so an issue log's
+# filer stamp can be checked against them (#83: WorkBuddy filed an issue stamped with a
+# Claude Code session it had copied from another issue).
+HARNESS = "claude"
+SESSION = ""
+HARNESS_NAMES = {"claude": "claude-code", "codex": "codex", "cursor": "cursor", "gemini": "gemini", "workbuddy": "workbuddy", "dsh": "dsh"}
+IDENTITY_RE = re.compile(r"^###\s+Content Author Account or Runtime Identity\s*\n+(.+?)\s*$", re.MULTILINE)
+SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+
+
+def identity(harness: str | None = None, session: str | None = None) -> str:
+    """This session's runtime identity, as issue logs, board claims and OIO records stamp it."""
+    return f"agent:{HARNESS_NAMES.get(harness or HARNESS, harness or HARNESS)}/{(SESSION if session is None else session) or '<session id>'}"
+
+
+def not_this_session(stamp: str, what: str, field: str) -> str | None:
+    """Why an `agent:` stamp names another harness or session than this one, or None."""
+    if not stamp.lower().startswith("agent:"):
+        return None  # a human filer, or no stamp: the form checks the rest
+    want = HARNESS_NAMES.get(HARNESS, HARNESS)
+    named = SESSION_ID_RE.findall(stamp)
+    if want not in stamp.lower() or (SESSION and named and SESSION.lower() not in (n.lower() for n in named)):
+        return (
+            f"{what}: it says it was filed by `{stamp}`, but this session is `{identity()}`. "
+            f"Stamp {field} with the agent that is running it, not one copied from another issue or session."
+        )
+    return None
+
+
+def wrong_filer(body: str) -> str | None:
+    """Why the issue log's runtime identity is not this session's, or None."""
+    match = IDENTITY_RE.search(body)
+    return not_this_session(
+        match.group(1).strip() if match else "",
+        "gh issue create: the issue log",
+        "`Content Author Account or Runtime Identity` (and the session reference)",
+    )
+
+
+# The stack's own writers that stamp an agent (#97, #98): the flag that carries the stamp.
+STAMPING_SCRIPTS = {"oio_record.py": "--filer", "board.py": "--agent"}
+
+
+def wrong_stamp(args: list[str]) -> str | None:
+    """Why an OIO record or board change names another session than this one, or None."""
+    script = next((Path(a).name for a in args[:3] if Path(a).name in STAMPING_SCRIPTS), None)
+    if script is None:
+        return None
+    flag = STAMPING_SCRIPTS[script]
+    for i, arg in enumerate(args):
+        value = args[i + 1] if arg == flag and i + 1 < len(args) else arg.partition("=")[2] if arg.startswith(flag + "=") else None
+        if value is not None:
+            return not_this_session(value, script, f"`{flag}`")
+    return None
+
+
+# Every harness's hook file that runs the guard (#83).
+HOOK_FILES = (".claude/settings.json", ".codex/hooks.json", ".cursor/hooks.json", ".gemini/settings.json", ".codebuddy/settings.json")
 
 
 def removes_guard(tool: str, tool_input: dict) -> bool:
     path = str(tool_input.get("file_path") or "")
     if path.endswith(GUARD_NAME):
         return True
-    if not path.endswith(os.path.join(".claude", "settings.json")):
+    if not path.replace(os.sep, "/").endswith(HOOK_FILES):
         return False
     if tool == "Write":
         return GUARD_NAME not in str(tool_input.get("content") or "")
@@ -476,6 +546,8 @@ def removes_guard(tool: str, tool_input: dict) -> bool:
 
 
 def pre_tool(event: dict) -> str | None:
+    global SESSION
+    SESSION = str(event.get("session_id") or "")
     tool = event.get("tool_name") or ""
     tool_input = event.get("tool_input") or {}
     cwd = Path(event.get("cwd") or os.getcwd())
@@ -745,10 +817,28 @@ def checkout_problems(top: Path, written: list[Path], local_only: bool = False, 
     return problems, notes
 
 
+def stop_marker(event: dict, kind: str = "blocked") -> Path:
+    """A per-session file under the temp folder: ``stop-`` counts blocked retries, ``blocked-`` marks a blocked stop."""
+    session = re.sub(r"[^\w.-]", "_", str(event.get("session_id") or "unknown"))[:80]
+    return Path(tempfile.gettempdir()) / "acs-guard" / f"{kind}-{session}"
+
+
+def mark_stop(event: dict, blocked: bool) -> None:
+    path = stop_marker(event)
+    try:
+        if blocked:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        else:
+            path.unlink(missing_ok=True)
+            stop_marker(event, "stop").unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def retries(event: dict) -> int:
     """How many retried stops this session has had blocked, counting this one."""
-    session = re.sub(r"[^\w.-]", "_", str(event.get("session_id") or "unknown"))[:80]
-    path = Path(tempfile.gettempdir()) / "acs-guard" / f"stop-{session}"
+    path = stop_marker(event, "stop")
     try:
         count = int(path.read_text(encoding="utf-8").strip() or 0) + 1
     except (OSError, ValueError):
@@ -775,12 +865,15 @@ def stop(event: dict) -> str | None:
         problems += [f"- `{top}`: {p}" for p in found]
         notes += [f"- `{top}`: {n}" for n in noted]
     if not problems:
+        mark_stop(event, blocked=False)
         return None  # a check gh couldn't make is not a reason to block
     if retry and retries(event) > MAX_STOP_RETRIES:
+        mark_stop(event, blocked=False)
         # Give up rather than loop forever when the agent truly can't push (offline, no permission).
         sys.stderr.write(f"acs guard: letting the stop through after {MAX_STOP_RETRIES} blocked retries; work is still only local:\n"
                          + "\n".join(problems) + "\n")
         return None
+    mark_stop(event, blocked=True)
     return "\n".join([
         "Work is not done while it is not on GitHub with a pull request that will merge itself. Before you stop:",
         *problems, *notes,
@@ -954,6 +1047,12 @@ def session_start(event: dict) -> str | None:
     records = check_records(top)
     if records:
         notes.append(records)
+    if event.get("session_id"):
+        notes.append(
+            f"This session's runtime identity is `{identity(session=str(event['session_id']))}`. Stamp it on every issue log "
+            "you file (`Content Author Account or Runtime Identity`), board claim (`board.py --agent`) and OIO record "
+            "(`oio_record.py --filer`); never copy another issue's or session's stamp."
+        )
     if event.get("source") == "compact":
         notes.append(
             "Context was just compacted. Summaries and earlier briefs are not the owner's words; "
@@ -982,16 +1081,22 @@ def link(arg: str) -> int:
 
 # ---------------------------------------------------------------- other harnesses (#83)
 
-HARNESSES = ("claude", "codex", "cursor", "gemini")
+HARNESSES = ("claude", "codex", "cursor", "gemini", "workbuddy", "dsh")
 # Gemini CLI's tool names, as the Claude Code tools the checks know.
 GEMINI_TOOLS = {"run_shell_command": "Bash", "write_file": "Write", "replace": "Edit"}
 
 
 def normalize(harness: str, hook: str, event: dict) -> dict:
     """The harness's hook input in the shape pre_tool, stop and session_start take."""
-    if harness in ("claude", "codex"):  # Codex sends Claude Code's fields; its shell tool is `Bash`
+    if harness in ("claude", "codex", "workbuddy"):  # all send Claude Code's fields; the shell tool is `Bash`
         return event
     event = dict(event)
+    if harness == "dsh":
+        if event.get("tool_name") == "bash":
+            event["tool_name"] = "Bash"
+        if hook == "stop":  # dsh never sets stop_hook_active; the guard remembers its own blocks
+            event["stop_hook_active"] = stop_marker(event).exists()
+        return event
     if harness == "cursor":
         roots = event.get("workspace_roots") or []
         if not event.get("cwd"):  # stop and sessionStart send no cwd
@@ -1035,6 +1140,54 @@ def answer(harness: str, hook: str, text: str | None) -> int:
     return 2
 
 
+DSH_PACKAGE = "@deepseek-ai/dsh-hooks-claude-code"
+DSH_PATCH_ID = "acs-guard-hooks"
+
+
+def dsh_hooks() -> dict:
+    """Hooks for dsh's bridge: run the guard of the stack checkout the session is in, if any."""
+    def hook(sub: str) -> dict:
+        command = (
+            'g="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/acs_guard.py"; '
+            f'[ -f "$g" ] || exit 0; exec python3 "$g" --harness dsh {sub}'
+        )
+        return {"type": "command", "command": f"sh -c '{command}'", "timeout": 60}
+    return {"hooks": {
+        "SessionStart": [{"hooks": [hook("session-start")]}],
+        "PreToolUse": [{"matcher": "bash|Bash", "hooks": [hook("pre-tool")]}],
+        "Stop": [{"hooks": [hook("stop")]}],
+    }}
+
+
+def setup_dsh(args: list[str], home: Path | None = None) -> int:
+    """Wire DeepSeek Harness's desktop profile to the guard (see the module docstring)."""
+    home = home or Path.home()
+    profile = home / ".dsh" / "profiles" / (flag_value(["", "", *args], "--profile") or "desktop")
+    if not profile.is_dir():
+        print(f"setup-dsh: no DeepSeek Harness profile at {profile}; open the app once first", file=sys.stderr)
+        return 1
+    config = home / ".dsh" / "acs-hooks.json"
+    config.write_text(json.dumps(dsh_hooks(), indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {config}")
+    patch = profile / "cordis.patch.yml"
+    text = patch.read_text(encoding="utf-8") if patch.exists() else ""
+    if f"id: {DSH_PATCH_ID}" in text:
+        print(f"{patch} already loads the bridge")
+    else:
+        row = (
+            "\n# Runs the agent stack's guard (acs_guard.py) through dsh's Claude Code hook\n"
+            "# bridge, in whatever stack checkout a session is in. Written by acs_guard.py setup-dsh.\n"
+            f"- insert:\n    - id: {DSH_PATCH_ID}\n      name: \"{DSH_PACKAGE}\"\n"
+            f"      config:\n        configPath: {json.dumps(str(config))}\n"
+        )
+        patch.write_text(text.rstrip("\n") + "\n" + row, encoding="utf-8")
+        print(f"added the bridge to {patch}")
+    if not (profile / "node_modules" / DSH_PACKAGE).is_dir():
+        print(f"install the bridge, matching the app's version: cd {profile} && pnpm add {DSH_PACKAGE}@<app version> --ignore-scripts")
+    print("then restart DeepSeek Harness")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     harness = "claude"
@@ -1050,6 +1203,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if argv[0] == "link":
         return link(argv[1] if len(argv) > 1 else "")
+    if argv[0] == "setup-dsh":
+        return setup_dsh(argv[1:])
     known = argv[0] in ("session-start", "pre-tool", "stop")
     if os.environ.get("ACS_GUARD", "").lower() == "off":
         return answer(harness, argv[0], None) if known else 0
@@ -1060,6 +1215,8 @@ def main(argv: list[str] | None = None) -> int:
         event = json.load(sys.stdin)
     except ValueError:
         event = {}
+    global HARNESS
+    HARNESS = harness
     event = normalize(harness, argv[0], event if isinstance(event, dict) else {})
     check = {"session-start": session_start, "pre-tool": pre_tool, "stop": stop}[argv[0]]
     return answer(harness, argv[0], check(event))

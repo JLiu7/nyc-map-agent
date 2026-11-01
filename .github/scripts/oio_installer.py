@@ -42,6 +42,7 @@ PACKAGE_FILES = {
     ".github/workflows/issue-triage.yml": ".github/workflows/issue-triage.yml",
     ".github/scripts/oio_installer.py": ".github/scripts/oio_installer.py",
     ".github/scripts/oio_triage.py": ".github/scripts/oio_triage.py",
+    ".github/scripts/oio_record.py": ".github/scripts/oio_record.py",
 }
 # Callers for OIO's reusable close workflows, rendered with the agent-stack-train
 # commit that installed them so an adopter's close behaviour changes only when it

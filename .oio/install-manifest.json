@@ -9,19 +9,20 @@
     ".oio/ontology/default.json": "1120f15a62c92698bb102e1d1566609191ae446c8d1950f124fb5b939d4f8d87",
     ".oio/ontology/project-template.json": "ab7957e5d540717302dd39d1a96a11e46e8b2a79fa793426f8c3271bce0857e3",
     ".oio/ontology/ISSUE_LOG_ONTOLOGY.md": "f7b22af69e1ead2cae0cb8fef94fd7bbdd3611bb9a28d54ba02e883c854a50bd",
-    ".oio/ontology/AGENT_GUIDE.md": "fd5f8109859bca84e5088ab6643309bb43087ce42ef5a595b87e4fcbf7e01b0e",
+    ".oio/ontology/AGENT_GUIDE.md": "6285f80a7b4de7eb76b16b6a8b6a1969bb7dcc803dcff9ad60b892cd9ebb6224",
     ".oio/requirements.txt": "9671d9b90a21841752d8189c55c8807b0e06283947c6199384dbec6b68542151",
     ".oio/schemas/v1/default-ontology.schema.json": "358628082b317ef6d1de422c5e17664d8397d57b059f52a696576400788f56b5",
     ".oio/schemas/v1/project-ontology.schema.json": "976c8cb8272352ec9b83f2f42559191e2200ed71c795b34832490f9ca60b6455",
     ".oio/schemas/v1/issue-log-record.schema.json": "9f8000a9058dc6c853df29472b87956dd56a744274f72efdcc27ddc50945bbdd",
     ".github/ISSUE_TEMPLATE/observational-issue.yml": "0e2a91de7d04664e89b8c614a1ca7c26ebf83443b7a98ce745d0bbc335cb2b15",
     ".github/workflows/issue-triage.yml": "1dfd3af9527cf6cc39e3941f4aad910e47e418c6d04e6824f41a533d99b5de22",
-    ".github/scripts/oio_installer.py": "3980a7cac49e489da3b631500dfd58c023658e308a1656efdc2f3b6b8e5e5957",
+    ".github/scripts/oio_installer.py": "02bac0cff6ad4378417268d0a6d902219ae449f51e036cdc2f89edc07eab0d7a",
     ".github/scripts/oio_triage.py": "c796ce66a03c3e655b108200b24ca0015bdc17c83bf9504b32d7f57af6609c82",
-    ".github/workflows/oio-close-on-merge.yml": "c83b3d4ad7c4681eac0a22e470e1a6390d74626a5ea5378af7a44e8f40a42c56",
-    ".github/workflows/oio-close-sweep.yml": "8d5ea9dd224abb3cedb959594051ed089ffe6583e7a79cdc2c56372d6c73c69b"
+    ".github/scripts/oio_record.py": "4bb054082584898fdbe73378511082816309c2dfff4ce8d761c7a32102adcc15",
+    ".github/workflows/oio-close-on-merge.yml": "511b012e614e2a6d53ce8ba71ad2ba4cb93ad82bc0dd9ab215a547be14287a60",
+    ".github/workflows/oio-close-sweep.yml": "c6b685577b1002dac41391614b425a9a8b1a9d26c6442653be85614047819802"
   },
   "agents_block_sha256": "dd08b0a68f4af90c53d164dfdde8dc1996547193a2404965bf4c4adeffa5b9dc",
   "project_extension": ".oio/ontology/project.json",
-  "oio_ref": "3d63fcea1b1308adc1f3b4520191cf58cab3ae0f"
+  "oio_ref": "2d5d83cf9c349c7d088425368d161a2bf2f94a06"
 }
