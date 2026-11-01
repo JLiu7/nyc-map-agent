@@ -10,6 +10,7 @@ Follow this to change one thing, measure it, and keep or drop it. Do not skip a 
 4. **Numbers decide.** Keep a change when `eval-line-status-compare` prints `keep`. The rule (`report.ts`): train clean rate up by at least 3 points, held-out down by no more than 3 points, and no single check up by more than 10 points on held-out. With fewer than 30 trials in a split the answer is `inconclusive`: run more trials, do not guess.
 5. **Never edit a check or a case to make a number move.** If a check is wrong, change it in its own pull request with a test that shows the wrong verdict, and re-run both sides of the comparison afterwards.
 6. **Write every iteration in `LEDGER.md`,** including the ones you reject. A rejected idea saves the next run from repeating it.
+7. **A run that cannot reach the model is not a run.** Each trial retries a failed call three times, then stops the whole run and says which case broke, so no row is written for a call that never happened. Before this, a dropped tunnel was recorded as an empty reply and scored against the model: one run lost 12 trials that way and another lost 6, and the two numbers could not be compared. If a run stops this way, fix the endpoint and start again; never patch the rows by hand.
 
 ## One iteration
 

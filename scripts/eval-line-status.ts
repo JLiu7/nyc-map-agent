@@ -24,6 +24,7 @@ import { openDataEntrances } from "../server/features/agent/transit";
 import { builtinCases, generatedCases, snapshotCases } from "./eval/line-status/cases";
 import { checkReply, factsFrom } from "./eval/line-status/checks";
 import { format } from "./eval/line-status/report";
+import { UnreachableModel, withRetry } from "./eval/line-status/retry";
 import type { Case, Row } from "./eval/line-status/types";
 
 const arg = (name: string, fallback: string) => { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : fallback; };
@@ -72,16 +73,30 @@ async function trial(c: Case, n: number, runId: string): Promise<Row> {
   const body = JSON.stringify({ messages: [{ role: "user", content: c.question }], location: null, now: c.snapshot.asOf });
   let reply = "";
   let planned = false;
+  // A call that cannot reach the model is retried, then stops the run. Recording it as an empty
+  // reply would score the network against the model and make two runs incomparable (#629).
   try {
-    const res = await POST(new Request("http://local/api/agent", { method: "POST", body }), { deps, fairUse });
-    for (const line of (await res.text()).trim().split("\n")) {
-      const e = JSON.parse(line) as { type: string; text?: string; name?: string; command?: { type?: string } };
-      if (e.type === "text") reply += e.text ?? "";
-      if ((e.type === "step" && (e.name === "showRoute" || e.name === "openPanel")) || (e.type === "command" && (e.command?.type === "showRoute" || e.command?.type === "openPanel"))) planned = true;
-    }
+    await withRetry(async () => {
+      reply = "";
+      planned = false;
+      const res = await POST(new Request("http://local/api/agent", { method: "POST", body }), { deps, fairUse });
+      let failure = "";
+      for (const line of (await res.text()).trim().split("\n")) {
+        const e = JSON.parse(line) as { type: string; text?: string; message?: string; name?: string; command?: { type?: string } };
+        if (e.type === "error") failure = e.message ?? "the agent reported an error";
+        if (e.type === "text") reply += e.text ?? "";
+        if ((e.type === "step" && (e.name === "showRoute" || e.name === "openPanel")) || (e.type === "command" && (e.command?.type === "showRoute" || e.command?.type === "openPanel"))) planned = true;
+      }
+      // The route reports a failed model call as an error event on an otherwise fine response,
+      // so this is where "could not reach the model" actually shows up.
+      if (failure) throw new Error(failure);
+    }, {
+      attempts: 3,
+      delayMs: 2000,
+      onRetry: (err, next) => console.error(`  ${c.id} trial ${n}: retry ${next} after ${err instanceof Error ? err.message : String(err)}`),
+    });
   } catch (err) {
-    reply = "";
-    console.error(`  ${c.id} trial ${n}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new UnreachableModel(c.id, n, err);
   }
   const facts = factsFrom(lineTroubles(c.snapshot.alerts, trouble, c.lines, Math.floor(asOfMs / 1000)));
   reply = reply.trim();
