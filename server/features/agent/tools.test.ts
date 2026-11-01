@@ -7,9 +7,9 @@ import { octant } from "./transit";
 
 describe("tool argument schemas", () => {
   it("transit_plan defaults from to 'here' and takes the user's time words (resolved server-side)", () => {
-    expect(args.transit_plan.parse({ to: "Grand Central", depart: "2026-10-22T09:00" }).from).toBe("here");
-    expect(args.transit_plan.parse({ to: "Grand Central", depart: "tomorrow 9am" }).depart).toBe("tomorrow 9am");
-    expect(args.transit_plan.parse({ to: "Grand Central" }).depart).toBe("now");
+    expect(args.transit_plan.parse({ to: "Grand Central", depart: "2026-10-22T09:00", language: "en" }).from).toBe("here");
+    expect(args.transit_plan.parse({ to: "Grand Central", depart: "tomorrow 9am", language: "en" }).depart).toBe("tomorrow 9am");
+    expect(args.transit_plan.parse({ to: "Grand Central", language: "en" }).depart).toBe("now");
   });
   it("playFlythrough accepts 2x/5x/10x/30x", () => {
     expect(args.playFlythrough.parse({ tripId: "t" }).speed).toBe(10);
@@ -37,7 +37,7 @@ describe("transit_plan resolves the time on the server", () => {
       },
     });
     const run = tools.transit_plan.execute as unknown as (a: unknown, o: unknown) => Promise<{ depart: string; whenNote?: string }>;
-    const brief = await run({ from: "here", to: "here", depart: "tomorrow 9am", arriveBy: false }, { toolCallId: "x", messages: [] });
+    const brief = await run({ from: "here", to: "here", depart: "tomorrow 9am", arriveBy: false, language: "en" }, { toolCallId: "x", messages: [] });
     expect(asked).toEqual(["2026-10-25T09:00"]);
     expect(brief.depart).toBe("2026-10-25T09:00");
     expect(brief.whenNote).toMatch(/Sun, Oct 25, 9:00 AM.*live delays are not known/);

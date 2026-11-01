@@ -5,6 +5,7 @@
  * the same tool the model would call, so the buttons under the answer match.
  * Anything else gets null and the caller keeps its usual message.
  */
+import { isArea } from "./ask";
 import { hoursToday } from "./hours";
 import type { makeTools } from "./tools";
 
@@ -140,7 +141,8 @@ export async function answerWithoutModel(q: Question, tools: Tools, intent: NoMo
       return `Use the ${r.exit} at ${r.station}${walk}.${lift}${out} Want to start?`;
     }
     if (intent.kind === "trip") {
-      if (intent.from === "here" && !q.hasLocation) return null;
+      // "How do I get to Brooklyn": the model asks where in Brooklyn (ask.ts).
+      if ((intent.from === "here" && !q.hasLocation) || isArea(intent.to)) return null;
       const r = await run<TripResult>(tools.transit_plan, { from: intent.from, to: intent.to });
       // A trip the day's changes break needs the model to weigh the alternatives; a place found under
       // another name may be the wrong place, and the model can ask.

@@ -20,6 +20,7 @@ import { AnswerAudit } from "./audit";
 import { RunLog } from "./runLog";
 import { sessionFrom } from "../../lib/tracing";
 import { mayReadBack, planReadBack } from "./readback";
+import { askIn, CloseHold, isQuestion, questionsAnswered, riderLanguage, say, sayPrompt, type Lang, type Line } from "./ask";
 import { openDataEntrances, type Station } from "./transit";
 
 export const INFERHUB_BASE_URL = process.env.INFERHUB_BASE_URL ?? "https://api.inferhub.dev/v1";
@@ -97,21 +98,28 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
         const list = actions.list(answerText);
         if (list.length) send({ type: "actions", actions: list });
       };
+      // The app's own sentence (ask.ts): a question before planning, or a planned trip's follow-up,
+      // in the language the model named. It is said by code, after the model's text.
+      const closing: { line: Line | null; lang: Lang | null } = { line: null, lang: null };
+      const clearLine = () => { closing.line = null; };
+      const hold = new CloseHold();
       const nowLocal = toNyLocal(clock);
       // Data sources and their age, plus the "no guessing" check (#375); one "sources" line before "done".
       const audit = new AnswerAudit([nowLocal, contextLine(context) ?? "", ...messages.filter((m) => m.role === "user").map((m) => m.content)]);
-      const tools = makeTools({ location, now: clock, emit: (command) => send({ type: "command", command }), actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
+      const tools = makeTools({ location, now: clock, emit: (command) => send({ type: "command", command }), actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), answered: questionsAnswered(messages), say: (line, language) => { closing.line = line; closing.lang = riderLanguage(lastAsked, language); }, drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
       // Restrooms and line status still get a real answer with no model (#199).
       const lastAsked = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
       run.input = lastAsked;
       const answerAlone = async (fast = false): Promise<boolean> => {
+        clearLine();
         const q = { text: lastAsked, hasLocation: location !== null, now: clock };
         const text = await answerWithoutModel(q, tools, fast ? fastIntent(lastAsked) : undefined);
         if (!text) return false;
-        answerText = text;
-        run.text(text);
-        audit.text(text);
-        send({ type: "text", text });
+        // The fast path speaks English only, so its follow-up needs no translating.
+        answerText = closing.line && !isQuestion(closing.line) ? `${text} ${say(closing.line, "en")}` : text;
+        run.text(answerText);
+        audit.text(answerText);
+        send({ type: "text", text: answerText });
         flushActions();
         return true;
       };
@@ -145,7 +153,14 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
           messages: withFacts(messages, requestFacts(nowLocal, location, mode, context, lang, memory, underground)),
           allowSystemInMessages: true,
           tools,
-          stopWhen: stepCountIs(8),
+          // A question the app can say itself ends the model's turn right after the tool asks for it.
+          stopWhen: [stepCountIs(8), () => !!closing.line && isQuestion(closing.line) && closing.lang !== null],
+          // A trip tool that needs one more detail (ask.ts): the next step only writes that question, with no tool to plan on a guess.
+          // In another language the model words it, in a step with no tools and only that question to say.
+          prepareStep: ({ steps }) => {
+            const ask = askIn(steps.at(-1)?.toolResults ?? []);
+            return ask ? { toolChoice: "none" as const, activeTools: [], system: sayPrompt(ask.question, lang), messages } : {};
+          },
           // Spoken answers are 1-4 sentences; this bounds a runaway reply's cost (#199).
           maxOutputTokens: 800,
           maxRetries: 1,
@@ -159,7 +174,11 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
           },
         });
         for await (const part of result.fullStream) {
-          if (part.type === "text-delta") { run.text(part.text); audit.text(part.text); answerText += part.text; send({ type: "text", text: part.text }); }
+          if (part.type === "text-delta") {
+            const text = hold.push(part.text);
+            run.text(text); audit.text(text); answerText += text;
+            if (text) send({ type: "text", text });
+          }
           else if (part.type === "tool-call") {
             // "tool" stays for older clients; "step" pairs a start with its end (#370).
             send({ type: "tool", name: part.toolName });
@@ -171,6 +190,8 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
             run.stepEnd(part.toolCallId, true);
           } else if (part.type === "tool-error") { run.stepEnd(part.toolCallId, false); send({ type: "step", id: part.toolCallId.slice(0, 100), name: part.toolName, status: "error" }); }
           else if (part.type === "error") {
+            const left = hold.rest(false);
+            if (left) { answerText += left; send({ type: "text", text: left }); }
             run.finish("error", null);
             finished = true;
             if (answerText || !(await answerAlone())) send({ type: "error", message: "I couldn't answer just now. Please try again in a moment." });
@@ -178,6 +199,15 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
           }
           else if (part.type === "finish") {
             fair.budget.record((part.totalUsage.inputTokens ?? 0) + (part.totalUsage.outputTokens ?? 0));
+            // The model's own "Want to start?" gives way to the app's one follow-up offer.
+            const line = closing.line;
+            // A question the model already worded (a language without phrases) is not said twice.
+            const asking = !!line && isQuestion(line) && closing.lang !== null;
+            const following = !!line && !isQuestion(line) && !!answerText;
+            const own = hold.rest(following).trimEnd();
+            const ours = line && (asking || following) ? (say(line, closing.lang) ?? (following ? say(line, "en") : null)) : null;
+            const close = `${own}${ours ? `${answerText || own ? " " : ""}${ours}` : ""}`;
+            if (close) { run.text(close); audit.text(close); answerText += close; send({ type: "text", text: close }); }
             flushActions();
             const sources = audit.event();
             if (sources) send(sources);

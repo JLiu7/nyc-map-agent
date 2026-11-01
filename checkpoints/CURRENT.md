@@ -20,6 +20,7 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 | Pull request | What it is | State |
 |---|---|---|
+| #625 | The trip chat asks one short question when a request is vague (a whole borough, no start, a day with no hour, a hint about stairs or walking) and ends a planned trip with one follow-up offer, in the rider's language | Open, checks green |
 | #602 | The agent reads an unclear place back before answering ("86 St" has six stations) | Open, checks green |
 | #378 | Docs: realign the project, hackathon writeup and research sources | Open for review |
 | #232 | The release bot's release pull request | Left to the bot |

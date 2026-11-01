@@ -15,7 +15,9 @@ const blocked = (t: TripCore) => t.impacts.some((i) => i.blocks);
 export async function planTrip(origin: Place, destination: Place, local: string, arriveBy: boolean, deps: PlanDeps = {}, prefer: TripPrefer = "fastest"): Promise<Trip> {
   const otp = deps.otp === undefined ? (process.env.TRIP_PLANNER === "motis" ? httpMotis : httpOtp) : deps.otp;
   const its = otp ? await safe(otp.plan(origin.at, destination.at, local, arriveBy, prefer), []) : [];
-  const top = rankItineraries(its, 3, arriveBy, prefer);
+  const best = rankItineraries(its, 3, arriveBy, prefer);
+  // No ferry goes there: the fastest way instead, rather than the subway-only fallback router.
+  const top = best.length || prefer !== "ferry" ? best : rankItineraries(its, 3, arriveBy);
   if (!top.length) {
     // Fallback router only knows depart-at; approximate arrive-by with a 75 min lead.
     const dep = arriveBy ? toNyLocal(new Date(nyLocalToDate(local).getTime() - 75 * 60_000)) : local;

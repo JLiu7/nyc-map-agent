@@ -13,6 +13,7 @@ import { landmarkAtTurn, landmarksOnWay } from "./landmarksOnWay";
 import { sameStation } from "../../../src/lib/transit/serviceChanges";
 import { lineTroubles, otherLinesAt, stuckTrains, troubleSummary, type FeedAlert, type LiveVehicle } from "../../../src/lib/transit/trouble";
 import { planTrip, type PlanDeps } from "./plan";
+import { askFor, followUpFor, preferFrom, type Line } from "./ask";
 import { withSources, type SourceLedger } from "./freshness";
 import { parseWhen, sayWhen, scheduleFor } from "./when";
 import { dayWindow, weekendWindow } from "../../../src/lib/transit/weekend";
@@ -45,6 +46,10 @@ export interface ToolContext {
   sources?: SourceLedger;
   /** The request's clock, so "tomorrow 9am" resolves against the asker's now. */
   now?: Date;
+  /** Questions the rider just answered in a row (ask.ts), so a detail is not asked about forever. */
+  answered?: number;
+  /** The app's own sentence for this answer (ask.ts): the question before planning, or the follow-up after; the route says it, in the language the model named. */
+  say?: (line: Line, language: string) => void;
 }
 
 /** A time in the user's words; the server resolves it in New York time (parseWhen). */
@@ -59,7 +64,13 @@ export const args = {
     to: z.string().min(2),
     depart: when.describe("When to leave (or arrive by, with arriveBy): the user's own words, e.g. \"tomorrow 9am\", \"now\", or a New York time 2026-10-22T09:00"),
     arriveBy: z.boolean().default(false).describe("true when the user must arrive by that time"),
-    prefer: z.enum(["fastest", "subway", "bus", "less-walking"]).default("fastest").describe("fastest (any mode), subway only, bus only, or the least walking"),
+    prefer: z.enum(["fastest", "subway", "bus", "ferry", "less-walking"]).default("fastest").describe("fastest (any mode), subway only, bus only, by ferry, or the least walking"),
+    // What the rider said, in any language, read into fixed values; ask.ts decides in code whether to ask first (#625).
+    timing: z.enum(["now", "set", "vague"]).default("now").describe("now: leave now or no time said; set: a clock time or \"in 20 minutes\"; vague: only a day or part of day (\"tomorrow\", \"tonight\", \"this afternoon\", \"later\")"),
+    access: z.enum(["none", "step-free", "unclear"]).default("none").describe("step-free: they need elevators, no stairs (wheelchair, \"no stairs\"); unclear: any hint that stairs or distance may be hard (a stroller, luggage, a bad knee, an older relative, someone who walks slowly or tires easily, a wheelchair user with them) without saying they need step-free; none: nothing said"),
+    walking: z.enum(["any", "less", "unclear"]).default("any").describe("less: as little walking as possible; unclear: a hint about walking (\"not too far\", \"my feet hurt\") without saying how much; any: nothing said"),
+    mode: z.enum(["any", "subway", "bus", "ferry", "unclear"]).default("any").describe("the way they want to go; unclear: they want a particular way but did not say which; any: nothing said"),
+    language: z.string().max(12).describe("the language of the user's latest message as a code: en, es, zh, ru, bn, ht (Haitian Creole), fr, ko, or another"),
   }),
   weather_forecast: z.object({ place: z.string().default("here"), time: when }),
   hazards: z.object({ place: z.string().default("here") }),
@@ -241,13 +252,24 @@ function allTools(ctx: ToolContext) {
     transit_plan: tool({
       description: "Door-to-door public transit search across subway, bus (incl. SBS), LIRR, Metro-North, ferry and SIR: the best itinerary plus up to 2 alternatives (each with depart/arrive, legs, stops), weather, planned work, elevator outages, recommended exit. Returns a tripId for map tools.",
       inputSchema: args.transit_plan,
-      execute: sourced(async ({ from, to, depart, arriveBy, prefer }: z.infer<typeof args.transit_plan>) => {
+      execute: sourced(async ({ from, to, depart, arriveBy, prefer, language, ...said }: z.infer<typeof args.transit_plan>) => {
+        const details = { from, to, ...said };
+        // Missing or vague: one question back, and the route lets the next step only write it (#625).
+        const ask = askFor(details, { hasLocation: !!ctx.location, answered: ctx.answered ?? 0 });
+        if (ask) { ctx.say?.({ kind: ask.ask, place: ask.place }, language); return ask; }
         const [o, d] = await Promise.all([resolve(from), resolve(to)]);
-        const t = schedule(await planTrip(o, d, localTime(depart), arriveBy, ctx.deps, prefer));
+        const way = preferFrom(details, prefer);
+        const t = schedule(await planTrip(o, d, localTime(depart), arriveBy, ctx.deps, way));
         trips.set(t.id, t);
         for (const a of t.alternatives) trips.set(a.id, { ...a, alternatives: [] });
         offer(tripActions(t));
-        return tripBrief(t);
+        // The closing offer is the app's, said after the answer (routes.ts), so the model never words it.
+        ctx.say?.(followUpFor(t, said), language);
+        return {
+          ...tripBrief(t),
+          ...(way === "ferry" && !t.legs.some((l) => l.kind === "ride" && l.mode === "ferry") ? { noFerry: "No ferry goes there at that time; this is the fastest way. Say so first." } : {}),
+          ...(said.access === "step-free" ? { stepFree: "The planner cannot pick step-free stations yet: call elevator_status for the stations this trip uses and say which have no working elevator." } : {}),
+        };
       }),
     }),
     ...(ctx.drive === false ? {} : {

@@ -119,6 +119,10 @@ describe("fastIntent: exits and trips", () => {
 });
 
 describe("fast trip checks", () => {
+  it("leaves a trip to a whole borough to the model, which asks where in it (#625)", async () => {
+    expect(await answerWithoutModel({ text: "How do I get to Brooklyn", hasLocation: true }, {} as never, { kind: "trip", from: "here", to: "Brooklyn" })).toBeNull();
+  });
+
   it("reads New York local time as it is", () => {
     expect(clock("2026-10-28T22:43")).toBe("10:43 pm");
     expect(clock("2026-10-28T00:05")).toBe("12:05 am");
