@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GET, decodePolyline, loadBusArrivals, loadBusStops, towards } from "./routes";
+import { GET, busFetch, decodePolyline, loadBusArrivals, loadBusStops, towards } from "./routes";
 
 describe("bus sheet endpoints", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -87,5 +87,26 @@ describe("bus-arrivals", () => {
     const { arrivals } = await loadBusArrivals("k", "MTA_1");
     expect(arrivals.map((a) => a.route)).toEqual(["Q8", "Q6"]);
     expect(arrivals[0]).toMatchObject({ destination: "JAMAICA", vehicle: "MTA NYCT_Q8", away: "2 stops away" });
+  });
+});
+
+describe("Bus Time through the Octo vault relay", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  it("sends an MTA key as key= straight to Bus Time", async () => {
+    const f = vi.fn(() => Promise.resolve(new Response("{}")));
+    vi.stubGlobal("fetch", f);
+    await busFetch("https://bustime.mta.info/api/siri/stop-monitoring.json?MonitoringRef=MTA_1", "mta-key");
+    expect(new URL((f.mock.calls[0] as unknown[])[0] as string).searchParams.get("key")).toBe("mta-key");
+  });
+  it("sends a working key to the relay, never as key=, and never follows a redirect", async () => {
+    vi.stubEnv("OCTO_BASE_URL", "https://octo.test");
+    const f = vi.fn(() => Promise.resolve(new Response("{}")));
+    vi.stubGlobal("fetch", f);
+    await busFetch("https://bustime.mta.info/api/siri/stop-monitoring.json?MonitoringRef=MTA_1", "octo_tmp_abc");
+    const [url, init] = f.mock.calls.find((c) => String((c as unknown[])[0]).endsWith("/api/vault/proxy")) as unknown as [string, RequestInit & { headers: Record<string, string> }];
+    expect(url).toBe("https://octo.test/api/vault/proxy");
+    expect(init.redirect).toBe("manual");
+    expect(init.headers.authorization).toBe("Bearer octo_tmp_abc");
+    expect(init.headers["x-octo-target"]).toBe("https://bustime.mta.info/api/siri/stop-monitoring.json?MonitoringRef=MTA_1");
   });
 });

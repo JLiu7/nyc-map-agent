@@ -124,9 +124,35 @@ export function slimTrips(feeds: Array<ReturnType<typeof FeedMessage.decode>>, n
   return { at: Math.round(now), trips };
 }
 
+const RELAY_RENEW_MS = 24 * 3600_000;
+let relayRenewedAt = 0;
+/**
+ * A Bus Time call. MTA_BUSTIME_KEY is either the MTA key, sent as `key=` as the MTA expects, or an
+ * Octo vault working key (octo_tmp_…): then the call goes through Octo's relay, which adds the real
+ * key, so this server never holds it. The working key lasts 30 days; it is renewed once a day.
+ */
+export async function busFetch(url: string, key: string, init: RequestInit = {}): Promise<Response> {
+  const u = new URL(url);
+  if (!key.startsWith("octo_tmp_")) {
+    u.searchParams.set("key", key);
+    return fetch(u.toString(), { ...init, signal: AbortSignal.timeout(10_000) });
+  }
+  const octo = (process.env.OCTO_BASE_URL ?? "https://octodb.design-bakery.com").replace(/\/$/, "");
+  const auth = { authorization: `Bearer ${key}` };
+  if (Date.now() - relayRenewedAt > RELAY_RENEW_MS) {
+    relayRenewedAt = Date.now();
+    void fetch(`${octo}/api/vault/lease/renew`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ expiresInDays: 30 }), signal: AbortSignal.timeout(10_000) })
+      .then((r) => { if (!r.ok) console.warn(`[transit] Bus Time working key renewal failed: HTTP ${r.status}`); })
+      .catch(() => console.warn("[transit] Bus Time working key renewal failed"));
+  }
+  // A redirect from Bus Time names the real key in its Location; never follow or pass one on.
+  return fetch(`${octo}/api/vault/proxy`, { ...init, redirect: "manual", headers: { ...auth, "x-octo-target": u.toString() }, signal: AbortSignal.timeout(10_000) });
+}
+
 export async function loadBuses(key: string) {
-  const url = `https://gtfsrt.prod.obanyc.com/vehiclePositions?${new URLSearchParams({ key })}`;
-  const feed = await decode(url);
+  const res = await busFetch("https://gtfsrt.prod.obanyc.com/vehiclePositions", key);
+  if (!res.ok) throw new Error(`bus positions upstream ${res.status}`);
+  const feed = FeedMessage.decode(new Uint8Array(await res.arrayBuffer()));
   const buses = [];
   for (const e of feed.entity) {
     const v = e.vehicle;
@@ -231,8 +257,8 @@ export function decodePolyline(str: string): Array<[number, number]> {
 
 type SiriCall = { StopPointRef?: string; StopPointName?: unknown; ExpectedArrivalTime?: string; AimedArrivalTime?: string; Extensions?: { Distances?: { PresentableDistance?: string } } };
 async function loadBusTrip(key: string, vehicle: string) {
-  const qs = new URLSearchParams({ key, VehicleRef: vehicle, VehicleMonitoringDetailLevel: "calls", MaximumNumberOfCallsOnwards: "40" });
-  const r = await fetch(`${BUSTIME}siri/vehicle-monitoring.json?${qs}`, { signal: AbortSignal.timeout(10_000) });
+  const qs = new URLSearchParams({ VehicleRef: vehicle, VehicleMonitoringDetailLevel: "calls", MaximumNumberOfCallsOnwards: "40" });
+  const r = await busFetch(`${BUSTIME}siri/vehicle-monitoring.json?${qs}`, key);
   if (!r.ok) throw new Error(`bus-trip upstream ${r.status}`);
   const d = (await r.json()) as { Siri?: { ServiceDelivery?: { VehicleMonitoringDelivery?: Array<{ VehicleActivity?: Array<{ MonitoredVehicleJourney: Record<string, unknown> }> }> } } };
   const j = d.Siri?.ServiceDelivery?.VehicleMonitoringDelivery?.[0]?.VehicleActivity?.[0]?.MonitoredVehicleJourney;
@@ -246,7 +272,7 @@ async function loadBusTrip(key: string, vehicle: string) {
 
 async function loadBusRoute(key: string, route: string) {
   for (const agency of ["MTA NYCT", "MTABC"]) {
-    const r = await fetch(`${BUSTIME}where/stops-for-route/${encodeURIComponent(`${agency}_${route}`)}.json?${new URLSearchParams({ key, includePolylines: "true", version: "2" })}`, { signal: AbortSignal.timeout(10_000) });
+    const r = await busFetch(`${BUSTIME}where/stops-for-route/${encodeURIComponent(`${agency}_${route}`)}.json?${new URLSearchParams({ includePolylines: "true", version: "2" })}`, key);
     if (!r.ok) continue;
     const d = (await r.json()) as { code?: number; data?: { entry?: { polylines?: Array<{ points: string }> }; references?: { stops?: Array<{ id: string; name: string; lat: number; lon: number; routeIds?: string[] }> } } };
     const lines = (d.data?.entry?.polylines ?? []).map((p) => decodePolyline(p.points)).filter((l) => l.length > 1);
@@ -275,7 +301,7 @@ export function towards(raw: string): string {
 
 /** Each stop's destination on one route, from its stop groupings (one group per direction). */
 async function routeHeadings(key: string, routeId: string): Promise<Record<string, string>> {
-  const r = await fetch(`${BUSTIME}where/stops-for-route/${encodeURIComponent(routeId)}.json?${new URLSearchParams({ key, includePolylines: "false", version: "2" })}`, { signal: AbortSignal.timeout(10_000) });
+  const r = await busFetch(`${BUSTIME}where/stops-for-route/${encodeURIComponent(routeId)}.json?${new URLSearchParams({ includePolylines: "false", version: "2" })}`, key);
   if (!r.ok) return {};
   const d = (await r.json()) as { data?: { entry?: { stopGroupings?: Array<{ stopGroups?: ObaStopGroup[] }> } } };
   const out: Record<string, string> = {};
@@ -291,8 +317,8 @@ async function routeHeadings(key: string, routeId: string): Promise<Record<strin
  * and where each route's buses go from that stop (owner, 2026-10-27: "say which direction the buses are heading").
  */
 export async function loadBusStops(key: string, lat: number, lon: number) {
-  const qs = new URLSearchParams({ key, lat: String(lat), lon: String(lon), latSpan: "0.006", lonSpan: "0.008", version: "2" });
-  const r = await fetch(`${BUSTIME}where/stops-for-location.json?${qs}`, { signal: AbortSignal.timeout(10_000) });
+  const qs = new URLSearchParams({ lat: String(lat), lon: String(lon), latSpan: "0.006", lonSpan: "0.008", version: "2" });
+  const r = await busFetch(`${BUSTIME}where/stops-for-location.json?${qs}`, key);
   if (!r.ok) throw new Error(`bus-stops upstream ${r.status}`);
   const d = (await r.json()) as { data?: { list?: ObaStop[]; references?: { routes?: ObaRoute[] } } };
   const names = new Map((d.data?.references?.routes ?? []).map((x) => [x.id, x.shortName ?? x.id.replace(/^[^_]*_/, "")]));
@@ -317,8 +343,8 @@ const STOP_RE = /^(MTA|MTABC)_\d{1,8}$/;
 type SiriVisit = { MonitoredVehicleJourney?: Record<string, unknown> & { MonitoredCall?: SiriCall } };
 /** Next buses at one stop (SIRI stop-monitoring), soonest first. */
 export async function loadBusArrivals(key: string, stop: string) {
-  const qs = new URLSearchParams({ key, MonitoringRef: stop, MaximumStopVisits: "12", StopMonitoringDetailLevel: "normal" });
-  const r = await fetch(`${BUSTIME}siri/stop-monitoring.json?${qs}`, { signal: AbortSignal.timeout(10_000) });
+  const qs = new URLSearchParams({ MonitoringRef: stop, MaximumStopVisits: "12", StopMonitoringDetailLevel: "normal" });
+  const r = await busFetch(`${BUSTIME}siri/stop-monitoring.json?${qs}`, key);
   if (!r.ok) throw new Error(`bus-arrivals upstream ${r.status}`);
   const d = (await r.json()) as { Siri?: { ServiceDelivery?: { StopMonitoringDelivery?: Array<{ MonitoredStopVisit?: SiriVisit[] }> } } };
   const visits = d.Siri?.ServiceDelivery?.StopMonitoringDelivery?.[0]?.MonitoredStopVisit ?? [];

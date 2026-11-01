@@ -15,7 +15,7 @@ import { clientIp } from "../../lib/clientIp";
 import { answerWithoutModel, fastIntent } from "./noModel";
 import { budgetConfigFromEnv, createDailyBudget, createLimiter, limitConfigFromEnv, limitedResponse, noModelMessage } from "./fair-use";
 import { ActionCollector } from "./mapActions";
-import { contextLine, systemPrompt } from "./prompt";
+import { contextLine, requestFacts, stablePrompt } from "./prompt";
 import { AnswerAudit } from "./audit";
 import { RunLog } from "./runLog";
 import { sessionFrom } from "../../lib/tracing";
@@ -33,6 +33,12 @@ function defaultModel(only?: string, run?: RunLog): LanguageModel {
   // Over the daily cap only the configured cheap model is tried, with no fallbacks to pricier ones.
   const models = only ? [only] : modelChain(process.env.INFERHUB_MODEL ?? DEFAULT_MODEL, process.env.INFERHUB_MODEL_FALLBACKS);
   return createOpenAICompatible({ name: "inferhub", baseURL: INFERHUB_BASE_URL, apiKey: key, fetch: fallbackFetch(models, fetch, (m) => { console.warn(m); run?.note(m); }, undefined, undefined, (m) => run?.usedModel(m)) })(models[0]);
+}
+
+/** The request's facts as a system message right before the latest user message. */
+function withFacts<M extends { role: string }>(messages: M[], facts: string): (M | { role: "system"; content: string })[] {
+  const i = messages.map((m) => m.role).lastIndexOf("user");
+  return i < 0 ? [...messages, { role: "system", content: facts }] : [...messages.slice(0, i), { role: "system", content: facts }, ...messages.slice(i)];
 }
 
 export type FairUse = { limiter: ReturnType<typeof createLimiter>; budget: ReturnType<typeof createDailyBudget>; now: () => number };
@@ -115,8 +121,11 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
         const model = opts.model ?? defaultModel(budget.tier === "cheap" ? budget.model : undefined, run);
         const result = streamText({
           model,
-          system: systemPrompt(nowLocal, location, mode, context, lang, memory, underground),
-          messages,
+          // Rules first and identical every time, facts just before the latest question, so the cached
+          // prefix (rules, tools, earlier turns) is reused; see requestFacts.
+          system: stablePrompt(),
+          messages: withFacts(messages, requestFacts(nowLocal, location, mode, context, lang, memory, underground)),
+          allowSystemInMessages: true,
           tools,
           stopWhen: stepCountIs(8),
           // Spoken answers are 1-4 sentences; this bounds a runaway reply's cost (#199).

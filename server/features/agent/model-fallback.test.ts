@@ -136,6 +136,7 @@ describe("speed", () => {
   it("turns thinking off for DeepSeek and Qwen unless INFERHUB_THINKING=on", () => {
     expect(withoutThinking("cb/deepseek-v4.1-flash", {})).toEqual({ thinking: { type: "disabled" } });
     expect(withoutThinking("ali/qwen3.8-flash", {})).toEqual({ enable_thinking: false });
+    expect(withoutThinking("lfm3", {})).toEqual({ chat_template_kwargs: { enable_thinking: false } });
     expect(withoutThinking("other/model", { a: 1 })).toEqual({ a: 1 });
     expect(withoutThinking("cb/deepseek-v4.1-flash", {}, "on")).toEqual({});
   });

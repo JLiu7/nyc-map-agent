@@ -3,17 +3,23 @@
   "project": "nyc-map-agent",
   "repo": "https://github.com/Pukujan-lab/nyc-map-agent",
   "owner": "Pukujan",
-  "purpose": "NYC map application plus its continuous-deployment dashboard.",
-  "deploy_path": "/srv/nyc-map-agent",
-  "compose": "app/deploy/docker-compose.yml",
-  "overlays": ["app/deploy/docker-compose.edge.yml"],
+  "purpose": "NYC map application on the VPS (ssh vps), with MOTIS for trips and LFM3 from the MacBook Pro for chat. Moved from gravebuster on 2026-10-31.",
+  "deploy_path": "/home/ubuntu/apps/nyc-map-agent",
+  "compose": "deploy/docker-compose.vps.yml",
+  "overlays": [],
   "exposure": {
-    "public": ["nyc.design-bakery.com"],
+    "public": [],
     "tailnet": [],
-    "loopback": []
+    "loopback": [
+      "18088"
+    ]
   },
   "data": [
-    { "kind": "directory", "name": "/srv/nyc-map-agent/state", "backup": "deploy history JSONL; regenerable" }
+    {
+      "kind": "directory",
+      "name": "/home/ubuntu/apps/nyc-map-motis",
+      "backup": "MOTIS dataset; regenerable with deploy/motis/build.sh"
+    }
   ],
-  "observed": "2026-10-21"
+  "observed": "2026-10-31"
 }

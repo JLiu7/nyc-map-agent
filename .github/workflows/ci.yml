@@ -206,29 +206,35 @@ jobs:
           OCTO_API_KEY: ${{ secrets.OCTO_API_KEY }}
           OCTO_WORKSPACE_ID: ${{ secrets.OCTO_WORKSPACE_ID }}
         run: pnpm db:migrate
+      # The app moved to the VPS on 2026-10-31 and has no deploy API there yet,
+      # so these two steps wait for NYC_DEPLOY_URL (deploy/README.md, "CI").
       - name: Trigger deploy
         id: trigger
+        if: vars.NYC_DEPLOY_URL != ''
         env:
           TOKEN: ${{ secrets.NYC_DEPLOY_TOKEN }}
+          DEPLOY_URL: ${{ vars.NYC_DEPLOY_URL }}
         run: |
           set -euo pipefail
           response=$(curl -fsS -X POST \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"sha\":\"${{ github.sha }}\"}" \
-            https://nyc.design-bakery.com/deploy/api/deploy)
+            "$DEPLOY_URL/api/deploy")
           id=$(printf '%s' "$response" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
           echo "id=$id" >> "$GITHUB_OUTPUT"
           echo "started run $id"
       - name: Wait for the run
+        if: vars.NYC_DEPLOY_URL != ''
         env:
           TOKEN: ${{ secrets.NYC_DEPLOY_TOKEN }}
+          DEPLOY_URL: ${{ vars.NYC_DEPLOY_URL }}
           RUN_ID: ${{ steps.trigger.outputs.id }}
         run: |
           set -euo pipefail
           for i in $(seq 1 120); do
             body=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
-              "https://nyc.design-bakery.com/deploy/api/deploys/$RUN_ID" || true)
+              "$DEPLOY_URL/api/deploys/$RUN_ID" || true)
             status=$(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("status",""))' 2>/dev/null || echo "")
             echo "run $RUN_ID: ${status:-pending}"
             case "$status" in
@@ -236,7 +242,7 @@ jobs:
               failed|interrupted)
                 echo "deploy $status"
                 curl -fsS -H "Authorization: Bearer $TOKEN" \
-                  "https://nyc.design-bakery.com/deploy/api/deploys/$RUN_ID" | python3 -m json.tool
+                  "$DEPLOY_URL/api/deploys/$RUN_ID" | python3 -m json.tool
                 exit 1 ;;
             esac
             sleep 10
@@ -252,7 +258,8 @@ jobs:
     # POST routes (agent, speech) are left out because each call costs money;
     # vehicle models because the spec cannot name {mode} without an API major bump.
     needs: [deploy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Skipped until the VPS app has a public route (deploy/README.md, "CI").
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.NYC_PUBLIC_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     container: { image: node:22-bookworm }
@@ -260,12 +267,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install uv
         run: curl -LsSf https://releases.astral.sh/github/uv/releases/download/0.12.22/uv-installer.sh | env UV_INSTALL_DIR="$RUNNER_TEMP/uv" UV_NO_MODIFY_PATH=1 sh
-      - name: Schemathesis against nyc.design-bakery.com
+      - name: Schemathesis against the public site
+        env:
+          PUBLIC_URL: ${{ vars.NYC_PUBLIC_URL }}
         # Hypothesis 6.170.10 removed an internal Schemathesis 4.0.0 relies on
         # ('many' object has no attribute 'more'); 4.32.5 misreads our 3.1 prefixItems.
         run: >
           "$RUNNER_TEMP/uv/uvx" --with 'hypothesis<6.170.10' schemathesis@4.0.0 run openapi.json
-          --url https://nyc.design-bakery.com
+          --url "$PUBLIC_URL"
           --exclude-method POST --exclude-path-regex '^/api/(?!v1/)|/vehicle-models/'
           --max-examples 2 --phases examples,fuzzing
           --checks not_a_server_error,response_schema_conformance,content_type_conformance

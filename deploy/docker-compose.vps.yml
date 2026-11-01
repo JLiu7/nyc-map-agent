@@ -1,0 +1,68 @@
+# nyc-map-agent on the VPS: the app with MOTIS for trips and LFM3 for chat. See deploy/README.md.
+#   docker compose -f deploy/docker-compose.vps.yml --env-file ~/apps/nyc-map-agent.env up -d
+# The app binds loopback only; the Cloudflare tunnel reaches it on 127.0.0.1:18088.
+# LFM3 runs on the MacBook Pro (the tax demo's llama-server). The Pro holds an SSH reverse tunnel to
+# this host's 127.0.0.1:18099 (launchd com.pukujan.lfm3-tunnel), and lfm3-bridge re-offers it on the
+# Docker gateway, because containers cannot reach the host's loopback.
+name: nyc-map-agent
+
+services:
+  web:
+    container_name: nyc-map-web
+    image: ${NYC_MAP_IMAGE:-nyc-map-agent:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_DATA_BACKEND: ${VITE_DATA_BACKEND:-octo}
+        MAPILLARY_TOKEN: ${MAPILLARY_TOKEN:-}
+    restart: unless-stopped
+    env_file:
+      - path: ${NYC_MAP_ENV_FILE:-../../nyc-map-agent.env}
+        required: false
+    environment:
+      PORT: "8080"
+      TRIP_PLANNER: motis
+      MOTIS_URL: http://nyc-map-motis:8080
+      INFERHUB_BASE_URL: ${INFERHUB_BASE_URL:-http://host.docker.internal:18099/v1}
+      INFERHUB_MODEL: ${INFERHUB_MODEL:-lfm3}
+      # llama-server takes no key, but the route refuses to start without one.
+      INFERHUB_API_KEY: ${INFERHUB_API_KEY:-local}
+      INFERHUB_MODEL_FALLBACKS: ${INFERHUB_MODEL_FALLBACKS:-}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:18088:8080
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Data from deploy/motis/build.sh; rebuild weekly, then restart this container.
+  motis:
+    container_name: nyc-map-motis
+    image: debian:13-slim
+    command: ["/motis/bin/motis", "server"]
+    working_dir: /motis
+    restart: unless-stopped
+    mem_limit: 2g
+    volumes:
+      - ${MOTIS_ROOT:-/home/ubuntu/apps/nyc-map-motis}:/motis
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  lfm3-bridge:
+    container_name: nyc-map-lfm3-bridge
+    image: alpine/socat:1.8.0.3
+    network_mode: host
+    command: ["TCP-LISTEN:18099,bind=172.17.0.1,fork,reuseaddr,range=172.16.0.0/12", "TCP:127.0.0.1:18099"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

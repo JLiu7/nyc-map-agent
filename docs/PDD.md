@@ -226,7 +226,7 @@ Run from the preview worktree. CI requires check, lint, api, e2e, deps, size and
    - List the PRs it folds in with `Refs #N`.
    - Mention that it supersedes draft #341, whose top-bar idea became the menu row.
 2. Wait for the required checks.
-3. Merging to `main` deploys to nyc.design-bakery.com: CI runs `pnpm db:migrate` on production, then the deploy.
+3. Merging to `main` runs `pnpm db:migrate` on production. The app on the VPS does not follow main until it has a Komodo stack; `deploy/README.md` says what runs there.
    - This release carries one migration, `db/migrations/20261024000100_osm_toilets.sql`, which only adds a table and a view column.
    - Watch the deploy job to the end and open the site at phone size afterwards.
 4. Afterwards, with the owner's OK, close the folded-in PRs with a comment pointing at the merged one.

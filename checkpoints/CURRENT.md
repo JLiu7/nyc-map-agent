@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-10-29. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-01. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 GitHub Issues own task scope and progress; this file is a projection of them, not task authority. No Project Continuity Modules (PCM) task file is active, so `tasks/` is still empty. The build plan is [`docs/PDD.md`](../docs/PDD.md) (the product design document): what is built, what remains, how to check it and how to ship it. The design rules every screen must follow are in [`docs/DESIGN_RULES.md`](../docs/DESIGN_RULES.md).
+
+**Where it runs.** The app runs on the VPS (`ssh vps`) since 2026-10-31, built by hand from `feat/motis-planner` before that branch had a pull request; #603 brings that code onto main. It has no Komodo stack yet, so merges to main do not reach it, and nyc.design-bakery.com answers 530 because no Cloudflare tunnel routes that name to the VPS. See `deploy/README.md`.
 
 **What the project is now.** An agent-first map of New York City: a chat and voice assistant over a clean map that helps people get around (restrooms, landmarks, subway exits, readable MTA disruptions). The realignment is described in [`PROJECT.md`](../PROJECT.md). Work from before the realignment (3D city, street view extras, datasets) was closed on 2026-10-25; those pull requests keep their branches on GitHub if any of it comes back (#376).
 
@@ -18,6 +20,8 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 | Pull request | What it is | State |
 |---|---|---|
+| #603 | Make GitHub match the VPS deploy; folds in `feat/motis-planner` | Open, checks green |
+| #602 | The agent reads an unclear place back before answering ("86 St" has six stations) | Open, checks green |
 | #378 | Docs: realign the project, hackathon writeup and research sources | Open for review |
 | #232 | The release bot's release pull request | Left to the bot |
 
@@ -29,6 +33,7 @@ After pulling main, run `pnpm install`: main now needs `xstate`, and #349 change
 
 ## Next
 
+- **Give the VPS app a GitHub → Komodo deploy and a public route:** nyc-map-agent needs an entry in server-management's `vps/PLAN.md` and a Komodo stack (the owner's call, in that repository), then a Cloudflare route from nyc.design-bakery.com to the VPS's `127.0.0.1:18088`.
 0. **New issue logs from 2026-10-29, filed in the form's shape:** a scorecard that compares our help with Google and Apple Maps on 17 tasks (#586), reading exit signs with the camera offline (#587), the problem tour that flies spot to spot while the agent talks (#588), photos of entrances and destinations (#589), and app labels in the rider's language (#590).
 1. **Finish the remaining-work list in `docs/PDD.md`** (items 1 to 9: menu row, the dropdowns, quick bar, memory summary, task-screen restyle, dead ends). Item 10, the screen-space rules, is done.
 2. **Underground help that never lets you miss your exit or get lost inside a station:** count stops from the saved trip and timetable when there is no signal, and keep exit guidance ready before going down (#373).

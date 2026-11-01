@@ -1,0 +1,173 @@
+{
+ "itineraries": [
+  {
+   "duration": 1140,
+   "startTime": "2026-10-31T19:01:00Z",
+   "endTime": "2026-10-31T19:20:00Z",
+   "transfers": 0,
+   "legs": [
+    {
+     "mode": "WALK",
+     "from": {
+      "name": "START",
+      "lat": 40.758,
+      "lon": -73.9855
+     },
+     "to": {
+      "name": "7 AV/W 44 ST",
+      "stopId": "m_405297",
+      "lat": 40.757476,
+      "lon": -73.985927
+     },
+     "duration": 420,
+     "startTime": "2026-10-31T19:01:00Z",
+     "endTime": "2026-10-31T19:08:00Z",
+     "scheduledStartTime": "2026-10-31T19:01:00Z",
+     "scheduledEndTime": "2026-10-31T19:08:00Z",
+     "realTime": false,
+     "distance": 96.0,
+     "legGeometry": {
+      "points": "cntvlAb}ublCcAo@??bAsC??RJV?RGRU??zAb@??|Ab@??Ut@AZD\\JVTR??aAvC??jYfS",
+      "precision": 6,
+      "length": 23
+     },
+     "steps": [
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 4.0,
+       "streetName": "",
+       "polyline": {
+        "points": "cntvlAb}ublCcAo@",
+        "precision": 6,
+        "length": 2
+       }
+      },
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 7.0,
+       "streetName": "",
+       "polyline": {
+        "points": "gptvlAr{ublCbAsC",
+        "precision": 6,
+        "length": 2
+       }
+      },
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 5.0,
+       "streetName": "",
+       "polyline": {
+        "points": "cntvlA~vublCRJV?RGRU",
+        "precision": 6,
+        "length": 5
+       }
+      }
+     ]
+    },
+    {
+     "mode": "BUS",
+     "from": {
+      "name": "7 AV/W 44 ST",
+      "stopId": "m_405297",
+      "lat": 40.757476,
+      "lon": -73.985927
+     },
+     "to": {
+      "name": "7 AV/W 34 ST",
+      "stopId": "m_401360",
+      "lat": 40.750626999999994,
+      "lon": -73.99102000000002
+     },
+     "duration": 480,
+     "startTime": "2026-10-31T19:08:00Z",
+     "endTime": "2026-10-31T19:16:00Z",
+     "scheduledStartTime": "2026-10-31T19:08:00Z",
+     "scheduledEndTime": "2026-10-31T19:16:00Z",
+     "realTime": false,
+     "headsign": "14 ST via COLUMBUS via 7 AV",
+     "routeId": "m_M7",
+     "routeShortName": "M7",
+     "routeLongName": "Harlem - 14th Street",
+     "routeColor": "00aeef",
+     "intermediateStops": [
+      {
+       "name": "7 AV/W 41 ST",
+       "stopId": "m_450045",
+       "lat": 40.755498,
+       "lon": -73.98732400000002
+      },
+      {
+       "name": "7 AV/W 37 ST",
+       "stopId": "m_401359",
+       "lat": 40.752568000000004,
+       "lon": -73.98949400000001
+      }
+     ],
+     "legGeometry": {
+      "points": "gmsvlAlwvblCz@iCjGhEfOzJbVzOfJbGr]nU|_@|VhG`EnPbLfT~Mbe@nZve@v[jf@v[nSvMrPvKve@j\\jMrInZjR~WfRmBtF",
+      "precision": 6,
+      "length": 21
+     }
+    },
+    {
+     "mode": "WALK",
+     "from": {
+      "name": "7 AV/W 34 ST",
+      "stopId": "m_401360",
+      "lat": 40.750626999999994,
+      "lon": -73.99102000000002
+     },
+     "to": {
+      "name": "END",
+      "lat": 40.7505,
+      "lon": -73.9934
+     },
+     "duration": 240,
+     "startTime": "2026-10-31T19:16:00Z",
+     "endTime": "2026-10-31T19:20:00Z",
+     "scheduledStartTime": "2026-10-31T19:16:00Z",
+     "scheduledEndTime": "2026-10-31T19:20:00Z",
+     "realTime": false,
+     "distance": 251.0,
+     "legGeometry": {
+      "points": "eafvlAvu`clC|GnE??a@lA??HDpA|@??jAv@??eCzH??sF|P??}@lC??yH~U??dFbD_@nA??g@|AqCdJ??PPT`@FZRrAh@pEWJy@f@AxE",
+      "precision": 6,
+      "length": 32
+     },
+     "steps": [
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 18.0,
+       "streetName": "",
+       "polyline": {
+        "points": "eafvlAvu`clC|GnE",
+        "precision": 6,
+        "length": 2
+       }
+      },
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 4.0,
+       "streetName": "",
+       "polyline": {
+        "points": "gxevlAf|`clCa@lA",
+        "precision": 6,
+        "length": 2
+       }
+      },
+      {
+       "relativeDirection": "CONTINUE",
+       "distance": 6.0,
+       "streetName": "",
+       "polyline": {
+        "points": "iyevlAt~`clCHDpA|@",
+        "precision": 6,
+        "length": 3
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

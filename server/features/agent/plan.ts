@@ -1,7 +1,8 @@
-/** Trip search: OpenTripPlanner first (top 3, all modes), built-in subway router if OTP is down. */
+/** Trip search: OpenTripPlanner (or MOTIS, TRIP_PLANNER=motis) first (top 3, all modes), built-in subway router if it is down. */
 import type { LngLatTuple, Trip, TripCore } from "../../../src/features/agent/schema";
 import type { ServiceChange } from "../../../src/lib/transit/serviceChanges";
 import { hazardsAt, weatherAt } from "./services";
+import { httpMotis } from "./motis";
 import { httpOtp, itineraryToTrip, rankItineraries, type OtpClient, type TripPrefer } from "./otp";
 import { buildTrip, changesAt, nyLocalToDate, safe, skippedStops, toNyLocal, tripImpacts, type TripDeps } from "./trip";
 import { openDataEntrances, type Station } from "./transit";
@@ -12,7 +13,7 @@ type Place = { label: string; at: LngLatTuple };
 const blocked = (t: TripCore) => t.impacts.some((i) => i.blocks);
 
 export async function planTrip(origin: Place, destination: Place, local: string, arriveBy: boolean, deps: PlanDeps = {}, prefer: TripPrefer = "fastest"): Promise<Trip> {
-  const otp = deps.otp === undefined ? httpOtp : deps.otp;
+  const otp = deps.otp === undefined ? (process.env.TRIP_PLANNER === "motis" ? httpMotis : httpOtp) : deps.otp;
   const its = otp ? await safe(otp.plan(origin.at, destination.at, local, arriveBy, prefer), []) : [];
   const top = rankItineraries(its, 3, arriveBy, prefer);
   if (!top.length) {

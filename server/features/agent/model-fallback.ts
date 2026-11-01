@@ -67,6 +67,8 @@ export function withoutThinking(model: string, body: Record<string, unknown>, en
   if (env === "on") return body;
   if (/deepseek/i.test(model)) return { ...body, thinking: { type: "disabled" } };
   if (/qwen/i.test(model)) return { ...body, enable_thinking: false };
+  // LFM3 on llama.cpp: the chat template's switch. Thinking ran out the output budget before any answer.
+  if (/lfm/i.test(model)) return { ...body, chat_template_kwargs: { enable_thinking: false } };
   return body;
 }
 
