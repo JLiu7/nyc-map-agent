@@ -12,6 +12,10 @@ answers instead (`trip.planner = "fallback"`).
 Code: `server/features/agent/otp.ts` (client, ranking, Trip mapping),
 `server/features/agent/plan.ts` (OTP first, fallback second).
 
+The ferry map layer (`/api/v1/ferry`) used to read OTP too. It now reads the two
+ferry GTFS feeds and NYC Ferry's vehicle positions itself
+(`server/features/ferry/gtfs.ts`), so it works on the VPS, where no OTP runs (#618).
+
 ## Service
 
 `otp` in `deploy/docker-compose.yml` (container `nyc-map-otp`):

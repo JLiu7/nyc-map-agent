@@ -8,7 +8,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 *Updated 2026-11-01. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
-GitHub Issues own task scope and progress; this file is a projection of them, not task authority. The one Project Continuity Modules (PCM) task file is `tasks/TASK-NMA-0001-public-route.md`, for #614. The build plan is [`docs/PDD.md`](../docs/PDD.md) (the product design document): what is built, what remains, how to check it and how to ship it. The design rules every screen must follow are in [`docs/DESIGN_RULES.md`](../docs/DESIGN_RULES.md).
+GitHub Issues own task scope and progress; this file is a projection of them, not task authority. The Project Continuity Modules (PCM) task files are `tasks/TASK-NMA-0001-public-route.md` (#614) and `tasks/TASK-NMA-0002-ferry-without-otp.md` (#618). The build plan is [`docs/PDD.md`](../docs/PDD.md) (the product design document): what is built, what remains, how to check it and how to ship it. The design rules every screen must follow are in [`docs/DESIGN_RULES.md`](../docs/DESIGN_RULES.md).
 
 **Where it runs.** The app runs on the VPS (`ssh vps`). Komodo deploys main there: the `nyc-map-agent-deploy-on-push` action checks every 5 minutes and runs `deploy/vps/autodeploy.sh`, which builds `nyc-map-agent:<12-char sha>` and rolls back if the health check fails. The first deploy, main at #613 (`0cb74693be46`), went live on 2026-11-01. Since 2026-11-01 nyc.design-bakery.com reaches it through Cloudflare tunnel A (`octo-cloudflared` on the VPS, rule to `http://nyc-map-web:8080`); its DNS record used to point at the dead gravebuster tunnel. See `deploy/README.md`.
 
@@ -33,8 +33,7 @@ After pulling main, run `pnpm install`: main now needs `xstate`, and #349 change
 
 ## Next
 
-- **Ferries are missing on the live map (#618):** `/api/v1/ferry` answers 502 because the ferry layer still asks OpenTripPlanner, which does not run on the VPS. Read ferries from MOTIS or run OTP there.
-- **Turn on CI's live contract check (#614):** set the repository variable `NYC_PUBLIC_URL` to `https://nyc.design-bakery.com` once #618 is fixed; until then the check fails on the ferry endpoint.
+- **Turn on CI's live contract check (#614):** set the repository variable `NYC_PUBLIC_URL` to `https://nyc.design-bakery.com` once the ferry fix (#618) is live on the VPS; before that the check failed on the ferry endpoint.
 0. **New issue logs from 2026-10-29, filed in the form's shape:** a scorecard that compares our help with Google and Apple Maps on 17 tasks (#586), reading exit signs with the camera offline (#587), the problem tour that flies spot to spot while the agent talks (#588), photos of entrances and destinations (#589), and app labels in the rider's language (#590).
 1. **Finish the remaining-work list in `docs/PDD.md`** (items 1 to 9: menu row, the dropdowns, quick bar, memory summary, task-screen restyle, dead ends). Item 10, the screen-space rules, is done.
 2. **Underground help that never lets you miss your exit or get lost inside a station:** count stops from the saved trip and timetable when there is no signal, and keep exit guidance ready before going down (#373).
