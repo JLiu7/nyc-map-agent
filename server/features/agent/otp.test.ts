@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decodePolyline, itineraryToTrip, rankItineraries, stopName, type OtpItinerary } from "./otp";
 import { serviceChanges } from "../../../src/lib/transit/serviceChanges";
 import { planTrip } from "./plan";
 import { tripBrief } from "./trip";
 import type { Station, StationEntrances, TransitPlanner } from "./transit";
 
+// planTrip also asks the weather, the weather alerts and the walking router; offline, those fall back, so no test
+// here waits on a live site (the shared CI runners timed out on them).
+beforeEach(() => { vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline")))); });
+afterEach(() => { vi.unstubAllGlobals(); });
 const noStations: StationEntrances = { stations: () => Promise.resolve([]), entrances: () => Promise.resolve([]) };
 const t = (h: string) => `2026-10-23T${h}:00-04:00`;
 const pt = (name: string, lon: number, lat: number, stop = false) => ({ name, lon, lat, stop: stop ? { gtfsId: `X:${name}`, name } : null });
