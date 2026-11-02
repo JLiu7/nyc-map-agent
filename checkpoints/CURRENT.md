@@ -29,20 +29,6 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 **`feat/place-readback` is a leftover branch, not work in flight.** Its work merged as #602 on 2026-11-01 and its content is on main; the ref is a squash-merge artifact and can be deleted. The same is true of `docs/614-public-route-live` and the other `docs/614-*` branches whose checkpoints merged.
 
-## Completed recently
-
-#635 merged on 2026-11-01 and voice works on the live site again. The speech-to-text endpoint had sent every recording to Groq's hosted Whisper by default, a service the owner never chose and never disclosed to riders. It now answers 503 unless `STT_BASE_URL` is set, and on the VPS that address is the Pro's own speech server. `/api/stt` on nyc.design-bakery.com transcribed a Spanish clip in 3.2 seconds on 2026-11-01.
-
-#626, #628, #630, #631 and #632 merged on 2026-11-01, and together they are the line status work. The trip chat now asks one short question when a request is vague (#625) instead of guessing a borough. The A train answer no longer sends riders to stops it skips (#627). Line status answers are scored on replayed MTA feeds with ten rule checks and a handoff for DeepSeek (#629), and the baseline on LFM3 is in `docs/eval/line-status/LEDGER.md` (14.6% of training trials clean, 25.5% of held-out ones). The loop's first iteration (#632) drops the route's own "Want to start?" when no trip set a follow-up, which lifted clean trials to 43.9% on training and 39.2% on held-out.
-
-#621, #622 and #624 also merged on 2026-11-01. Ferries came back to the live map without a trip planner (#618); the VPS app stopped reading another project's database and the public route went live (#614); and the agent stack moved to 1.0.7.
-
-#416 (app text follows the asked language), #415 (held trains and feed-skipped stops), #359 (Live View camera scaffold) and #417 (menu row language) merged on 2026-10-25.
-
-Merged from the sort: #209, #348, #349, #394, #408, #414.
-
-After pulling main, run `pnpm install`: main now needs `xstate`, and #349 changes vite and vitest.
-
 ## Next
 
 0. **Iteration 3 of the line status loop (#629, task NMA-0005), and it needs a clean baseline first.** Iteration 2 was tried and rejected on 2026-11-01: dropping the shuttle bus from the prompt cut invented shuttles from 67 trials to 5 but sent held-out clean trials from 49.0% down to 23.5%, and moved the failure into "denies trouble" (3 trials to 28). It is written up in `LEDGER.md` and the change was dropped. The two runs either side of it were also polluted by dropped connections, which the runner used to record as empty replies; that is fixed, so start iteration 3 with a fresh baseline on the fixed runner and change one prompt line at a time rather than two.

@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "GIT_TERMINAL_PROMPT=0 GIT_PAGER=cat PAGER=cat GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy session-start",
-            "timeout": 180
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy session-start",
+            "timeout": 60
           }
         ]
       }
@@ -17,8 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "GIT_TERMINAL_PROMPT=0 GIT_PAGER=cat PAGER=cat GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy pre-tool",
-            "timeout": 120
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy pre-tool",
+            "timeout": 60
           }
         ]
       }
@@ -28,8 +28,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "GIT_TERMINAL_PROMPT=0 GIT_PAGER=cat PAGER=cat GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy stop",
-            "timeout": 120
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/acs_guard.py\" --harness workbuddy stop",
+            "timeout": 60
           }
         ]
       }

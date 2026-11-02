@@ -12,7 +12,9 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  copy differs, and warn when an active task
                                  record is behind its issue on GitHub (closed,
                                  or commented on since), or when that can't be
-                                 checked (#68). It never blocks.
+                                 checked (#68); state the GitHub cadence in
+                                 force and name pushed branches past it with
+                                 no pull request (#108). It never blocks.
     acs_guard.py pre-tool        PreToolUse: block (exit 2) work without an
                                  owning issue, pushes to the default branch,
                                  force pushes, worktrees outside
@@ -23,6 +25,8 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  secret, release, label and workflow changes)
                                  that name no issue, `gh pr merge` on a pull
                                  request whose author is not trusted (#91),
+                                 shell loops and watches that poll GitHub
+                                 faster than the cadence allows (#108),
                                  and edits that remove
                                  this guard
     acs_guard.py stop            Stop: block ending a turn while work is not on
@@ -30,9 +34,12 @@ Claude Code's own defaults and loses often enough to matter (#37).
                                  worked in (from its transcript): uncommitted
                                  tracked changes, files it wrote that git does
                                  not track, unpushed commits, a push without a
-                                 PCM checkpoint, or a pushed branch with no open
-                                 pull request, or no auto-merge armed where the
-                                 repository allows auto-merge
+                                 PCM checkpoint, or a pushed branch past the
+                                 cadence limit (#108: 10 commits, 400 changed
+                                 lines or 24 hours, `.coord/cadence.json`)
+                                 with no ready pull request, or an open one with
+                                 no auto-merge armed where the repository
+                                 allows auto-merge
     acs_guard.py link <N>        record issue N (or owner/repo#N) as the current
                                  branch's owning issue, after checking it exists
 
@@ -459,6 +466,9 @@ def check_gh(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
 
 
 def check_bash(command: str, cwd: Path) -> str | None:
+    reason = polls_too_fast(command, cwd)
+    if reason:
+        return reason
     for env, args in segments_with_env(command):
         if args[0] == "cd" and len(args) > 1:
             cwd = (cwd / args[1]).expanduser()
@@ -662,16 +672,186 @@ def session_checkouts(project: Path, event: dict) -> tuple[list[Path], list[Path
     return tops, written
 
 
+# Coordination files the pack rewrites as agents take the seat or claim tasks. They are local
+# runtime state (ROLES.md: the claim file is the seat of record, not GitHub), so a change to one
+# is not unfinished work (#104).
+RUNTIME_STATE = (".coord/boss_claim.json", ".coord/board.json", ".coord/board-events.jsonl")
+
+
+def runtime_state(top: Path) -> set[str]:
+    """The checkout's coordination runtime files, including the assignment's own claim file path."""
+    paths = set(RUNTIME_STATE)
+    try:
+        assignment = json.loads((top / ".coord" / "assignment.json").read_text(encoding="utf-8"))
+        claim = assignment["boss_failover"]["check_in"]["claim_file_path"]
+        if isinstance(claim, str) and claim.strip():
+            paths.add(Path(claim.strip()).as_posix())
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return paths
+
+
 def names(paths: list[str], limit: int = 5) -> str:
     return ", ".join(f"`{p}`" for p in paths[:limit]) + (" …" if len(paths) > limit else "")
 
 
-def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None]:
+# ---------------------------------------------------------------- cadence (#108)
+
+# How often GitHub hears from an agent. A pull request at every stop and two comments after every
+# push made a few agents open about 750 issues and pull requests in a week. A branch is pushed at
+# every stop, but its pull request is only required once the branch reaches one of these limits;
+# `.coord/cadence.json` in an adopter overrides any of them.
+CADENCE_FILE = Path(".coord") / "cadence.json"
+CADENCE_DEFAULTS = {"pr_after_commits": 10, "pr_after_lines": 400, "pr_after_hours": 24, "min_poll_seconds": 60}
+
+
+def cadence(top: Path | None) -> dict[str, int]:
+    """The cadence limits in force for a checkout: the defaults, with the adopter's valid overrides."""
+    limits = dict(CADENCE_DEFAULTS)
+    try:
+        data = json.loads((top / CADENCE_FILE).read_text(encoding="utf-8")) if top else None
+    except (OSError, ValueError):
+        data = None
+    if isinstance(data, dict):
+        for key in limits:
+            value = data.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                limits[key] = value
+    return limits
+
+
+def branch_size(top: Path, default: str, ref: str = "HEAD") -> tuple[int, int, float]:
+    """(commits, changed lines, hours since its first commit) of a branch's own work.
+
+    Checkpoint commits don't count: they record the work, so a branch would otherwise grow toward
+    its limit one stop at a time.
+    """
+    log = git(top, "log", "--format=%ct %s", f"origin/{default}..{ref}") or ""
+    times = [int(stamp) for stamp, _, subject in (line.partition(" ") for line in log.splitlines())
+             if stamp.isdigit() and not subject.startswith(CHECKPOINT_PREFIX)]
+    lines = 0
+    for row in (git(top, "diff", "--numstat", f"origin/{default}...{ref}") or "").splitlines():
+        added, _, rest = row.partition("\t")
+        deleted = rest.partition("\t")[0]
+        lines += sum(int(n) for n in (added, deleted) if n.isdigit())  # binary files show `-`
+    hours = (datetime.now(timezone.utc).timestamp() - min(times)) / 3600 if times else 0.0
+    return len(times), lines, hours
+
+
+def pr_due(top: Path, default: str, ref: str = "HEAD") -> str | None:
+    """Why the branch needs its pull request now, or None while it is under every cadence limit."""
+    limits = cadence(top)
+    commits, lines, hours = branch_size(top, default, ref)
+    if commits >= limits["pr_after_commits"]:
+        return f"it has {commits} commits (the limit is {limits['pr_after_commits']})"
+    if lines >= limits["pr_after_lines"]:
+        return f"it changes {lines} lines (the limit is {limits['pr_after_lines']})"
+    if commits and hours >= limits["pr_after_hours"]:
+        return f"its first commit is {int(hours)} hours old (the limit is {limits['pr_after_hours']})"
+    return None
+
+
+def cadence_note(top: Path) -> str:
+    limits = cadence(top)
+    return (
+        f"GitHub cadence (#108): push at every stop, but open a branch's pull request when its work is done or once it "
+        f"reaches {limits['pr_after_commits']} commits, {limits['pr_after_lines']} changed lines or "
+        f"{limits['pr_after_hours']} hours, not at every stop. Put small steps on the owning issue's checklist instead of "
+        "filing new issues; file a sub-issue only for a piece with its own pull request. Post an issue receipt when the "
+        "pull request opens, at a handoff or block, and once after the merge, not after every push. Never poll GitHub "
+        f"more often than every {limits['min_poll_seconds']} seconds; wait for the harness's notification instead."
+    )
+
+
+# Only recent branches are checked: an old branch is someone's settled business, and a checkout with
+# hundreds of local branches would otherwise make every session start slow.
+OVERDUE_RECENT_DAYS = 14
+OVERDUE_MAX_BRANCHES = 30
+
+
+def overdue_branches(top: Path, default: str) -> list[str]:
+    """Recent pushed branches past a cadence limit that have no pull request at all, so finished work isn't stranded.
+
+    Branch sizes are read locally; GitHub is asked once, and only when some branch is past a limit.
+    """
+    due = []
+    cutoff = datetime.now(timezone.utc).timestamp() - OVERDUE_RECENT_DAYS * 86400
+    refs = git(top, "for-each-ref", "--sort=-committerdate", f"--count={OVERDUE_MAX_BRANCHES}",
+               "--format=%(refname:short)|%(upstream:short)|%(upstream:track)|%(committerdate:unix)", "refs/heads")
+    for line in (refs or "").splitlines():
+        name, upstream, track, when = (line.split("|") + ["", "", ""])[:4]
+        if not when.isdigit() or int(when) < cutoff:
+            break  # sorted newest first: the rest are older
+        # `[gone]`: the remote branch was deleted, which a merged pull request does.
+        if name and upstream and "[gone]" not in track and name != default and pr_due(top, default, f"refs/heads/{name}"):
+            due.append(name)
+    if not due:
+        return []
+    code, out = run(["gh", "pr", "list", "--state", "all", "--json", "headRefName", "--limit", "200"], top, timeout=10)
+    try:
+        heads = {p.get("headRefName") for p in json.loads(out)} if code == 0 else None
+    except (ValueError, AttributeError):
+        heads = None
+    return [] if heads is None else [name for name in due if name not in heads]
+
+
+LOOP_RE = re.compile(r"(?:^|[\s;&|(])(while|until|for)\s")
+GH_CALL_RE = re.compile(r"(?:^|[\s;&|(`\"'$])(?:[\w./-]*/)?gh\s")
+SLEEP_RE = re.compile(r"\bsleep\s+(\d+(?:\.\d+)?)([smhd]?)(?![\w.])")
+SLEEP_UNITS = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}
+# gh's own watch commands and their default intervals in seconds.
+GH_WATCHES = {("run", "watch"): 3, ("pr", "checks"): 10}
+
+
+def poll_interval(command: str) -> float | None:
+    """The fastest interval, in seconds, at which the command asks GitHub again, or None if it doesn't poll."""
+    found: list[float] = []
+    loop = LOOP_RE.search(command)
+    if loop and GH_CALL_RE.search(command):
+        sleeps = [float(n) * SLEEP_UNITS[unit] for n, unit in SLEEP_RE.findall(command)]
+        if sleeps:
+            found.append(min(sleeps))
+        elif loop.group(1) != "for":  # `for` over a list of repositories is a batch read, not a poll
+            found.append(0.0)
+    for _, args in segments_with_env(command):
+        name = Path(args[0]).name
+        if name == "watch" and any(Path(a).name == "gh" for a in args[1:]):
+            found.append(float(flag_value(args, "-n", "--interval") or 2))
+        elif name == "gh" and len(args) > 2 and (args[1], args[2]) in GH_WATCHES:
+            if args[1] == "pr" and "--watch" not in args:
+                continue
+            value = flag_value(args, "-i", "--interval")
+            try:
+                found.append(float(value) if value is not None else GH_WATCHES[(args[1], args[2])])
+            except ValueError:
+                found.append(0.0)
+    return min(found) if found else None
+
+
+def polls_too_fast(command: str, cwd: Path) -> str | None:
+    interval = poll_interval(command)
+    if interval is None:
+        return None
+    limit = cadence(top_level(cwd) or top_level(Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)))["min_poll_seconds"]
+    if interval >= limit:
+        return None
+    return (
+        f"This command asks GitHub again every {interval:g} seconds. Tight polling spends the owner's whole API "
+        "budget and looks like abuse to GitHub (#108). Wait for the harness's notification instead, or check no more "
+        f"often than every {limit} seconds (`sleep {limit}`, `gh run watch --interval {limit}`, "
+        f"`gh pr checks --watch --interval {limit}`)."
+    )
+
+
+def pull_request_problem(top: Path, branch: str, due: str | None = "") -> tuple[str | None, str | None]:
     """(problem, note) for the branch's open pull request: missing, a draft, or without auto-merge.
 
     Auto-merge is only asked for when the repository allows it (#89); a
     repository that turns it off merges by hand, so an open, ready pull
-    request is all an agent can do there.
+    request is all an agent can do there. A missing or draft pull request is
+    only a problem once ``due`` says why the branch needs one (#108); the
+    empty-string default keeps the old always-required behaviour for callers
+    that pass nothing.
     """
     code, out = run(
         ["gh", "pr", "list", "--head", branch, "--state", "open", "--json", "number,isDraft,autoMergeRequest", "--limit", "1"],
@@ -684,18 +864,22 @@ def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None
     if not isinstance(pulls, list):
         # gh is missing, signed out or offline: say so, but don't block on it.
         return None, f"Could not check `{branch}`'s pull request on GitHub (gh failed or is offline); make sure it has an open pull request with auto-merge armed."
+    why = f", and {due}" if due else ""
     if not pulls:
-        if merged_at_tip(top, branch):
-            return None, None  # its pull request merged with this exact tip; nothing is left to do here
+        if due is None or merged_at_tip(top, branch):
+            return None, None  # under every cadence limit, or merged with this exact tip: nothing to do yet
         return (
-            f"Branch `{branch}` is pushed but has no open pull request. Open one (`gh pr create` with `Refs #N`, "
+            f"Branch `{branch}` is pushed but has no open pull request{why}. Open one (`gh pr create` with `Refs #N`, "
             "or `Closes #N` when the merge finishes the issue) and arm auto-merge (`gh pr merge <N> --auto --squash`).",
             None,
         )
     pr = pulls[0]
     number = pr.get("number")
     if pr.get("isDraft"):
-        return f"Pull request #{number} for `{branch}` is a draft, so nothing will merge it. Mark it ready (`gh pr ready {number}`) and arm auto-merge.", None
+        if due is None:
+            return None, None
+        return (f"Pull request #{number} for `{branch}` is a draft{why}, so nothing will merge it. "
+                f"Mark it ready (`gh pr ready {number}`) and arm auto-merge."), None
     if not pr.get("autoMergeRequest"):
         if not auto_merge_allowed(top):
             return None, f"This repository turns auto-merge off, so the owner merges pull request #{number} by hand; the work is not delivered until it merges."
@@ -704,8 +888,12 @@ def pull_request_problem(top: Path, branch: str) -> tuple[str | None, str | None
 
 
 def auto_merge_allowed(top: Path) -> bool:
-    """False only when GitHub says the repository turns auto-merge off; unknown counts as allowed."""
-    code, out = run(["gh", "repo", "view", "--json", "autoMergeAllowed", "-q", ".autoMergeAllowed"], top, timeout=10)
+    """False only when GitHub says the repository turns auto-merge off; unknown counts as allowed.
+
+    The repository endpoint, not `gh repo view`: no `gh` release has an `autoMergeAllowed`
+    field there, so that lookup always failed and every repository read as allowed (#102).
+    """
+    code, out = run(["gh", "api", "repos/{owner}/{repo}", "-q", ".allow_auto_merge"], top, timeout=10)
     return not (code == 0 and out.strip() == "false")
 
 
@@ -770,7 +958,11 @@ def checkout_problems(top: Path, written: list[Path], local_only: bool = False, 
     else:
         where, fix = f"`{branch}`", "commit, checkpoint and push them"
     # `run` strips the output, so the first line may have lost its leading status column; split instead of slicing.
-    tracked = [line.split(None, 1)[-1] for line in (git(top, "status", "--porcelain", "--untracked-files=no") or "").splitlines() if line.strip()]
+    state = runtime_state(top)
+    tracked = [
+        path for line in (git(top, "status", "--porcelain", "--untracked-files=no") or "").splitlines()
+        if line.strip() and (path := line.split(None, 1)[-1]) not in state
+    ]
     if tracked:
         problems.append(f"{len(tracked)} uncommitted change(s) to tracked files on {where} ({names(tracked)}): {fix}.")
     mine = [str(p.resolve().relative_to(top.resolve())) for p in written if within(p, top)]
@@ -785,7 +977,7 @@ def checkout_problems(top: Path, written: list[Path], local_only: bool = False, 
     unpushed = unpushed_branches(top, branch, since)
     for name, count in unpushed:
         fix = (f"move them to a task branch (`git switch -c <type>/<N>-<slug> {name}`), then push it and open a pull request"
-               if name == default else "checkpoint and push them (and open or update the pull request)")
+               if name == default else "checkpoint and push them (the pull request can wait for the cadence limit, #108)")
         problems.append(
             f"Branch `{name}` has {count} commit(s) that are not on GitHub. The rules say work is not "
             f"done while it exists only locally: {fix}."
@@ -811,7 +1003,7 @@ def checkout_problems(top: Path, written: list[Path], local_only: bool = False, 
             "`continuity checkpoint` (it commits and pushes the checkpoint)."
         )
         return problems, notes
-    problem, note = pull_request_problem(top, branch)
+    problem, note = pull_request_problem(top, branch, pr_due(top, default))
     problems += [problem] if problem else []
     notes += [note] if note else []
     return problems, notes
@@ -1047,6 +1239,13 @@ def session_start(event: dict) -> str | None:
     records = check_records(top)
     if records:
         notes.append(records)
+    notes.append(cadence_note(top))
+    stranded = overdue_branches(top, default)
+    if stranded:
+        notes.append(
+            f"Pushed branches past the cadence limit with no pull request: {names(stranded)}. If their work is "
+            "finished, open their pull requests (`Refs #N` or `Closes #N`) and arm auto-merge; otherwise say why on their issue."
+        )
     if event.get("session_id"):
         notes.append(
             f"This session's runtime identity is `{identity(session=str(event['session_id']))}`. Stamp it on every issue log "

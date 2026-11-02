@@ -21,9 +21,9 @@ permissions:
 
 jobs:
   sweep:
-    uses: Pukujan/agent-stack-train/.github/workflows/close-sweep.yml@2d5d83cf9c349c7d088425368d161a2bf2f94a06
+    uses: Pukujan/agent-stack-train/.github/workflows/close-sweep.yml@496bf33e0a8327345a8e3ba19e3dc40eae47164a
     with:
-      oio_ref: 2d5d83cf9c349c7d088425368d161a2bf2f94a06
+      oio_ref: 496bf33e0a8327345a8e3ba19e3dc40eae47164a
       runs_on: ${{ vars.OIO_RUNS_ON || '"ubuntu-latest"' }}
       apply: ${{ vars.OIO_CLOSE_SWEEP_APPLY == 'true' }}
       rollup: ${{ vars.OIO_CLOSE_SWEEP_ROLLUP || 'label' }}

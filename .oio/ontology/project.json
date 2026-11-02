@@ -1,6 +1,6 @@
 {
   "schema_version": "oio.project-issue-log-ontology.v1",
-  "project_id": "Pukujan-lab/nyc-map-agent",
+  "project_id": "pukujan-lab-2/nyc-map-agent",
   "namespace": "pukujan-nyc-map-agent",
   "extends": {
     "ontology_id": "oio:issue-log",
