@@ -105,7 +105,27 @@ export async function streamError(res: Response): Promise<string> {
   return (await peekStream(res)).message;
 }
 
-export function fallbackFetch(models: string[], base: typeof fetch = fetch, log: (m: string) => void = console.warn, wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)), slowMs = SLOW_START_MS, onUse: (model: string) => void = () => undefined): typeof fetch {
+/**
+ * One step of the chain: a model on the caller's own URL (a plain model name), or a whole provider
+ * with its own URL and headers (the smart profile, #35). `route` gets the path the SDK asked for.
+ */
+export interface Step { name: string; model: string; route?: (path: string) => { url: string; headers: Record<string, string> } }
+
+const pathOf = (input: Parameters<typeof fetch>[0]): string => {
+  const u = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  try { return new URL(u).pathname.replace(/^\/v\d+/, ""); } catch { return u; }
+};
+
+/** The caller's headers without its own key, which belongs to a different provider. */
+const headersWithout = (h: HeadersInit | undefined): Record<string, string> => {
+  const out: Record<string, string> = {};
+  new Headers(h).forEach((v, k) => { if (k !== "authorization") out[k] = v; });
+  return out;
+};
+
+export function fallbackFetch(chain: Array<string | Step>, base: typeof fetch = fetch, log: (m: string) => void = console.warn, wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)), slowMs = SLOW_START_MS, onUse: (model: string) => void = () => undefined): typeof fetch {
+  const steps: Step[] = chain.map((s) => (typeof s === "string" ? { name: s, model: s } : s));
+  const models = steps.map((s) => s.name);
   return async (input, init) => {
     const body = typeof init?.body === "string" ? init.body : null;
     let parsed: Record<string, unknown> | null = null;
@@ -114,15 +134,17 @@ export function fallbackFetch(models: string[], base: typeof fetch = fetch, log:
     const body0 = parsed;
     // One attempt: the response, and whether InferHub said "busy" (in the status, the body, or the
     // first stream chunk). With another model to try, a start slower than slowMs is abandoned.
-    const attempt = async (model: string, hasNext: boolean) => {
+    const attempt = async (step: Step, hasNext: boolean) => {
+      const { model } = step;
       const started = Date.now();
       const ctrl = new AbortController();
       const signal = init?.signal ? AbortSignal.any([init.signal, ctrl.signal]) : ctrl.signal;
       const timer = hasNext ? setTimeout(() => ctrl.abort(), slowMs) : undefined;
+      const to = step.route?.(pathOf(input));
       try {
         let res: Response;
         try {
-          res = await base(input, { ...init, signal, body: JSON.stringify(withoutThinking(model, { ...body0, model })) });
+          res = await base(to ? to.url : input, { ...init, ...(to ? { headers: { ...headersWithout(init?.headers), ...to.headers } } : {}), signal, body: JSON.stringify(withoutThinking(model, { ...body0, model })) });
         } catch (e) {
           if (ctrl.signal.aborted && !init?.signal?.aborted) return { res: new Response(null, { status: 504 }), msg: "slow", failed: true, busy: false, slow: true };
           throw e;
@@ -143,12 +165,12 @@ export function fallbackFetch(models: string[], base: typeof fetch = fetch, log:
     let last: Response | undefined;
     for (let i = 0; i < models.length; i++) {
       const hasNext = i < models.length - 1;
-      let a = await attempt(models[i], hasNext);
+      let a = await attempt(steps[i], hasNext);
       // A busy market usually clears within a second or two: retry the same model before giving up on it.
       for (let r = 0; a.busy && r < BUSY_RETRIES; r++) {
         log(`[agent] model ${models[i]} busy: HTTP ${a.res.status} ${a.msg}; retrying`);
         await wait(BUSY_WAIT_MS * (r + 1));
-        a = await attempt(models[i], hasNext);
+        a = await attempt(steps[i], hasNext);
       }
       if (a.slow) {
         log(`[agent] model ${models[i]} slow to start (over ${slowMs} ms); trying ${models[i + 1]}`);
@@ -160,7 +182,9 @@ export function fallbackFetch(models: string[], base: typeof fetch = fetch, log:
       }
       last = a.res;
       const type = a.res.ok ? "stream_error" : await errorType(a.res);
-      if (!(a.busy || (!a.res.ok && shouldFallBack(a.res.status, type))) || i === models.length - 1) return a.res;
+      // A separate provider is worth trying after any failure: a refused key or a bad request at one says nothing about the next.
+      const fallBack = a.busy || (!a.res.ok && (steps[i].route !== undefined || shouldFallBack(a.res.status, type))) || (a.res.ok && steps[i].route !== undefined);
+      if (!fallBack || i === models.length - 1) return a.res;
       log(`[agent] model ${models[i]} failed: HTTP ${a.res.status} ${type}; trying ${models[i + 1]}`);
     }
     return last as Response;

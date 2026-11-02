@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { useFlag } from "@/lib/flags";
 import { sharedCoords, startSharing, useSharedLocation } from "@/lib/geo/sharedLocation";
@@ -317,6 +317,20 @@ export function MapChrome() {
     lastLine.current = line;
     if (changed && line && !followed) setOpenMenu(null);
   }, [line, followed]);
+
+  // Publish where the button stack ends, so a phone's pull sheet stops short enough for Center on my
+  // location to fit between them. Zoom grows with the screen, so the stack ends lower on a tall phone.
+  useLayoutEffect(() => {
+    const el = stack.current;
+    const root = document.documentElement;
+    if (!el) return;
+    const publish = () => root.style.setProperty("--map-chrome-bottom", `${Math.ceil(el.getBoundingClientRect().bottom)}px`);
+    publish();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    ro?.observe(el);
+    window.addEventListener("resize", publish);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", publish); };
+  });
 
   const top = "calc(env(safe-area-inset-top) + 16px)";
   // Following: the same quick bar, with the follow cameras under Change view.

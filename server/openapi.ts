@@ -191,6 +191,7 @@ export const ROUTES = {
       ...errors,
     },
   }),
+  "/api/agent/health": jsonRoute("/api/agent/health", "The default model profile and each smart provider's last health probe (no keys)"),
   "/api/transit": jsonRoute("/api/transit", "Live transit capabilities ({ bus })"),
   "/api/transit/:system": jsonRoute(
     "/api/transit/{system}",

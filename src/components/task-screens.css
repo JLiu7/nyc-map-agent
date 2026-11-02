@@ -79,7 +79,8 @@
   padding: 2px 8px 8px;
   touch-action: none;
 }
-.pull-sheet[data-level="1"] { max-height: min(46dvh, calc(100dvh - var(--chat-bar-h, 96px) - 250px)); }
+/* Level 1 also leaves room under the top-right buttons for Center on my location (44 px, plus its 12 px gap and the 8 px --pull-sheet-h adds, plus 12 px clear). */
+.pull-sheet[data-level="1"] { max-height: min(46dvh, calc(100dvh - var(--chat-bar-h, 96px) - 250px), calc(100dvh - var(--chat-bar-h, 96px) - var(--map-chrome-bottom, 0px) - 76px)); }
 .pull-sheet[data-level="2"] { max-height: calc(100dvh - var(--chat-bar-h, 96px) - 220px); }
 .pull-sheet-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 /* A 24 px tap target (WCAG 2.2) that never shrinks in a full sheet; the bar itself stays a thin line near the top. */

@@ -1,6 +1,7 @@
 import { gapLeft, markAsked, QUESTION_GAP_MS, RETRY_WITHIN_S, waitFor } from "./askSpacing";
 import { streamEvent, type AgentRequest, type StreamEvent } from "./schema";
 import { SESSION_ID } from "../../lib/sessionId";
+import { getProfilePref } from "@/lib/modelProfile";
 
 /** Parse an NDJSON body into validated events; bad lines are dropped. */
 export async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamEvent> {
@@ -32,6 +33,9 @@ export function friendlyError(status: number): string {
   return "The assistant is unavailable right now. Try again in a moment.";
 }
 
+/** The model profile picked in Settings, unless the request already names one (the trip suite does). */
+export const withProfile = (req: AgentRequest, pick = getProfilePref()): AgentRequest => (req.profile || !pick ? req : { ...req, profile: pick });
+
 /**
  * Asks the agent. A question asked within the server's gap is held until the gap ends, and a
  * short fair-use refusal is waited out and retried, so the person never sees "one moment between
@@ -49,7 +53,7 @@ export async function* askAgent(req: AgentRequest, signal?: AbortSignal, onWait?
     }
     onWait?.(false);
     markAsked();
-    res = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", "x-session-id": SESSION_ID }, body: JSON.stringify(req), signal });
+    res = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", "x-session-id": SESSION_ID }, body: JSON.stringify(withProfile(req)), signal });
     if (res.status !== 429 || tries >= 2) break;
     const j = (await res.clone().json().catch(() => null)) as { retryAfterSeconds?: unknown } | null;
     const after = typeof j?.retryAfterSeconds === "number" ? j.retryAfterSeconds : Number(res.headers.get("retry-after"));

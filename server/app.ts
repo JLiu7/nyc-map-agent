@@ -60,6 +60,7 @@ const routes: Array<[string, Handler]> = [
   ["/api/transit-segments", transitSegments],
   ["/api/transit-live", transitLive],
   ["/api/transit-bus-segments", transitBusSegments],
+  ["/api/agent/health", agent.health],
   ["/api/transit", transit],
   ["/api/transit/:system", transit],
   ["/api/events", events],

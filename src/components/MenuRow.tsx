@@ -2,7 +2,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   BarChart3, BusFront, Building2, CalendarDays, ChevronRight, CircleDot, Database, Ear, History, House, Info, Languages, Layers,
-  Leaf, Lightbulb, LocateFixed, Lock, MessageSquare, Box, Palette, Settings, Shield, Signpost, SlidersHorizontal, Sun, TrainFront, Trash2, Volume2, Gauge, CloudSun, type LucideIcon,
+  Leaf, Lightbulb, Cpu, LocateFixed, Lock, MessageSquare, Box, Palette, Settings, Shield, Signpost, SlidersHorizontal, Sun, TrainFront, Trash2, Volume2, Gauge, CloudSun, type LucideIcon,
 } from "lucide-react";
 import { LiveLayerRows, SwitchRow } from "@/components/LiveLayerRows";
 import { FEATURES } from "@/features";
@@ -22,6 +22,7 @@ import { useSelectedLine } from "@/lib/transit/selectedLine";
 import { APP_LANGS, LANG_LABELS, setLangPref, useLangPref, type AppLang } from "@/lib/voice/langPref";
 import { setVoicePrefs, useVoicePrefs } from "@/lib/voice/voicePrefs";
 import { useMenuT, type MenuKey } from "@/lib/i18n/menuText";
+import { setProfilePref, useProfilePref, useSmartHealth, healthLine } from "@/lib/modelProfile";
 
 /**
  * The agent-first home's top-left menu row (#370, docs/DESIGN_RULES.md): six
@@ -215,6 +216,21 @@ function CityDataBody({ onClose, onOpenDashboard, onOpenSources }: { onClose: ()
   );
 }
 
+/** Smart (large hosted models) or Dev (the small model in training), with the smart chain's health. */
+function ModelChoice() {
+  const t = useMenuT();
+  const profile = useProfilePref();
+  const line = healthLine(useSmartHealth());
+  return (
+    <>
+      <Choice icon={<Cpu className={ICON} aria-hidden />} label={t("model")} value={profile ?? ""}
+        onChange={(v) => setProfilePref(v === "" ? null : v)}
+        options={[["", t("auto")], ["smart", "Smart"], ["dev", "Dev"]]} />
+      {line && profile !== "dev" ? <p data-testid="model-health" className="px-2 pb-2 pl-11 text-[12px] text-[#a5b4cb]">{line}</p> : null}
+    </>
+  );
+}
+
 function SettingsBody() {
   const [advanced, setAdvanced] = useAdvancedMode();
   const voice = useVoicePrefs();
@@ -240,6 +256,7 @@ function SettingsBody() {
       {flags.city3d ? <SwitchRow icon={<Box className={ICON} aria-hidden />} label={t("city3d")} on={city3d} onChange={setCity3d} /> : null}
       <SwitchRow icon={<Leaf className={ICON} aria-hidden />} label={t("eco")} on={eco} onChange={setEco} />
       <SwitchRow icon={<Gauge className={ICON} aria-hidden />} label={t("advanced")} on={advanced} onChange={setAdvanced} />
+      <ModelChoice />
     </div>
   );
 }

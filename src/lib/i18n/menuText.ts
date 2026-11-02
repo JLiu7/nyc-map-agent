@@ -14,7 +14,7 @@ type Key =
   | "rides" | "homeWork" | "chats" | "trips" | "exactLocation"
   | "crashes311" | "dataLayers" | "aboutData"
   | "language" | "thisPhone" | "speakAnswers" | "listenHeyMap" | "theme" | "auto" | "lighting" | "day" | "night"
-  | "weather" | "live" | "clear" | "off" | "city3d" | "eco" | "advanced"
+  | "weather" | "live" | "clear" | "off" | "city3d" | "eco" | "advanced" | "model"
   | "today" | "yourRides" | "lookedUp" | "ridesPaused" | "noUsualLine" | "noNotices" | "checking"
   | "planHomeWork" | "saveHomeWork" | "tripsShowHere" | "tripsPaused" | "home" | "work";
 
@@ -28,7 +28,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "Daily rides", homeWork: "Home & Work", chats: "Chats · 30 days", trips: "Trips looked up", exactLocation: "Exact location",
     crashes311: "311 and crashes", dataLayers: "Data layers", aboutData: "About the data",
     language: "Language", thisPhone: "This phone", speakAnswers: "Speak answers", listenHeyMap: "Listen for “Hey map”", theme: "Theme", auto: "Auto", lighting: "Lighting", day: "Day", night: "Night",
-    weather: "Weather", live: "Live", clear: "Clear", off: "Off", city3d: "Textured 3D city", eco: "Eco mode", advanced: "Advanced",
+    weather: "Weather", live: "Live", clear: "Clear", off: "Off", city3d: "Textured 3D city", eco: "Eco mode", advanced: "Advanced", model: "Model",
     today: "Today", yourRides: "Your rides", lookedUp: "Looked up", ridesPaused: "Daily rides are paused", noUsualLine: "No usual line yet", noNotices: "No notices", checking: "Checking…",
     planHomeWork: "Plan a trip between Home and Work", saveHomeWork: "Save Home and Work to see them here", tripsShowHere: "Trips you plan show here", tripsPaused: "Trips looked up are paused",
     home: "Home", work: "Work",
@@ -42,7 +42,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "Viajes diarios", homeWork: "Casa y trabajo", chats: "Chats · 30 días", trips: "Viajes buscados", exactLocation: "Ubicación exacta",
     crashes311: "311 y choques", dataLayers: "Capas de datos", aboutData: "Sobre los datos",
     language: "Idioma", thisPhone: "Este teléfono", speakAnswers: "Leer respuestas en voz alta", listenHeyMap: "Escuchar “Oye mapa”", theme: "Tema", auto: "Automático", lighting: "Luz", day: "Día", night: "Noche",
-    weather: "Clima", live: "En vivo", clear: "Despejado", off: "Apagado", city3d: "Ciudad 3D con texturas", eco: "Modo ahorro", advanced: "Avanzado",
+    weather: "Clima", live: "En vivo", clear: "Despejado", off: "Apagado", city3d: "Ciudad 3D con texturas", eco: "Modo ahorro", advanced: "Avanzado", model: "Modelo",
     today: "Hoy", yourRides: "Tus viajes", lookedUp: "Buscado", ridesPaused: "Viajes diarios en pausa", noUsualLine: "Aún no hay línea habitual", noNotices: "Sin avisos", checking: "Revisando…",
     planHomeWork: "Planea un viaje entre casa y trabajo", saveHomeWork: "Guarda casa y trabajo para verlos aquí", tripsShowHere: "Aquí aparecen los viajes que planees", tripsPaused: "Viajes buscados en pausa",
     home: "Casa", work: "Trabajo",
@@ -56,7 +56,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "日常乘车", homeWork: "家和公司", chats: "对话 · 30 天", trips: "查过的行程", exactLocation: "精确位置",
     crashes311: "311 和交通事故", dataLayers: "数据图层", aboutData: "关于数据",
     language: "语言", thisPhone: "跟随手机", speakAnswers: "朗读回答", listenHeyMap: "听“嘿地图”", theme: "主题", auto: "自动", lighting: "光线", day: "白天", night: "夜晚",
-    weather: "天气", live: "实时", clear: "晴天", off: "关闭", city3d: "带纹理的 3D 城市", eco: "省电模式", advanced: "高级",
+    weather: "天气", live: "实时", clear: "晴天", off: "关闭", city3d: "带纹理的 3D 城市", eco: "省电模式", advanced: "高级", model: "模型",
     today: "今天", yourRides: "你的乘车", lookedUp: "查过的", ridesPaused: "日常乘车已暂停", noUsualLine: "还没有常坐的线路", noNotices: "没有通知", checking: "正在检查…",
     planHomeWork: "规划家和公司之间的行程", saveHomeWork: "保存家和公司后会显示在这里", tripsShowHere: "你规划的行程会显示在这里", tripsPaused: "查过的行程已暂停",
     home: "家", work: "公司",
@@ -70,7 +70,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "Ежедневные поездки", homeWork: "Дом и работа", chats: "Чаты · 30 дней", trips: "Найденные маршруты", exactLocation: "Точное место",
     crashes311: "311 и аварии", dataLayers: "Слои данных", aboutData: "О данных",
     language: "Язык", thisPhone: "Как на телефоне", speakAnswers: "Озвучивать ответы", listenHeyMap: "Слушать «Эй, карта»", theme: "Тема", auto: "Авто", lighting: "Освещение", day: "День", night: "Ночь",
-    weather: "Погода", live: "Сейчас", clear: "Ясно", off: "Выкл.", city3d: "3D-город с текстурами", eco: "Эко-режим", advanced: "Расширенные",
+    weather: "Погода", live: "Сейчас", clear: "Ясно", off: "Выкл.", city3d: "3D-город с текстурами", eco: "Эко-режим", advanced: "Расширенные", model: "Модель",
     today: "Сегодня", yourRides: "Ваши поездки", lookedUp: "Вы искали", ridesPaused: "Ежедневные поездки на паузе", noUsualLine: "Пока нет обычной линии", noNotices: "Нет уведомлений", checking: "Проверяю…",
     planHomeWork: "Маршрут между домом и работой", saveHomeWork: "Сохраните дом и работу, чтобы видеть их здесь", tripsShowHere: "Здесь будут ваши маршруты", tripsPaused: "Найденные маршруты на паузе",
     home: "Дом", work: "Работа",
@@ -84,7 +84,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "প্রতিদিনের যাত্রা", homeWork: "বাসা ও কাজ", chats: "চ্যাট · ৩০ দিন", trips: "খোঁজা যাত্রা", exactLocation: "সঠিক অবস্থান",
     crashes311: "311 ও দুর্ঘটনা", dataLayers: "ডেটা স্তর", aboutData: "ডেটা সম্পর্কে",
     language: "ভাষা", thisPhone: "এই ফোনের মতো", speakAnswers: "উত্তর বলে শোনান", listenHeyMap: "“হেই ম্যাপ” শুনুন", theme: "থিম", auto: "স্বয়ংক্রিয়", lighting: "আলো", day: "দিন", night: "রাত",
-    weather: "আবহাওয়া", live: "লাইভ", clear: "পরিষ্কার", off: "বন্ধ", city3d: "টেক্সচারসহ 3D শহর", eco: "ইকো মোড", advanced: "উন্নত",
+    weather: "আবহাওয়া", live: "লাইভ", clear: "পরিষ্কার", off: "বন্ধ", city3d: "টেক্সচারসহ 3D শহর", eco: "ইকো মোড", advanced: "উন্নত", model: "মডেল",
     today: "আজ", yourRides: "আপনার যাত্রা", lookedUp: "খোঁজা হয়েছে", ridesPaused: "প্রতিদিনের যাত্রা বিরত", noUsualLine: "এখনও নিয়মিত লাইন নেই", noNotices: "কোনো নোটিশ নেই", checking: "দেখছি…",
     planHomeWork: "বাসা ও কাজের মধ্যে যাত্রা পরিকল্পনা করুন", saveHomeWork: "এখানে দেখতে বাসা ও কাজ সংরক্ষণ করুন", tripsShowHere: "আপনার পরিকল্পিত যাত্রা এখানে দেখাবে", tripsPaused: "খোঁজা যাত্রা বিরত",
     home: "বাড়ি", work: "কাজ",
@@ -98,7 +98,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "Vwayaj chak jou", homeWork: "Kay ak travay", chats: "Chat · 30 jou", trips: "Vwayaj ou chèche", exactLocation: "Kote egzak",
     crashes311: "311 ak aksidan", dataLayers: "Kouch done", aboutData: "Sou done yo",
     language: "Lang", thisPhone: "Menm jan ak telefòn nan", speakAnswers: "Li repons yo fò", listenHeyMap: "Koute “Hé kat”", theme: "Tèm", auto: "Otomatik", lighting: "Limyè", day: "Jou", night: "Nwit",
-    weather: "Tan an", live: "An dirèk", clear: "Klè", off: "Etenn", city3d: "Vil 3D ak teksti", eco: "Mòd ekonomi", advanced: "Avanse",
+    weather: "Tan an", live: "An dirèk", clear: "Klè", off: "Etenn", city3d: "Vil 3D ak teksti", eco: "Mòd ekonomi", advanced: "Avanse", model: "Modèl",
     today: "Jodi a", yourRides: "Vwayaj ou", lookedUp: "Ou te chèche", ridesPaused: "Vwayaj chak jou an poz", noUsualLine: "Poko gen liy abityèl", noNotices: "Pa gen avi", checking: "M ap tcheke…",
     planHomeWork: "Planifye yon vwayaj ant kay ak travay", saveHomeWork: "Sere kay ak travay pou wè yo isit la", tripsShowHere: "Vwayaj ou planifye ap parèt isit la", tripsPaused: "Vwayaj ou chèche an poz",
     home: "Lakay", work: "Travay",
@@ -112,7 +112,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "Trajets quotidiens", homeWork: "Maison et travail", chats: "Discussions · 30 jours", trips: "Trajets recherchés", exactLocation: "Position exacte",
     crashes311: "311 et accidents", dataLayers: "Calques de données", aboutData: "À propos des données",
     language: "Langue", thisPhone: "Comme le téléphone", speakAnswers: "Lire les réponses", listenHeyMap: "Écouter « Hé carte »", theme: "Thème", auto: "Auto", lighting: "Éclairage", day: "Jour", night: "Nuit",
-    weather: "Météo", live: "En direct", clear: "Dégagé", off: "Désactivé", city3d: "Ville 3D texturée", eco: "Mode éco", advanced: "Avancé",
+    weather: "Météo", live: "En direct", clear: "Dégagé", off: "Désactivé", city3d: "Ville 3D texturée", eco: "Mode éco", advanced: "Avancé", model: "Modèle",
     today: "Aujourd'hui", yourRides: "Vos trajets", lookedUp: "Recherché", ridesPaused: "Trajets quotidiens en pause", noUsualLine: "Pas encore de ligne habituelle", noNotices: "Aucun avis", checking: "Vérification…",
     planHomeWork: "Planifier un trajet entre maison et travail", saveHomeWork: "Enregistrez maison et travail pour les voir ici", tripsShowHere: "Vos trajets planifiés apparaissent ici", tripsPaused: "Trajets recherchés en pause",
     home: "Domicile", work: "Travail",
@@ -126,7 +126,7 @@ const T: Record<AppLang, Record<Key, string>> = {
     rides: "매일 타는 노선", homeWork: "집과 직장", chats: "대화 · 30일", trips: "찾아본 경로", exactLocation: "정확한 위치",
     crashes311: "311 및 사고", dataLayers: "데이터 레이어", aboutData: "데이터 안내",
     language: "언어", thisPhone: "휴대폰 설정", speakAnswers: "답변 읽어 주기", listenHeyMap: "“헤이 맵” 듣기", theme: "테마", auto: "자동", lighting: "조명", day: "낮", night: "밤",
-    weather: "날씨", live: "실시간", clear: "맑음", off: "끄기", city3d: "질감 있는 3D 도시", eco: "절약 모드", advanced: "고급",
+    weather: "날씨", live: "실시간", clear: "맑음", off: "끄기", city3d: "질감 있는 3D 도시", eco: "절약 모드", advanced: "고급", model: "모델",
     today: "오늘", yourRides: "내 노선", lookedUp: "찾아본 것", ridesPaused: "매일 타는 노선 기록 일시정지", noUsualLine: "아직 자주 타는 노선 없음", noNotices: "알림 없음", checking: "확인 중…",
     planHomeWork: "집과 직장 사이 경로 찾기", saveHomeWork: "집과 직장을 저장하면 여기에 보여요", tripsShowHere: "찾은 경로가 여기에 보여요", tripsPaused: "찾아본 경로 기록 일시정지",
     home: "집", work: "직장",

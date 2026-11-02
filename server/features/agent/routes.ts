@@ -11,6 +11,8 @@ import { resolveFlags } from "../../../src/lib/flags/registry";
 import { isShortReply, makeTools, type ToolContext } from "./tools";
 import { toNyLocal } from "./trip";
 import { fallbackFetch, modelChain } from "./model-fallback";
+import { pickProfile, routeFor, smartProviders, type Profile } from "./providers";
+import { byHealth, healthReport, startWatcher } from "./health";
 import { clientIp } from "../../lib/clientIp";
 import { answerWithoutModel, fastIntent } from "./noModel";
 import { budgetConfigFromEnv, createDailyBudget, createLimiter, limitConfigFromEnv, limitedResponse, noModelMessage } from "./fair-use";
@@ -30,13 +32,29 @@ export const DEFAULT_MODEL = "cb/deepseek-v4.1-flash";
 // The prompt lives in prompt.ts; re-exported for existing importers.
 export { contextLine, systemPrompt } from "./prompt";
 
-function defaultModel(only?: string, run?: RunLog): LanguageModel {
+function defaultModel(only?: string, run?: RunLog, profile: Profile = "dev"): LanguageModel {
+  const log = (m: string) => { console.warn(m); run?.note(m); };
+  // Smart (#35): the hosted providers, healthy ones first; each call goes to that provider's own URL.
+  const smart = !only && profile === "smart" ? byHealth(smartProviders()) : [];
+  if (smart.length) {
+    startWatcher();
+    const steps = smart.map((p) => ({ name: `${p.id}:${p.model}`, model: p.model, route: (path: string) => routeFor(p, path) }));
+    return createOpenAICompatible({ name: "smart", baseURL: "http://smart.invalid/v1", apiKey: "per-provider", fetch: fallbackFetch(steps, fetch, log, undefined, undefined, (m) => run?.usedModel(m)) })(steps[0].model);
+  }
   const key = process.env.INFERHUB_API_KEY;
   if (!key) throw new Error("INFERHUB_API_KEY is not set on the server.");
   // Over the daily cap only the configured cheap model is tried, with no fallbacks to pricier ones.
   const models = only ? [only] : modelChain(process.env.INFERHUB_MODEL ?? DEFAULT_MODEL, process.env.INFERHUB_MODEL_FALLBACKS);
-  return createOpenAICompatible({ name: "inferhub", baseURL: INFERHUB_BASE_URL, apiKey: key, fetch: fallbackFetch(models, fetch, (m) => { console.warn(m); run?.note(m); }, undefined, undefined, (m) => run?.usedModel(m)) })(models[0]);
+  return createOpenAICompatible({ name: "inferhub", baseURL: INFERHUB_BASE_URL, apiKey: key, fetch: fallbackFetch(models, fetch, log, undefined, undefined, (m) => run?.usedModel(m)) })(models[0]);
 }
+
+/** GET /api/agent/health (#35): the default profile and each smart provider's last probe. No keys or URLs. */
+export const health = {
+  GET: (): Promise<Response> => {
+    startWatcher();
+    return Promise.resolve(Response.json({ profile: pickProfile(undefined), smart: healthReport() }, { headers: { "cache-control": "no-store" } }));
+  },
+};
 
 /** The request's facts as a system message right before the latest user message. */
 function withFacts<M extends { role: string }>(messages: M[], facts: string): (M | { role: "system"; content: string })[] {
@@ -60,11 +78,13 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
   if (!limit.ok) return limitedResponse(limit.retryAt, limit.reason, fair.now());
   const budget = fair.budget.tier();
   const { now, mode, context, lang, memory, underground, heard } = parsed.data;
+  const profile = pickProfile(parsed.data.profile);
+  const smartFirst = profile === "smart" ? byHealth(smartProviders())[0] : undefined;
   let messages = parsed.data.messages;
   // In street view, "here" is the spot on screen (the prompt says so); otherwise the shared location.
   const location = context ? { lon: context.lon, lat: context.lat } : parsed.data.location ?? null;
   const enc = new TextEncoder();
-  const modelId = budget.tier === "cheap" ? budget.model : budget.tier === "none" ? "none" : (process.env.INFERHUB_MODEL ?? DEFAULT_MODEL);
+  const modelId = budget.tier === "cheap" ? budget.model : budget.tier === "none" ? "none" : smartFirst ? `${smartFirst.id}:${smartFirst.model}` : (process.env.INFERHUB_MODEL ?? DEFAULT_MODEL);
   // The asker's clock resolves "tomorrow"; a missing or broken one falls back to the server's.
   const asked = now ? new Date(now) : null;
   const clock = asked && Number.isFinite(asked.getTime()) ? asked : new Date();
@@ -144,7 +164,7 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
         return;
       }
       try {
-        const model = opts.model ?? defaultModel(budget.tier === "cheap" ? budget.model : undefined, run);
+        const model = opts.model ?? defaultModel(budget.tier === "cheap" ? budget.model : undefined, run, profile);
         const result = streamText({
           model,
           // Rules first and identical every time, facts just before the latest question, so the cached
