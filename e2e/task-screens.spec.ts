@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 const trip = JSON.parse(readFileSync(new URL("./fixtures/agent-trip.json", import.meta.url), "utf8")) as Record<string, unknown>;
 const stream = (events: unknown[]) => events.map((e) => JSON.stringify(e)).join("\n") + "\n";
@@ -229,11 +230,11 @@ test("asking in street view keeps the camera at eye level", async ({ page }) => 
     { type: "text", text: "Bryant Park is the closest open restroom." }, { type: "done" },
   ]) }));
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: 15_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: slow(15_000) });
   await page.getByTestId("map-view-switch").getByRole("radio", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   const pitch = () => page.evaluate(() => (window as unknown as { __map: { getPitch(): number } }).__map.getPitch());
-  await expect.poll(pitch, { timeout: 15_000 }).toBeGreaterThan(60);
+  await expect.poll(pitch, { timeout: slow(15_000) }).toBeGreaterThan(60);
   await ask(page, "Where is the nearest restroom?");
   await expect(page.getByText("Bryant Park is the closest open restroom.")).toBeVisible();
   await page.waitForTimeout(1000);
@@ -253,9 +254,9 @@ test("a question from the ask box in street view is asked from the street spot",
     return r.fulfill({ contentType: "application/x-ndjson", body: stream([{ type: "text", text: "Bryant Park is the closest open restroom." }, { type: "done" }]) });
   });
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: 15_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: slow(15_000) });
   await page.getByTestId("map-view-switch").getByRole("radio", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   await ask(page, "Where is the nearest restroom?");
   await expect(page.getByText("Bryant Park is the closest open restroom.")).toBeVisible();
   expect(bodies[0].context?.source).toBe("street-view");
@@ -270,15 +271,15 @@ test("street view draws station markers only near you", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mockNetwork(page);
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: 15_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: slow(15_000) });
   await page.getByTestId("map-view-switch").getByRole("radio", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   const near = (id: string) => page.evaluate((layer) => {
     const m = (window as unknown as { __map: { getLayer(id: string): unknown; getFilter(id: string): unknown } }).__map;
     return m.getLayer(layer) ? JSON.stringify(m.getFilter(layer)).includes("distance") : null;
   }, id);
   for (const id of ["transit-work", "transit-skip", "transit-access"]) {
-    await expect.poll(() => near(id), { timeout: 15_000, message: id }).not.toBe(false);
+    await expect.poll(() => near(id), { timeout: slow(15_000), message: id }).not.toBe(false);
   }
   await expectLayout(page);
 });
@@ -298,11 +299,11 @@ test("a restroom answer in street view on a tablet keeps the camera, pad and min
     { type: "done" },
   ]) }));
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: 15_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __map?: unknown }).__map), null, { timeout: slow(15_000) });
   await page.getByTestId("map-view-switch").getByRole("radio", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   const pitch = () => page.evaluate(() => (window as unknown as { __map: { getPitch(): number } }).__map.getPitch());
-  await expect.poll(pitch, { timeout: 15_000 }).toBeGreaterThan(60);
+  await expect.poll(pitch, { timeout: slow(15_000) }).toBeGreaterThan(60);
   const zoom = () => page.evaluate(() => (window as unknown as { __map: { getZoom(): number } }).__map.getZoom());
   const eyeZoom = await zoom();
   await ask(page, "Where is the nearest restroom?");

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 const stream = (events: unknown[]) => events.map((e) => JSON.stringify(e)).join("\n") + "\n";
 const SHOTS = process.env.LANG_SHOTS;
@@ -13,7 +14,7 @@ for (const [width, height] of [[375, 667], [320, 568]]) {
     ]) }));
     await page.goto("/");
     // The agent overlay loads lazily; a busy machine can take a few seconds.
-    await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: slow(15_000) });
     await page.getByLabel("Ask the assistant").fill("我要上厕所");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const ask = page.getByLabel("问助手");

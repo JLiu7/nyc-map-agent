@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 const nd = (evs: unknown[]) => evs.map((e) => JSON.stringify(e)).join("\n") + "\n";
 const shots = process.env.QA_SHOTS_DIR;
@@ -73,7 +74,7 @@ test("street level: Ask opens a compact sheet and sends the spot as context; han
   await expect(sheet.getByRole("button", { name: "Hands-free" })).toHaveAttribute("aria-pressed", "true");
   await expect(sheet.getByTestId("voice-status")).toContainText("Listening");
   await shot(page, "3-listening");
-  await expect.poll(() => bodies.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => bodies.length, { timeout: slow(10_000) }).toBeGreaterThanOrEqual(2);
   expect((bodies[1] as { messages: Array<{ content: string }> }).messages.at(-1)?.content).toBe("which exit for the 1 train");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __said: string[] }).__said.length)).toBeGreaterThanOrEqual(1);
   // One question per tap: once the agent takes it, hands-free ends and the mic does not reopen.

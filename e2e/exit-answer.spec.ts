@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 const stream = (events: unknown[]) => events.map((e) => JSON.stringify(e)).join("\n") + "\n";
 const SHOTS = process.env.EXIT_SHOTS;
@@ -22,7 +23,7 @@ for (const [width, height] of [[375, 667], [320, 568]]) {
       { type: "done" },
     ]) }));
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: slow(15_000) });
     await page.getByLabel("Ask the assistant").fill("Which exit for the Empire State Building?");
     await page.getByRole("button", { name: "Send", exact: true }).click();
 
@@ -69,7 +70,7 @@ test("walking away from the place after an exit answer says to turn around", asy
     { type: "done" },
   ]) }));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Restroom" })).toBeVisible({ timeout: slow(15_000) });
   // Share location from Center on my location.
   await page.getByTestId("locate-button").first().click();
   await expect(page.getByTestId("locate-button").first()).toHaveAttribute("data-camera", "follow");
@@ -77,7 +78,7 @@ test("walking away from the place after an exit answer says to turn around", asy
   await expect.poll(() => page.evaluate(async () => {
     const src = (window as unknown as { __map?: { getSource: (id: string) => { getData: () => Promise<{ features?: unknown[] }> } | undefined } }).__map?.getSource("you");
     return (src ? await src.getData() : null)?.features?.length ?? 0;
-  }), { timeout: 15_000 }).toBe(1);
+  }), { timeout: slow(15_000) }).toBe(1);
   await page.getByLabel("Ask the assistant").fill("Which exit for the Empire State Building?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   const card = page.locator('[data-testid="answer-card"][data-compact]');

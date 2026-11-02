@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 // Owner, 2026-10-28: one sheet, like Google and Apple Maps. The ask box is always there; an answer
 // and a map card share one left column on wide screens, and a phone's answer pulls up and down.
@@ -59,10 +60,10 @@ test("a wide screen keeps status chips in one row at the top of the left side", 
   await page.waitForFunction(() => typeof (window as unknown as { __pushPanel?: unknown }).__pushPanel === "function");
   await page.evaluate(() => (window as unknown as { __pushPanel: (c: object) => void }).__pushPanel({ id: "restroom:test", title: "Bryant Park restroom", subtitle: "Public restroom" }));
   // The clean-map chip comes up for an open place, and the row is drawn on wide screens.
-  await expect(page.getByTestId("context-clean")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("context-clean")).toBeVisible({ timeout: slow(15_000) });
   await expect(page.getByTestId("left-chips")).toBeAttached();
   const chip = page.getByTestId("left-chips").getByTestId("context-clean");
-  await expect(chip).toBeVisible({ timeout: 15_000 });
+  await expect(chip).toBeVisible({ timeout: slow(15_000) });
   const box = (await chip.boundingBox())!;
   const card = (await page.getByTestId("left-slot").boundingBox())!;
   // Top left, above the card, not floating over the middle of the map.
@@ -86,7 +87,7 @@ test("a minimized card on a wide screen waits in the chip row at the top left", 
   await page.evaluate(() => (window as unknown as { __pushPanel: (c: object) => void }).__pushPanel({ id: "restroom:test", title: "Bryant Park restroom", subtitle: "Public restroom" }));
   await page.getByRole("button", { name: "Minimize", exact: true }).click();
   const peek = page.getByTestId("left-chips").getByTestId("peek-chip");
-  await expect(peek).toBeVisible({ timeout: 15_000 });
+  await expect(peek).toBeVisible({ timeout: slow(15_000) });
   const box = (await peek.boundingBox())!;
   // Top left, away from the ask box at the foot of the screen.
   expect(box.x).toBeLessThan(40);

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 const ORDER = [
   ["myDay", "My day"],
@@ -14,7 +15,7 @@ test("a phone is chat-first: no menu row, and language comes up from behind the 
   await page.setViewportSize({ width: 390, height: 800 });
   await mockNetwork(page);
   await page.goto("/");
-  await expect(page.getByTestId("agent-bar")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("agent-bar")).toBeVisible({ timeout: slow(15_000) });
   await expect(page.getByTestId("menu-row")).toHaveCount(0);
   await expect(page.getByTestId("zoom-control")).toBeHidden();
   // Quick buttons at the top right (zoom as + and −); Center on my location sits just above the chat.

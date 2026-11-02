@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 test("boarding the downtown 6 by mistake says to get off and cross over", async ({ page }) => {
   test.setTimeout(180_000);
@@ -9,7 +10,7 @@ test("boarding the downtown 6 by mistake says to get off and cross over", async 
   // The pretend trip plans the uptown 6 to Grand Central but rides it downtown.
   await page.goto("/?sim=wrongway");
   const warning = page.getByTestId("trip-warning");
-  await expect(warning).toHaveText(/^This train is going downtown\. Get off at .+ and cross over\.$/, { timeout: 120_000 });
+  await expect(warning).toHaveText(/^This train is going downtown\. Get off at .+ and cross over\.$/, { timeout: slow(120_000) });
   // One line in the bottom sheet, with the ask box still there.
   await expect(page.getByLabel("Ask the assistant")).toBeVisible();
   await expectLayout(page);

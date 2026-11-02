@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 /**
  * The primary panel slot (UI plan, build step 2): one panel at a time, a
@@ -79,7 +80,7 @@ test("a vehicle tap closes the drawer and follows it with a slim card", async ({
   await expect.poll(async () => {
     await tapMap(page, 0.5, BUS_Y);
     return page.getByTestId("follow-card").count();
-  }, { timeout: 30_000 }).toBeGreaterThan(0);
+  }, { timeout: slow(30_000) }).toBeGreaterThan(0);
   await expect(drawer(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Stop following" }).first()).toBeVisible();
   // The follow camera is top-down and north up. On a phone the orientation control
@@ -124,7 +125,7 @@ test("an empty map tap closes a details sheet", async ({ page }) => {
   await expect.poll(async () => {
     await page.mouse.click(canvas.x + 8, bar.y + bar.height + 24);
     return sheet(page).count();
-  }, { timeout: 10_000 }).toBe(0);
+  }, { timeout: slow(10_000) }).toBe(0);
 });
 
 test("Esc and Back close the top panel first", async ({ page }) => {
@@ -192,7 +193,7 @@ test("follow card stays clear of Layers and Lines stays on the action row", asyn
   await expect.poll(async () => {
     await tapMap(page, 0.5, BUS_Y);
     return page.getByTestId("follow-card").count();
-  }, { timeout: 30_000 }).toBeGreaterThan(0);
+  }, { timeout: slow(30_000) }).toBeGreaterThan(0);
   await page.getByTestId("layers-button").click();
   await expect(page.getByTestId("quick-layers")).toBeVisible();
   await expectFollowChromeClear(page);

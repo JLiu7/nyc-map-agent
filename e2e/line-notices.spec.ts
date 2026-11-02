@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 // The 2 line with one elevator outage at Times Sq-42 St (captured from /api/transit-live, trimmed).
 const FIXTURE = JSON.parse(readFileSync(new URL("./fixtures/transit-live-2-line.json", import.meta.url), "utf8")) as {
@@ -25,8 +26,8 @@ for (const [width, height] of [[375, 667], [320, 568]]) {
     await page.route("**/api/transit-live*", (r) => r.fulfill({ contentType: "application/json", body: liveNow() }));
     await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: false }) }));
     await page.goto("/");
-    await page.getByRole("button", { name: "My train" }).click({ timeout: 15_000 });
-    await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: 15_000 });
+    await page.getByRole("button", { name: "My train" }).click({ timeout: slow(15_000) });
+    await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: slow(15_000) });
     const sheet = page.getByTestId("line-panel");
     await expect(sheet).toBeVisible();
 
@@ -43,13 +44,13 @@ for (const [width, height] of [[375, 667], [320, 568]]) {
     const ring = page.locator(".maplibregl-marker", { hasText: "No elevator" });
     await expect(ring).toBeVisible();
     // Tapping the notice is asking where it is: the map goes in close on the station.
-    await expect.poll(zoom, { timeout: 5_000 }).toBeGreaterThan(14);
+    await expect.poll(zoom, { timeout: slow(5_000) }).toBeGreaterThan(14);
     // Then the ring sits in the open map: on screen and above the sheet.
     await expect.poll(async () => {
       const r = (await ring.boundingBox())!;
       const s = (await sheet.boundingBox())!;
       return r.y >= 0 && r.x >= 0 && r.x + 34 <= width && r.y + 34 <= s.y;
-    }, { timeout: 5_000 }).toBe(true);
+    }, { timeout: slow(5_000) }).toBe(true);
   });
 }
 
@@ -63,9 +64,9 @@ test("escalators out at one station are one card, and the Lines list counts what
   await page.route("**/api/transit-live*", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(body) }));
   await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: false }) }));
   await page.goto("/");
-  await page.getByRole("button", { name: "My train" }).click({ timeout: 15_000 });
+  await page.getByRole("button", { name: "My train" }).click({ timeout: slow(15_000) });
   const row = page.locator('[data-line="2"] button');
-  await expect(row).toContainText("2 notices", { timeout: 15_000 });
+  await expect(row).toContainText("2 notices", { timeout: slow(15_000) });
   await row.click();
   const sheet = page.getByTestId("line-panel");
   await expect(sheet.locator("[data-notice]")).toHaveCount(2);
@@ -92,8 +93,8 @@ for (const [width, height] of [[375, 667], [1280, 800]]) {
         changes: [], skipNames: ["Christopher St-Stonewall", "Houston St"] }] }) });
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "My train" }).click({ timeout: 15_000 });
-    await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: 15_000 });
+    await page.getByRole("button", { name: "My train" }).click({ timeout: slow(15_000) });
+    await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: slow(15_000) });
     await expect(page.getByTestId("line-panel")).toBeVisible();
     const days = page.getByTestId("line-day");
     await expect(days.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "true");
@@ -112,8 +113,8 @@ test("a desktop line card sits in the left column", async ({ page }) => {
   await page.route("**/api/transit-live*", (r) => r.fulfill({ contentType: "application/json", body: liveNow() }));
   await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: false }) }));
   await page.goto("/");
-  await page.getByRole("button", { name: "My train" }).click({ timeout: 15_000 });
-  await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: 15_000 });
+  await page.getByRole("button", { name: "My train" }).click({ timeout: slow(15_000) });
+  await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: slow(15_000) });
   const line = page.getByTestId("left-slot").getByTestId("line-panel");
   await expect(line).toBeVisible();
   expect((await line.boundingBox())!.x).toBeLessThan(40);
@@ -133,11 +134,11 @@ test("the old layout's Lines list opens the picked line from street view", async
   await page.goto("/?flags=-agentHome");
   await expect(page.locator("canvas.maplibregl-canvas").first()).toBeVisible();
   await page.getByTestId("view-switcher").getByRole("button", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   await page.getByTestId("lines-button").click();
-  await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: 15_000 });
-  await expect(page.getByTestId("line-panel")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: slow(15_000) });
+  await expect(page.getByTestId("line-panel")).toBeVisible({ timeout: slow(15_000) });
   // Street level goes to the flat map on the line.
-  await expect(page.getByTestId("street-minimap")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toHaveCount(0, { timeout: slow(15_000) });
   await expectLayout(page);
 });

@@ -1,5 +1,6 @@
 import { expect, test, type ConsoleMessage } from "@playwright/test";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 // Network refusals we cause on purpose (mocks.ts) are not app bugs.
 const EXPECTED = [/ERR_BLOCKED_BY_CLIENT/, /Failed to load resource/];
@@ -28,9 +29,9 @@ test("map loads, search opens a panel, street level toggles, no console errors",
 
   // Street level on from the view switcher, then back up with Top.
   await page.getByTestId("view-switcher").getByRole("button", { name: "Street", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toBeVisible({ timeout: slow(15_000) });
   await page.getByTestId("view-switcher").getByRole("button", { name: "Top", exact: true }).click();
-  await expect(page.getByTestId("street-minimap")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("street-minimap")).toHaveCount(0, { timeout: slow(15_000) });
   await expect(page.getByTestId("view-switcher").getByRole("button", { name: "Street", exact: true })).toHaveAttribute("aria-pressed", "false");
 
   expect(errors, errors.join("\n")).toEqual([]);

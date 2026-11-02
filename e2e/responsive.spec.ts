@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { expectLayout, SIZES } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 /**
  * Every main screen meets the layout bar in e2e/layout.ts at every size in
@@ -123,7 +124,7 @@ for (const size of SIZES) {
       await ask(page, "Plan my trip to Times Square, leaving now.");
       await expect(page.getByText(/Sending in a moment/).first()).toBeVisible();
       await expectLayout(page);
-      await expect(page.getByText("Times Square is 12 minutes away on the 1 train.")).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText("Times Square is 12 minutes away on the 1 train.")).toBeVisible({ timeout: slow(10_000) });
       await expect(page.getByText(/between questions/)).toHaveCount(0);
       await expectLayout(page);
     });

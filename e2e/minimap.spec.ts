@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 test("street level shows a mini map whose heading cone turns with the camera", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -12,7 +13,7 @@ test("street level shows a mini map whose heading cone turns with the camera", a
   await areas;
   await page.getByTestId("view-switcher").getByRole("button", { name: "Street", exact: true }).click();
   const mini = page.getByTestId("street-minimap");
-  await expect(mini).toBeVisible({ timeout: 15_000 });
+  await expect(mini).toBeVisible({ timeout: slow(15_000) });
   const cone = page.getByTestId("minimap-cone");
   await page.waitForTimeout(1500);
   const before = Number(await cone.getAttribute("data-bearing"));
@@ -49,7 +50,7 @@ test("street level mini map points to the nearest restroom and the card offers d
   await areas;
   await page.getByTestId("view-switcher").getByRole("button", { name: "Street", exact: true }).click();
   const chip = page.getByTestId("minimap-nearest-restroom");
-  await expect(chip).toBeVisible({ timeout: 20_000 });
+  await expect(chip).toBeVisible({ timeout: slow(20_000) });
   await expect(chip).toHaveAttribute("aria-label", /^Nearest restroom, \d+ m /);
   await expect(chip).toContainText(" m");
   await chip.click();

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
+import { slow } from "./slow";
 
 // Myrtle Av on the J, M and Z: three lines share the track and the station.
 const SUBWAY = JSON.parse(readFileSync(new URL("../public/transit/subway.json", import.meta.url), "utf8")) as {
@@ -15,7 +16,7 @@ async function tapMyrtle(page: Page) {
   await mockNetwork(page);
   await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: false }) }));
   await page.goto("/");
-  await page.waitForFunction(() => Boolean((window as unknown as { __map?: TestMap }).__map?.getLayer("transit-line")), null, { timeout: 20_000 });
+  await page.waitForFunction(() => Boolean((window as unknown as { __map?: TestMap }).__map?.getLayer("transit-line")), null, { timeout: slow(20_000) });
   await page.evaluate((c) => (window as unknown as { __map: TestMap }).__map.jumpTo({ center: c, zoom: 13.5, bearing: 0, pitch: 0 }), MYRTLE);
   // Wait until the J and M are drawn around the station: tapping before they are lands on the dot instead.
   // (The Z runs at rush hour only, so a phone may not draw it.)
@@ -27,7 +28,7 @@ async function tapMyrtle(page: Page) {
     const p = m.project(c);
     const routes = new Set(m.queryRenderedFeatures([[p.x - 30, p.y - 30], [p.x + 30, p.y + 30]], { layers: ["transit-line"] }).map((f) => String(f.properties?.route)));
     return ["J", "M"].filter((r) => routes.has(r)).join(" ") || `none at ${at.lng.toFixed(4)},${at.lat.toFixed(4)} z${m.getZoom().toFixed(1)}`;
-  }, MYRTLE), { timeout: 15_000 }).toBe("J M");
+  }, MYRTLE), { timeout: slow(15_000) }).toBe("J M");
   // A tap on the white dot opens the station card as before; the chooser is for the shared track beside it,
   // so tap the J/M/Z line about 8 px from the dot.
   const at = await page.evaluate((c) => {
