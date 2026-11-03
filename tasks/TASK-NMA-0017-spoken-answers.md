@@ -100,6 +100,29 @@ Blocked/uncertain:
 Next:
 - Wait for the pull request's checks to pass and auto-merge, then listen to the Kokoro voice on a phone once deployed
 
+### 2026-11-03 21:24:31 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["checkpoints/CURRENT.md"],"completed":["CURRENT.md now says the model switch and the spoken answers are merged, that the four smart keys are in the VPS env, and what is still open"],"decisions":["no new decisions"],"evidence":["Only checkpoints/CURRENT.md changed; the pull request has auto-merge on"],"evidence_class":"observed","next_action":"Wait for the pull request to merge, then listen to the Kokoro voice on a phone once the build deploys","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0017","timestamp":"2026-11-03T21:24:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"faa9a1f32d77806999f2d2cee832f118cf08b25dcf0f54f701530d96859c5fa3","request_id":"4e5af9f826ce490f8bc115145f1d86c2","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0017"} -->
+
+Completed:
+- CURRENT.md now says the model switch and the spoken answers are merged, that the four smart keys are in the VPS env, and what is still open
+
+Evidence:
+- Only checkpoints/CURRENT.md changed; the pull request has auto-merge on
+
+Decisions:
+- no new decisions
+
+Changed:
+- checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Wait for the pull request to merge, then listen to the Kokoro voice on a phone once the build deploys
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
