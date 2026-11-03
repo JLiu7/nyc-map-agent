@@ -18,6 +18,8 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 ## In flight
 
+**e2e runs on two pinned CPUs on the VPS runners (#31, pull request #46, opened 2026-11-03).** From 2026-11-02 02:40 UTC every e2e run hit its 30-minute limit, on the same main commit that had passed at 02:04, so nothing could merge. The runners give each job a 2-CPU quota, but Chromium's software renderer starts 12 worker threads, one per VPS CPU, and those threads used most of the quota. The runs slowed when the VPS went quiet and those threads could all run at once. The e2e step now runs through `scripts/ci/pin-cpus.sh`, which keeps the suite on the two quietest CPUs. The pull request's first run passed all 110 tests in 13 minutes, at a median of 11 s per test (the slow runs took 30 to 38 s). Other repositories that run Chromium on the org-pool runners may see the same slowdown.
+
 **The pull request backlog was sorted on 2026-10-25 (#376, closed).** 51 old pull requests were closed: 35 whose work is already on main, and 16 from the direction before the realignment. Each has a comment saying why. Only two pull requests are open now:
 
 | Pull request | What it is | State |

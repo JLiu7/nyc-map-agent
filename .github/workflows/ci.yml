@@ -179,7 +179,8 @@ jobs:
       # Browsers come from the image (version-matched to @playwright/test 1.56.1); no install step.
       - run: pnpm build:e2e
       - name: Smoke e2e (Playwright, fixture API, offline)
-        run: pnpm e2e
+        # The runner's quota is 2 CPUs; on 2 pinned CPUs the browser can't spend it in bursts (#31).
+        run: scripts/ci/pin-cpus.sh 2 pnpm e2e
       - name: Clean workspace (persistent runner)
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true

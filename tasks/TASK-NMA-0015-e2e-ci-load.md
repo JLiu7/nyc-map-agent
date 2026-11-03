@@ -74,6 +74,29 @@ Blocked/uncertain:
 Next:
 - Watch PR #32's e2e run; if green, merge it, then merge #30 and #29
 
+### 2026-11-03 09:19:08 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":["none"],"changed":["scripts/ci/pin-cpus.sh, .github/workflows/ci.yml, checkpoints/CURRENT.md"],"completed":["e2e runs on two pinned CPUs (scripts/ci/pin-cpus.sh); pull request #46 opened"],"decisions":["Pin the suite to as many CPUs as the runner's 2-CPU quota allows instead of raising time limits; runner-wide CPU sets are left to server-management"],"evidence":["Both pinned runs passed 110 of 110: 41605974620 in 13.1 min (median 11.2 s per test) and 41608169660 in 11.5 min (median 9.8 s) on a VPS 18-23% busy; the slow runs took 30-38 s per test"],"next_action":"Merge #46 when its checks pass, then confirm e2e on main's next run","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0015","timestamp":"2026-11-03T09:19:08Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"18e6727f6e2566013dd75d4f31e05c56e49e12e438762a3b8391a38bcee252ff","request_id":"c43d021d5da7486589eed2622ae40afc","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0015"} -->
+
+Completed:
+- e2e runs on two pinned CPUs (scripts/ci/pin-cpus.sh); pull request #46 opened
+
+Evidence:
+- Both pinned runs passed 110 of 110: 41605974620 in 13.1 min (median 11.2 s per test) and 41608169660 in 11.5 min (median 9.8 s) on a VPS 18-23% busy; the slow runs took 30-38 s per test
+
+Decisions:
+- Pin the suite to as many CPUs as the runner's 2-CPU quota allows instead of raising time limits; runner-wide CPU sets are left to server-management
+
+Changed:
+- scripts/ci/pin-cpus.sh, .github/workflows/ci.yml, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge #46 when its checks pass, then confirm e2e on main's next run
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
