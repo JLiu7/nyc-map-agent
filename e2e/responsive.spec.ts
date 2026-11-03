@@ -53,6 +53,14 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    // Station shorthand is spelled out in the answer (#37): "Times Sq-42 St" reads "Times Square-42 Street".
+    test("an answer spells out station names", async ({ page }) => {
+      await open(page, [{ type: "text", text: "Take the 7 to Times Sq-42 St, then walk to Jackson Hts-Roosevelt Av." }]);
+      await ask(page, "How do I get to Times Square?");
+      await expect(page.getByText("Take the 7 to Times Square-42 Street, then walk to Jackson Heights-Roosevelt Avenue.")).toBeVisible();
+      await expectLayout(page);
+    });
+
     test("a restroom answer keeps the restroom in view", async ({ page }) => {
       await open(page, [
         { type: "text", text: "Bryant Park is the closest open restroom." },

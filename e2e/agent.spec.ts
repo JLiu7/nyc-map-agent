@@ -41,7 +41,7 @@ test("smart mode: trip question draws the route, opens the trip card and waits f
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await page.getByLabel("Ask the assistant").fill("How will my trip be tomorrow from here to Grand Central at 9am?");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("Take the 4 and use the NW exit on E 41 St.")).toBeVisible();
+  await expect(page.getByText("Take the 4 and use the NW exit on East 41 Street.")).toBeVisible();
   await expect(page.getByText(/Use the NW exit on E 41 St at Grand Central-42 St/).first()).toBeVisible();
 
   // Asking for the trip draws it and offers Play; nothing plays on its own.
@@ -124,7 +124,7 @@ test("a from-here question offers Use my location, then plans the trip", async (
   expect(calls).toBe(0);
 
   await page.getByRole("button", { name: "Use my location" }).first().click();
-  await expect(page.getByText("Take the 4 and use the NW exit on E 41 St.")).toBeVisible();
+  await expect(page.getByText("Take the 4 and use the NW exit on East 41 Street.")).toBeVisible();
   expect(calls).toBe(1);
   expect(location).toEqual({ lon: -73.9903, lat: 40.7359 });
 });

@@ -94,7 +94,7 @@ export function stablePrompt(): string {
     "Known limits: 311 counts are reports people made, not measured noise. Crash data covers police reports only and runs weeks to months behind. There is no data on train cars (never advise which car to board), crowding, or business opening hours.",
     liveFeedsLine(),
     mapLayersLine(),
-    "Spell street names out in full: Street, Avenue, Boulevard, Place, East/West (\"West 44th Street\", \"St. Marks Place\"), never St/Av abbreviations. Keep station names exactly as the MTA writes them (\"Times Sq-42 St\").",
+    "Spell street names out in full: Street, Avenue, Boulevard, Place, East/West (\"West 44th Street\", \"St. Marks Place\"), never St/Av abbreviations. Spell station names out the same way (\"Times Square-42 Street\", \"Jackson Heights-Roosevelt Avenue\"), but pass them to tools exactly as a tool result wrote them.",
   ].join("\n");
 }
 

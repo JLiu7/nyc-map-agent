@@ -8,7 +8,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { apiRateLimit } from "./lib/apiRateLimit";
-import { AGENT_ROUTE, STT_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
+import { AGENT_ROUTE, STT_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
 import * as aggregate from "../api/aggregate";
 import * as area from "../api/area/[block]";
 import * as areas from "../api/areas";
@@ -26,6 +26,7 @@ import * as traffic from "./features/traffic/routes";
 import * as parking from "./features/parking/routes";
 import * as agent from "./features/agent/routes";
 import { transcribe } from "./features/agent/stt";
+import { speak } from "./features/agent/tts";
 import * as transit from "./features/transit/routes";
 import * as transitSegments from "./features/transit/segments";
 import * as transitLive from "./features/transit/live";
@@ -87,7 +88,7 @@ app.use("/api/*", apiRateLimit());
 app.use("/api/*", async (c, next) => {
   // Tile ranges are already-compressed binary; gzip would break Content-Range.
   const p = c.req.path.replace(/^\/api\/v1\//, "/api/");
-  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent") return next();
+  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent" || p === "/api/tts") return next(); // streams
   return compress()(c, next);
 });
 // Canonical paths are /api/v1/*; /api/* stays as an alias (marked deprecated in the spec).
@@ -121,6 +122,9 @@ app.openapi(legacyAlias(AGENT_ROUTE), agentHandler as never);
 const sttHandler = async (c: Context) => transcribe(await c.req.formData(), c.req.raw.headers);
 app.openapi(toV1Route(STT_ROUTE), sttHandler as never);
 app.openapi(legacyAlias(STT_ROUTE), sttHandler as never);
+const ttsHandler = (c: Context) => speak(c.req.raw);
+app.openapi(toV1Route(TTS_ROUTE), ttsHandler as never);
+app.openapi(legacyAlias(TTS_ROUTE), ttsHandler as never);
 
 const docConfig = { openapi: "3.1.0", info: API_INFO };
 app.doc31("/api/v1/openapi.json", docConfig);

@@ -7,7 +7,7 @@
   {
     "name": "app (boot chunk, loaded after the first paint)",
     "path": ".size-build/assets/boot-*.js",
-    "limit": "277 kB"
+    "limit": "278 kB"
   },
   {
     "name": "map library (maplibre-gl, its own chunk so it stays cached across deploys)",
@@ -22,7 +22,7 @@
   {
     "name": "feature: agent (lazy overlay)",
     "path": ".size-build/assets/AgentOverlay-*.js",
-    "limit": "27.5 kB"
+    "limit": "28 kB"
   },
   {
     "name": "lib: screen space (xstate, lazy)",

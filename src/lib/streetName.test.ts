@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatStreetName, formatStreetPair, formatStreetText } from "./streetName";
+import { formatStationName } from "./streetName";
 
 describe("formatStreetName", () => {
   it.each([
@@ -65,4 +66,25 @@ describe("formatStreetText", () => {
   ])("%s → %s", (input, want) => {
     expect(formatStreetText(input)).toBe(want);
   });
+});
+
+describe("formatStationName", () => {
+  it.each([
+    ["Times Sq-42 St", "Times Square-42 Street"],
+    ["14 St-Union Sq", "14 Street-Union Square"],
+    ["W 4 St-Wash Sq", "West 4 Street-Washington Square"],
+    ["Jackson Hts-Roosevelt Av", "Jackson Heights-Roosevelt Avenue"],
+    ["Atlantic Av-Barclays Ctr", "Atlantic Avenue-Barclays Center"],
+    ["Ft Hamilton Pkwy", "Fort Hamilton Parkway"],
+    ["Lexington Av/59 St", "Lexington Avenue/59 Street"],
+    ["Kew Gardens-Union Tpke", "Kew Gardens-Union Turnpike"],
+    ["St Lawrence Av", "St. Lawrence Avenue"],
+    ["Bedford Park Blvd-Lehman College", "Bedford Park Boulevard-Lehman College"],
+    ["Grand Central-42 St", "Grand Central-42 Street"],
+    ["Coney Island-Stillwell Av", "Coney Island-Stillwell Avenue"],
+    ["Mt Eden Av", "Mount Eden Avenue"],
+    ["Botanic Garden", "Botanic Garden"],
+    ["It is 500 ft past the exit", "It is 500 ft past the exit"],
+    ["Take the 4 from 14 St-Union Sq to Grand Central-42 St.", "Take the 4 from 14 Street-Union Square to Grand Central-42 Street."],
+  ])("%s → %s", (raw, out) => expect(formatStationName(raw)).toBe(out));
 });

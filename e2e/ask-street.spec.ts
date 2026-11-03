@@ -64,7 +64,7 @@ test("street level: Ask opens a compact sheet and sends the spot as context; han
   await expect(page.getByTestId("view-switcher").getByRole("button", { name: "Top", exact: true })).toBeEnabled();
   await sheet.getByLabel("Ask the assistant").fill("which exit should I use?");
   await sheet.getByRole("button", { name: "Send" }).click();
-  await expect(sheet.getByText("Use the stairs at 7 Av and W 43 St for the 1 train.")).toBeVisible();
+  await expect(sheet.getByText("Use the stairs at 7 Avenue and West 43 Street for the 1 train.")).toBeVisible();
   expect(bodies[0].context).toMatchObject({ source: "street-view" });
   expect(typeof bodies[0].context?.lon).toBe("number");
   expect(typeof bodies[0].context?.heading).toBe("number");

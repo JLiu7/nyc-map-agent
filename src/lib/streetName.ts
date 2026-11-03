@@ -74,8 +74,33 @@ export function formatStreetText(text: string | null | undefined): string {
       .map((p, i) => (i % 2 ? p.replace(/AT/, "at") : p.replace(/^(\d+[A-Z]?\s+)?(.*)$/, (_m, n: string | undefined, rest: string) => (n ?? "") + formatStreetName(rest))))
       .join("");
   }
-  return text.replace(PHRASE, (m) => {
+  return text.replace(PHRASE, (m: string, at: number, all: string) => {
     // A leading Saint inside the phrase stays "St.", the suffix expands.
-    return formatStreetName(m);
+    const out = formatStreetName(m);
+    // "… to 42 St." ends a sentence: keep its full stop once "St" is spelled out.
+    const ends = /^\s*(?:$|[A-Z])/.test(all.slice(at + m.length));
+    return m.endsWith(".") && !out.endsWith(".") && ends ? `${out}.` : out;
   });
+}
+
+/** Shorthand the MTA uses in station names beyond street types: "Jackson Hts", "Barclays Ctr", "Ft Hamilton". Capitalised only, so "500 ft" and "pk" in prose stay. */
+const STATION_WORDS: Record<string, string> = {
+  Hts: "Heights", Ctr: "Center", Cntr: "Center", Tpke: "Turnpike", Jct: "Junction", Bch: "Beach",
+  Gdns: "Gardens", Gdn: "Garden", Pk: "Park", Coll: "College", Univ: "University", Hosp: "Hospital", Bklyn: "Brooklyn",
+};
+const STATION_WORD_RE = new RegExp(`\\b(${Object.keys(STATION_WORDS).join("|")})\\b\\.?`, "g");
+/** Fort and Mount only before a capitalised name: "Ft Hamilton Pkwy", not "5 ft away". */
+const FORT_MOUNT_RE = /\b(Ft|Mt)\.? (?=[A-Z])/g;
+
+/**
+ * A station name, or text naming stations, spelled out for reading and speaking (owner, 2026-11-01:
+ * "it says st, ave, sq … can we make it say the full form"): "Times Sq-42 St" → "Times Square-42 Street",
+ * "W 4 St-Wash Sq" → "West 4 Street-Washington Square", "Jackson Hts-Roosevelt Av" → "Jackson Heights-Roosevelt Avenue".
+ * "St" as Saint stays "St." ("St Lawrence Av" → "St. Lawrence Avenue").
+ */
+export function formatStationName(text: string | null | undefined): string {
+  if (!text) return "";
+  const words = text.replace(STATION_WORD_RE, (_m, w: string) => STATION_WORDS[w]).replace(FORT_MOUNT_RE, (_m, w: string) => (w === "Ft" ? "Fort " : "Mount ")).replace(/\bWash Sq\b/g, "Washington Sq");
+  // Each part of "A-B" or "A/B" is its own name: "Times Sq" and "42 St".
+  return words.split(/(\s*[-–/]\s*)/).map((p, i) => (i % 2 ? p : formatStreetText(p))).join("");
 }

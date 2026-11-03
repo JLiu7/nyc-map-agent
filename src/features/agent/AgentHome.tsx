@@ -1,4 +1,5 @@
 import { AlertCircle, ArrowUp, AudioLines, Check, ChevronDown, Loader2, Mic, X } from "lucide-react";
+import { formatStationName } from "@/lib/streetName";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { nextLevel, swipeOf, type SheetLevel } from "@/components/sheetSwipe";
@@ -109,7 +110,7 @@ export function AnswerCard(p: AnswerCardProps) {
   if (p.compact && !more) {
     return (
       <div className="flex flex-col gap-2 pl-11" data-testid="answer-card" data-compact="">
-        {p.text ? <p className="line-clamp-2 text-[15px] leading-snug text-slate-100" aria-live="polite">{p.text}</p> : null}
+        {p.text ? <p className="line-clamp-2 text-[15px] leading-snug text-slate-100" aria-live="polite">{formatStationName(p.text)}</p> : null}
         {p.busy ? <p className="text-sm text-slate-300" role="status">{t(p.waiting ? "sendingSoon" : "agentsWorking")}…</p> : null}
         {done ? (
           <div className="flex min-h-9 items-center gap-2">
@@ -131,7 +132,7 @@ export function AnswerCard(p: AnswerCardProps) {
       ) : null}
       {p.text ? (
         <div className="flex flex-col gap-3 rounded-[18px] border border-[#22314a] bg-[#111c2f]/90 p-3.5">
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-100" aria-live="polite">{plainText(p.text)}</p>
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-100" aria-live="polite">{formatStationName(plainText(p.text))}</p>
           {done ? (
             <div className="flex flex-col gap-2">
               {p.location ? <div ref={locationEl} className="flex flex-col gap-2">{p.location}</div> : null}

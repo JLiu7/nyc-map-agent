@@ -53,7 +53,7 @@ import { useHeading } from "@/lib/compass/useHeading";
 import { metres } from "@/lib/map/mapRead";
 import { AnswerActions, RestroomSpotDetails } from "./AnswerActions";
 import { AnswerSources, type AnswerSourcesLine } from "./AnswerSources";
-import { formatStreetText } from "@/lib/streetName";
+import { formatStationName, formatStreetText } from "@/lib/streetName";
 import { sharedCoords, startSharing, stopSharing, useSharedLocation } from "@/lib/geo/sharedLocation";
 import { usePlayer, type Speed } from "./usePlayer";
 import { useWakePhrase } from "./useWakePhrase";
@@ -661,7 +661,7 @@ export default function AgentOverlay() {
             // In the home sheet the working panel stands in for the empty reply bubble.
             home && !compact && m.role === "assistant" && !m.content && !m.actions?.length && !m.offerLocation ? null : (
             <div key={m.id} className={cn("max-w-[90%] rounded-lg px-3 py-2 text-sm", m.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted")}>
-              {nameLocationButton(nameRemindButton(m.content, m.actions, tr(appLang, "remindMe")), m.offerLocation, tr(appLang, "useMyLocation")) || (busy ? (waiting ? `${tr(appLang, "sendingSoon")}…` : "…") : "")}
+              {(m.role === "assistant" ? formatStationName : (x: string) => x)(nameLocationButton(nameRemindButton(m.content, m.actions, tr(appLang, "remindMe")), m.offerLocation, tr(appLang, "useMyLocation"))) || (busy ? (waiting ? `${tr(appLang, "sendingSoon")}…` : "…") : "")}
               {m.actions?.length ? <AnswerActions actions={m.actions} onRun={runAction} /> : null}
               {m.sources ? <AnswerSources line={m.sources} /> : null}
               {m.offerLocation && shared.status !== "on" ? (
