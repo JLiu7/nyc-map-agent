@@ -31,12 +31,16 @@ services:
       # llama-server takes no key, but the route refuses to start without one.
       INFERHUB_API_KEY: ${INFERHUB_API_KEY:-local}
       INFERHUB_MODEL_FALLBACKS: ${INFERHUB_MODEL_FALLBACKS:-}
+      # The VPS's one Sablier (server-management komodo/resources/platform.toml): the app wakes
+      # otp and valhalla through it, and they sleep after 10 idle minutes (#44).
+      SABLIER_URL: http://sablier:10000
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:18088:8080
     # edge: Cloudflare tunnel A (octo-cloudflared) reaches the app as nyc-map-web:8080.
-    networks: [default, edge]
+    # sablier: the shared network where http://sablier:10000 answers.
+    networks: [default, edge, sablier]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -49,11 +53,24 @@ services:
 
   # Graph from deploy/otp/build-graph.sh (weekly; it restarts this container). otp.env holds only
   # MTA_BUSTIME_KEY, which router-config.json reads for live bus times; the build writes it.
+  # Sleeps after 10 idle minutes; the app wakes it (server/features/agent/sablier.ts, #44).
   otp:
     container_name: nyc-map-otp
     image: ${OTP_IMAGE:-opentripplanner/opentripplanner:2.10.0}
     command: ["--load", "--serve"]
     restart: unless-stopped
+    labels:
+      sablier.enable: "true"
+      sablier.group: nyc-map
+    # Healthy once /otp/ answers, which is after the graph has loaded. Sablier holds a wake until
+    # then. The image has no curl, so bash asks over /dev/tcp.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /otp/ HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 2s
     env_file:
       - path: ${OTP_ROOT:-/home/ubuntu/apps/nyc-map-otp}/otp.env
         required: false
@@ -67,10 +84,21 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   # Tiles from deploy/valhalla/build.sh (weekly; it restarts this container). Serves only.
+  # Sleeps after 10 idle minutes like otp, and starts in about a second.
   valhalla:
     container_name: nyc-map-valhalla
     image: ghcr.io/valhalla/valhalla-scripted:3.9.1
     restart: unless-stopped
+    labels:
+      sablier.enable: "true"
+      sablier.group: nyc-map
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8002/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
     environment:
       serve_tiles: "True"
       use_tiles_ignore_pbf: "True"
@@ -108,4 +136,8 @@ services:
 networks:
   edge:
     name: study-os_edge
+    external: true
+  # Created by server-management's `platform` stack, which Komodo deploys first.
+  sablier:
+    name: sablier
     external: true

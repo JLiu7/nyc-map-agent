@@ -24,6 +24,7 @@ import { sessionFrom } from "../../lib/tracing";
 import { mayReadBack, planReadBack } from "./readback";
 import { askIn, CloseHold, isQuestion, questionsAnswered, riderLanguage, say, sayPrompt, type Lang, type Line } from "./ask";
 import { openDataEntrances, type Station } from "./transit";
+import { OTP_CONTAINER, VALHALLA_CONTAINER, waker } from "./sablier";
 
 export const INFERHUB_BASE_URL = process.env.INFERHUB_BASE_URL ?? "https://api.inferhub.dev/v1";
 /** Cheap, fast, good at tool calls: ~$0.075 in / $0.30 out per M tokens (InferHub market max ask). */
@@ -56,6 +57,14 @@ export const health = {
   },
 };
 
+/** GET /api/agent/warm (#44): sent once when the page opens, so the trip planner is up before the first question. */
+export const warm = {
+  GET: (): Promise<Response> => {
+    waker.poke([OTP_CONTAINER, VALHALLA_CONTAINER]);
+    return Promise.resolve(Response.json({ ok: true }, { headers: { "cache-control": "no-store" } }));
+  },
+};
+
 /** The request's facts as a system message right before the latest user message. */
 function withFacts<M extends { role: string }>(messages: M[], facts: string): (M | { role: "system"; content: string })[] {
   const i = messages.map((m) => m.role).lastIndexOf("user");
@@ -76,6 +85,8 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
   const fair = opts.fairUse ?? sharedFairUse();
   const limit = fair.limiter.take(`ip:${clientIp(request.headers)}`);
   if (!limit.ok) return limitedResponse(limit.retryAt, limit.reason, fair.now());
+  // A question often leads to a trip or a walk: start them while the model thinks (#44).
+  waker.poke([OTP_CONTAINER, VALHALLA_CONTAINER]);
   const budget = fair.budget.tier();
   const { now, mode, context, lang, memory, underground, heard } = parsed.data;
   const profile = pickProfile(parsed.data.profile);

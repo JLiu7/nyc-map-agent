@@ -9,8 +9,8 @@ in case it comes back.
 | Container | Role |
 | --- | --- |
 | `nyc-map-web` | the app (Vite build + Hono), on `127.0.0.1:18088` only |
-| `nyc-map-otp` | OpenTripPlanner, the trip planner (subway, buses, LIRR, Metro-North, ferries) |
-| `nyc-map-valhalla` | Valhalla, the walking router |
+| `nyc-map-otp` | OpenTripPlanner, the trip planner (subway, buses, LIRR, Metro-North, ferries); sleeps when idle |
+| `nyc-map-valhalla` | Valhalla, the walking router; sleeps when idle |
 | `nyc-map-motis` | MOTIS, the old trip planner, kept until 2026-11-08 in case OTP has to be switched off |
 | `nyc-map-lfm3-bridge` | re-offers the LFM3 tunnel port to containers on the Docker gateway |
 
@@ -80,7 +80,8 @@ To roll back, revert the change on main; the action deploys the revert.
 ### Trip planner and walking data
 
 Run both rebuilds weekly from the checkout on the VPS; nothing schedules them yet. Each one restarts
-its own container when it finishes.
+its own container when it finishes. A restart starts a sleeping container too, and it goes back to
+sleep 10 minutes later (see below).
 
 `deploy/otp/build-graph.sh` downloads the OSM extract and the MTA, LIRR, Metro-North and ferry GTFS
 feeds into `~/apps/nyc-map-otp/stage` and builds the OTP graph. On 2026-11-01 that took 4 minutes
@@ -98,6 +99,28 @@ Hicksville, with both OTP and MOTIS). The extract's edge is the likely cause; a 
 
 To go back to MOTIS for trips, set `TRIP_PLANNER=motis` on the `web` service and redeploy.
 `deploy/motis/build.sh` still builds its data (about a minute and 4 GB of memory).
+
+### Sleeping when idle
+
+OTP holds about 3.7 GB and Valhalla about 0.9 GB, but trips come a few times a day. So both stop
+after 10 minutes with no trip or walk request, and start again on the next one (#44). The VPS's one
+Sablier stops and starts them. It is defined in server-management's `komodo/resources/platform.toml`,
+which also sets the 10 minutes. The app asks it at three moments (`server/features/agent/sablier.ts`):
+
+- When the page opens, it sends `GET /api/v1/agent/warm` once. The server passes at most one wake a
+  minute to Sablier, and an open tab sends nothing more.
+- At the start of each question, without waiting, because a question often leads to a trip.
+- Before each trip or walk search, waiting until the container's health check passes: up to 75
+  seconds for OTP, which has to load its graph, and 20 for Valhalla. If it is still not ready, the
+  search goes ahead and the usual fallback answers (the built-in router for trips, public OSRM for
+  walks).
+
+Health checks never go through Sablier, so they keep nothing awake. Without `SABLIER_URL` (local
+dev, tests, e2e) the app calls nothing and searches go straight out.
+
+To check it: `docker ps -a --filter label=sablier.group=nyc-map` lists both as `Exited (0)` while
+they sleep, and `docker logs sablier 2>&1 | grep nyc-map` shows each start and stop. To keep them
+on, remove their `sablier.*` labels and redeploy; Sablier never stops a container without the label.
 
 ### CI
 

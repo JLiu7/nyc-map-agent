@@ -90,7 +90,8 @@ Heavy code is reached only through dynamic `import()` so each feature is its own
 
 Octo itself: `OCTO_BASE_URL`, `OCTO_API_KEY`, `OCTO_WORKSPACE_ID` (server and GitHub Actions only).
 Dev/ops: `VITE_API_BASE`, `PORT`, `OCTO_ENV_FILE`, `INGEST_MONTHS`, `LIVE_SOCRATA`, `CITY`,
-`CITY_TILES_FILE`, `PART_MB`, `AREA_SIMPLIFY`, `SOCRATA_BASE`.
+`CITY_TILES_FILE`, `PART_MB`, `AREA_SIMPLIFY`, `SOCRATA_BASE`, `SABLIER_URL` (VPS only: wakes the
+sleeping trip planner and walking routes, see "Sleeping when idle" in `deploy/README.md`).
 
 Every upstream a browser does not hit directly should go through our Hono proxy so it can be
 cached and health-checked (`pnpm feeds:health`, scheduled workflow `feed-health.yml`).

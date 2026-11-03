@@ -10,10 +10,13 @@ import { elevatorStatus, serviceAlerts } from "./services";
 import { distM, openDataEntrances, type Station, type StationEntrances } from "./transit";
 import { nyLocalToDate, portalFor, safe, toNyLocal } from "./trip";
 import { decodePolyline } from "./polyline";
+import { OTP_CONTAINER, waker } from "./sablier";
 
 export { decodePolyline };
 
 const OTP_URL = (process.env.OTP_URL ?? "http://nyc-map-otp:8080").replace(/\/$/, "");
+/** On the VPS it sleeps when idle (#44) and loads its graph in under a minute; wait that long first. */
+const OTP_WAKE_S = 75;
 
 const QUERY = `query Plan($o: PlanLabeledLocationInput!, $d: PlanLabeledLocationInput!, $dt: PlanDateTimeInput!, $modes: PlanModesInput) {
   planConnection(origin: $o, destination: $d, dateTime: $dt, modes: $modes, first: 8, searchWindow: "PT90M") {
@@ -69,7 +72,9 @@ export interface OtpClient { plan(o: LngLatTuple, d: LngLatTuple, local: string,
 
 export const httpOtp: OtpClient = {
   async plan(o, d, local, arriveBy, prefer = "fastest") {
-    const loc = ([lon, lat]: LngLatTuple) => ({ location: { coordinate: { latitude: lat, longitude: lon } } });
+    // Not ready in time: ask anyway; if it is down, planTrip falls back to the built-in router.
+    if (!(await waker.ready(OTP_CONTAINER, OTP_WAKE_S))) console.warn(`[otp] not ready after ${OTP_WAKE_S} s of waking`);
+    const loc =([lon, lat]: LngLatTuple) => ({ location: { coordinate: { latitude: lat, longitude: lon } } });
     const dt = arriveBy ? { latestArrival: nyIso(local) } : { earliestDeparture: nyIso(local) };
     const ask = async (modes?: unknown) => {
       const res = await fetch(`${OTP_URL}/otp/gtfs/v1`, {

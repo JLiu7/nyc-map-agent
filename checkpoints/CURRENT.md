@@ -31,9 +31,13 @@ GitHub Issues own task scope and progress; this file is a projection of them, no
 
 **The line status eval loop is the work in progress, and it lives on an issue, not a pull request.** #629 is open and is task NMA-0005. The loop, its rules and its ledger are in `docs/eval/line-status/`; the handoff for running it alone is `HANDOFF_DEEPSEEK.md` there. Iteration 1 (#632) is merged. Iteration 2 is unstarted.
 
+**The trip planner and walking routes sleep on the VPS when idle (#44, opened 2026-11-03).** OTP (3.7 GB) and Valhalla (0.9 GB) ran all day for a few trips a day. The pull request for #44 labels both for the VPS's shared Sablier, gives them health checks, and has the app wake them on page open, at each question and before each search (`server/features/agent/sablier.ts`; "Sleeping when idle" in `deploy/README.md`). It reaches the VPS with the normal Komodo deploy. The VPS record is pukujan-lab-2/server-management#114.
+
 **`feat/place-readback` is a leftover branch, not work in flight.** Its work merged as #602 on 2026-11-01 and its content is on main; the ref is a squash-merge artifact and can be deleted. The same is true of `docs/614-public-route-live` and the other `docs/614-*` branches whose checkpoints merged.
 
 ## Next
+
+- **After #44 deploys, check sleep and wake on the VPS.** Both containers should show `Exited (0)` 10 minutes after the last request, the first trip after that should come from OTP rather than the built-in router, and OTP's real cold start should be written into `deploy/README.md` and server-management's `vps/services.toml`.
 
 0. **Iteration 3 of the line status loop (#629, task NMA-0005), and it needs a clean baseline first.** Iteration 2 was tried and rejected on 2026-11-01: dropping the shuttle bus from the prompt cut invented shuttles from 67 trials to 5 but sent held-out clean trials from 49.0% down to 23.5%, and moved the failure into "denies trouble" (3 trials to 28). It is written up in `LEDGER.md` and the change was dropped. The two runs either side of it were also polluted by dropped connections, which the runner used to record as empty replies; that is fixed, so start iteration 3 with a fresh baseline on the fixed runner and change one prompt line at a time rather than two.
 1. **New issue logs from 2026-10-29, filed in the form's shape:** a scorecard that compares our help with Google and Apple Maps on 17 tasks (#586), reading exit signs with the camera offline (#587), the problem tour that flies spot to spot while the agent talks (#588), photos of entrances and destinations (#589), and app labels in the rider's language (#590).

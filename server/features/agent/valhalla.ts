@@ -7,9 +7,12 @@ import { z } from "zod";
 import { formatStreetText } from "../../../src/lib/streetName";
 import type { LngLatTuple } from "../../../src/features/agent/schema";
 import { decodePolyline } from "./polyline";
+import { VALHALLA_CONTAINER, waker } from "./sablier";
 import type { WalkResult } from "./services";
 
 export const VALHALLA_URL = (process.env.VALHALLA_URL ?? "").replace(/\/$/, "");
+/** On the VPS it sleeps when idle (#44) and starts in about a second. */
+const VALHALLA_WAKE_S = 20;
 
 const maneuver = z.object({ type: z.number(), street_names: z.array(z.string()).optional(), begin_shape_index: z.number() });
 const routeSchema = z.object({
@@ -41,6 +44,8 @@ export function valhallaToWalk(json: unknown): WalkResult {
 }
 
 export async function valhallaWalk([aLon, aLat]: LngLatTuple, [bLon, bLat]: LngLatTuple): Promise<WalkResult> {
+  // Not ready in time: ask anyway; routeWalk falls back to OSRM if it fails.
+  await waker.ready(VALHALLA_CONTAINER, VALHALLA_WAKE_S);
   const res = await fetch(`${VALHALLA_URL}/route`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(8000),
     body: JSON.stringify({ locations: [{ lat: aLat, lon: aLon }, { lat: bLat, lon: bLon }], costing: "pedestrian", units: "kilometers" }),

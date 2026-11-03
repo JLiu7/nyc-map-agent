@@ -18,6 +18,11 @@ ferry GTFS feeds and NYC Ferry's vehicle positions itself
 
 ## Service
 
+On the VPS (`deploy/docker-compose.vps.yml`) OTP sleeps after 10 idle minutes, and the app wakes it
+before a trip search (#44). How that works and how to check it: "Sleeping when idle" in
+`deploy/README.md`. A sleeping OTP does not answer the checks below; open the site, or run
+`docker start nyc-map-otp`, first.
+
 `otp` in `deploy/docker-compose.yml` (container `nyc-map-otp`):
 
 - Internal compose network only, no published port. The web app reaches it at

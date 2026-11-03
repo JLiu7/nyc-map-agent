@@ -206,6 +206,7 @@ export const ROUTES = {
     },
   }),
   "/api/agent/health": jsonRoute("/api/agent/health", "The default model profile and each smart provider's last health probe (no keys)"),
+  "/api/agent/warm": jsonRoute("/api/agent/warm", "Wakes the trip planner and walking routes if they sleep, at most once a minute; the page sends it once on load"),
   "/api/transit": jsonRoute("/api/transit", "Live transit capabilities ({ bus })"),
   "/api/transit/:system": jsonRoute(
     "/api/transit/{system}",
