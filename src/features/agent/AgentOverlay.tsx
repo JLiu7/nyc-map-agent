@@ -77,6 +77,7 @@ import { useStationHelp, useStationHelpVisible } from "@/lib/underground/station
 import { applyStep, statusLine, type AgentStep } from "./agentSteps";
 import { detectLang, speechTag, statusLang } from "./statusLines";
 import { getAppLang, setAskedLang, tr, useAppLang } from "@/lib/i18n/appLang";
+import { languageList, languagePrompt, matchSpokenLanguage } from "@/lib/voice/languagePrompt";
 import { needsSharedOrigin, ORIGIN_PROMPT, replyAsksForOrigin } from "./needsOrigin";
 import { framePadding, frameRestrooms } from "@/lib/map/mapCover";
 import { useOpenMenu } from "@/lib/store/openMenu";
@@ -204,6 +205,12 @@ export default function AgentOverlay() {
   messagesRef.current = messages;
   /** The question waiting on a shared location, so the button can ask it again. */
   const pendingQuestion = useRef<string | null>(null);
+  // Hands-free opened with the spoken language question (#42): the next thing said picks the
+  // language rather than being sent to the agent as a question. State, not a ref, so the
+  // hands-free loop sees it flip and keeps its arm for the real question.
+  const [langAsked, setLangAsked] = useState(false);
+  // Bumped when the spoken language question is answered: hands-free opens the mic once more.
+  const [languagePicked, setLanguagePicked] = useState(0);
   const [handsFree, setHandsFree] = useState(false);
   const askReq = useAskRequest();
   const compact = askReq !== null;
@@ -227,8 +234,28 @@ export default function AgentOverlay() {
         setInput((v) => (v.trim() ? `${v.trim()} ${t}` : t));
         return;
       }
+      // Hands-free just asked which language: this turn answers that, and is not a question.
+      if (langAsked) {
+        setLangAsked(false);
+        const picked = matchSpokenLanguage(t);
+        if (picked) {
+          setAskedLang(picked);
+          // A `languagePicked` tick tells the hands-free loop to open the mic once more for the real
+          // question, now that the language round is over (#42).
+          setLanguagePicked((n) => n + 1);
+          speech.speak(languageList([picked]), { lang: speechTag(picked, lang) });
+          return;
+        }
+        // Heard no language it knows, or two: read the guess back and ask again.
+        const guess = parseLang(heard) ?? appLang;
+        setAskedLang(guess);
+        speech.speak(`${languageList([guess])}?`, { lang: speechTag(guess, lang) });
+        return;
+      }
       heardLangRef.current = parseLang(heard);
       voiceTurn.current = true;
+      // The real question is here, so the language round is over.
+      setLangAsked(false);
       void send(t);
     },
     lang: home ? lang : undefined,
@@ -516,7 +543,8 @@ export default function AgentOverlay() {
   }, [chatSeed, clearSeed, send]);
 
   const turnOffHandsFree = useCallback(() => setHandsFree(false), []);
-  useHandsFree({ on: handsFree, supported: speech.sttSupported, listening: speech.listening, busy, speaking: speech.speaking, error: speech.error, start: speech.startListening, stop: speech.stopListening, turnOff: turnOffHandsFree });
+  // `asking` keeps the hands-free loop armed while the spoken language question and its answer play (#42).
+  useHandsFree({ on: handsFree, supported: speech.sttSupported, listening: speech.listening, busy, speaking: speech.speaking, error: speech.error, asking: langAsked, languagePicked, start: speech.startListening, stop: speech.stopListening, turnOff: turnOffHandsFree });
   // A trip preview or a followed route starting takes over the screen: hands-free ends instead of
   // leaving the orb listening over it (owner report, 2026-10-24). Only the start counts, so you can
   // still turn hands-free on during one, and street-level Ask keeps it. The spoken answer still finishes.
@@ -537,10 +565,15 @@ export default function AgentOverlay() {
   useEffect(() => sendScreen({ type: "VOICE", on: orbShown }), [orbShown]);
   useEffect(() => () => { sendScreen({ type: "ANSWER", on: false }); sendScreen({ type: "VOICE", on: false }); sendScreen({ type: "TASK", on: false }); }, []);
   const toggleHandsFree = () => {
-    if (handsFree) { setHandsFree(false); speech.stopListening(); speech.stopSpeaking(); return; }
+    if (handsFree) { setHandsFree(false); setLangAsked(false); speech.stopListening(); speech.stopSpeaking(); return; }
     speech.setMuted(false);
     speech.clearError();
     setHandsFree(true);
+    // A hands-free conversation is answer-in-one-language for its whole length, and the only signal
+    // used to be Whisper's guess at the first thing said. Ask out loud first, every time hands-free
+    // starts, so a handed-over phone or a misheard word cannot fix the wrong language for a session.
+    setLangAsked(true);
+    speech.speakSequence(languagePrompt(appLang));
   };
 
   useWakePhrase(wake && speech.sttSupported, speech.listening || busy || speech.speaking, (t) => { voiceTurn.current = true; void send(t); }, speechTag(appLang, lang));

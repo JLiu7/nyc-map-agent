@@ -21,7 +21,13 @@ test("street level: Ask opens a compact sheet and sends the spot as context; han
       start() {
         (w as { __starts?: number }).__starts = ((w as { __starts?: number }).__starts ?? 0) + 1;
         this.onstart?.();
-        // A mid-sentence pause of 800 ms must not end the turn.
+        // Hands-free asks which language before the first question, so the first turn answers that
+        // and the second is the real question (a mid-sentence pause of 800 ms must not end it).
+        if (((w as { __starts?: number }).__starts ?? 0) === 1) {
+          const pick = Object.assign([{ transcript: "English" }], { isFinal: true });
+          setTimeout(() => this.onresult?.({ resultIndex: 0, results: [pick] }), 300);
+          return;
+        }
         const a = Object.assign([{ transcript: "which exit" }], { isFinal: true });
         const b = Object.assign([{ transcript: " for the 1 train" }], { isFinal: true });
         setTimeout(() => this.onresult?.({ resultIndex: 0, results: [a] }), 300);
@@ -72,15 +78,18 @@ test("street level: Ask opens a compact sheet and sends the spot as context; han
 
   await sheet.getByRole("button", { name: "Hands-free" }).click();
   await expect(sheet.getByRole("button", { name: "Hands-free" })).toHaveAttribute("aria-pressed", "true");
-  await expect(sheet.getByTestId("voice-status")).toContainText("Listening");
-  await shot(page, "3-listening");
-  await expect.poll(() => bodies.length, { timeout: slow(10_000) }).toBeGreaterThanOrEqual(2);
+  // Hands-free opens by asking which language, naming every one in its own voice (#42), then the
+  // mic opens for the answer and again for the real question.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __said: string[] }).__said.join("|")), { timeout: slow(20_000) }).toContain("Español.");
+  await shot(page, "3-language-question");
+  await expect.poll(() => bodies.length, { timeout: slow(40_000) }).toBeGreaterThanOrEqual(2);
   expect((bodies[1] as { messages: Array<{ content: string }> }).messages.at(-1)?.content).toBe("which exit for the 1 train");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __said: string[] }).__said.length)).toBeGreaterThanOrEqual(1);
   // One question per tap: once the agent takes it, hands-free ends and the mic does not reopen.
   await expect(sheet.getByRole("button", { name: "Hands-free" })).toHaveAttribute("aria-pressed", "false");
   await page.waitForTimeout(1500);
-  expect(await page.evaluate(() => (window as unknown as { __starts?: number }).__starts ?? 0)).toBe(1);
+  // Two turns: the language answer, then the question. The mic does not reopen after the question.
+  expect(await page.evaluate(() => (window as unknown as { __starts?: number }).__starts ?? 0)).toBe(2);
   await shot(page, "4-handsfree-done");
   await sheet.getByRole("button", { name: "Close Ask" }).click();
   await expect(sheet).toBeHidden();

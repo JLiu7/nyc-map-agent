@@ -74,6 +74,8 @@ export interface UseSpeechResult {
   startListening: () => void;
   stopListening: () => void;
   speak: (text: string, opts?: { bargeIn?: boolean; lang?: string }) => void;
+  /** Speak several utterances in a row, each in its own language's voice (the language question). */
+  speakSequence: (items: Array<{ text: string; lang: string }>) => void;
   stopSpeaking: () => void;
   speaking: boolean;
   muted: boolean;
@@ -268,6 +270,41 @@ export function useSpeech({
     [muted, stopSpeaking, lang],
   );
 
+  // The language question says each name in that language's own voice, one after another, so the
+  // rider hears what each voice sounds like before picking. Silence between names keeps them apart.
+  const speakSequence = useCallback(
+    (items: Array<{ text: string; lang: string }>) => {
+      if (muted) return;
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+      stopSpeaking();
+      finalRef.current = "";
+      interimRef.current = "";
+      recognitionRef.current?.abort();
+      setSpeaking(true);
+      const synth = window.speechSynthesis;
+      const voices = synth.getVoices();
+      // Hold every utterance: Chrome can GC one mid-speech and never fire onend.
+      const held: SpeechSynthesisUtterance[] = [];
+      let i = 0;
+      const next = () => {
+        if (i >= items.length) { setSpeaking(false); cancelSpeechRef.current = null; return; }
+        const item = items[i++];
+        const u = new SpeechSynthesisUtterance(item.text);
+        const voice = voices.find((v) => v.lang.toLowerCase().startsWith(item.lang.toLowerCase()));
+        if (voice) u.voice = voice;
+        u.lang = voice?.lang ?? item.lang;
+        u.rate = 0.98;
+        u.onend = () => setTimeout(next, 220);
+        u.onerror = () => setTimeout(next, 120);
+        held.push(u);
+        synth.speak(u);
+      };
+      cancelSpeechRef.current = () => { i = items.length; synth.cancel(); setSpeaking(false); };
+      next();
+    },
+    [muted, stopSpeaking],
+  );
+
   useEffect(() => {
     return () => {
       recognitionRef.current?.abort();
@@ -292,6 +329,7 @@ export function useSpeech({
     startListening,
     stopListening,
     speak,
+    speakSequence,
     stopSpeaking,
     speaking,
     muted,
