@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { speak, ttsConfig, ttsLang } from "./tts";
+import { speak, ttsConfig, ttsLang, warmVoice } from "./tts";
 
 const ENV = { STT_PROTOCOL: "speech", STT_BASE_URL: "http://voice.test:18799", STT_STACK: "multilingual" } as unknown as NodeJS.ProcessEnv;
 const post = (body: unknown) => new Request("http://app/api/tts", { method: "POST", body: JSON.stringify(body), headers: { "x-forwarded-for": "9.9.9.9" } });
@@ -29,5 +29,23 @@ describe("POST /api/tts", () => {
     expect((await speak(post({ text: "Привет", lang: "ru" }), fetch, ENV)).status).toBe(415);
     const down = vi.fn(() => Promise.resolve(new Response("", { status: 500 })));
     expect((await speak(post({ text: "hi", lang: "en" }), down as unknown as typeof fetch, ENV)).status).toBe(502);
+  });
+});
+
+describe("keeping the voice warm", () => {
+  it("asks the speech server to load our stack, and says whether it answered", async () => {
+    const ok = vi.fn(() => Promise.resolve(new Response("{}", { status: 200 })));
+    expect(await warmVoice(ok as unknown as typeof fetch, ENV)).toBe(true);
+    expect(ok).toHaveBeenCalledWith("http://voice.test:18799/load?stack=multilingual", expect.objectContaining({ method: "POST" }));
+    const bad = vi.fn(() => Promise.resolve(new Response("", { status: 500 })));
+    expect(await warmVoice(bad as unknown as typeof fetch, ENV)).toBe(false);
+    const down = vi.fn(() => Promise.reject(new Error("refused")));
+    expect(await warmVoice(down as unknown as typeof fetch, ENV)).toBe(false);
+  });
+
+  it("does nothing with no speech server set", async () => {
+    const f = vi.fn();
+    expect(await warmVoice(f as unknown as typeof fetch, {} as NodeJS.ProcessEnv)).toBe(false);
+    expect(f).not.toHaveBeenCalled();
   });
 });

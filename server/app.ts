@@ -26,7 +26,7 @@ import * as traffic from "./features/traffic/routes";
 import * as parking from "./features/parking/routes";
 import * as agent from "./features/agent/routes";
 import { transcribe } from "./features/agent/stt";
-import { speak } from "./features/agent/tts";
+import { speak, startVoiceKeeper } from "./features/agent/tts";
 import * as transit from "./features/transit/routes";
 import * as transitSegments from "./features/transit/segments";
 import * as transitLive from "./features/transit/live";
@@ -126,6 +126,8 @@ app.openapi(legacyAlias(STT_ROUTE), sttHandler as never);
 const ttsHandler = (c: Context) => speak(c.req.raw);
 app.openapi(toV1Route(TTS_ROUTE), ttsHandler as never);
 app.openapi(legacyAlias(TTS_ROUTE), ttsHandler as never);
+// Keep the speech server on our stack so the first spoken answer is not the one that waits for a model swap.
+startVoiceKeeper();
 
 const docConfig = { openapi: "3.1.0", info: API_INFO };
 app.doc31("/api/v1/openapi.json", docConfig);

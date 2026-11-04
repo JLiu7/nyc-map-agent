@@ -6,6 +6,10 @@
  * soon as it is made. We pass that stream straight through. Kokoro has voices for English, Spanish,
  * French and Chinese of the app's languages; any other answers 415 and the browser speaks it as before.
  * TTS_BASE_URL overrides the server when speech-to-text lives elsewhere. Nothing is stored or logged.
+ *
+ * The speech server keeps one stack of models in memory and swaps when another app asks for a different
+ * one, which costs the next rider about 6 s of silence. `startVoiceKeeper` asks it to load our stack
+ * (POST /load, a no-op when it is already there) at start and every few minutes.
  */
 import { clientIp } from "../../lib/clientIp";
 import { createLimiter } from "./fair-use";
@@ -53,4 +57,33 @@ export async function speak(req: Request, f: typeof fetch = fetch, env = process
   return new Response(res.body, {
     headers: { "content-type": "audio/L16", "x-sample-rate": res.headers.get("x-sample-rate") ?? "24000", "cache-control": "no-store" },
   });
+}
+
+/** Ask the speech server to have our stack loaded. True when it answered 2xx; never throws. */
+export async function warmVoice(f: typeof fetch = fetch, env = process.env): Promise<boolean> {
+  const { base, stack } = ttsConfig(env);
+  if (!base) return false;
+  try {
+    const res = await f(`${base}/load?stack=${encodeURIComponent(stack)}`, { method: "POST", signal: AbortSignal.timeout(60_000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const KEEP_WARM_EVERY_MS = 4 * 60_000;
+let keeping = false;
+
+/** Warm now and every four minutes. Starts once, and only when a speech server is set. Logs when it goes down or comes back. */
+export function startVoiceKeeper(log: (m: string) => void = console.warn, env = process.env): void {
+  if (keeping || !ttsConfig(env).base) return;
+  keeping = true;
+  let up: boolean | undefined;
+  const tick = async () => {
+    const ok = await warmVoice(fetch, env);
+    if (ok !== up) log(`[voice] speech server ${ok ? "has our stack loaded" : "did not answer /load"}`);
+    up = ok;
+  };
+  void tick();
+  setInterval(() => void tick(), KEEP_WARM_EVERY_MS).unref();
 }
