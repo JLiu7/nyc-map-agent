@@ -274,13 +274,19 @@ jobs:
           PUBLIC_URL: ${{ vars.NYC_PUBLIC_URL }}
         # Hypothesis 6.170.10 removed an internal Schemathesis 4.0.0 relies on
         # ('many' object has no attribute 'more'); 4.32.5 misreads our 3.1 prefixItems.
-        run: >
-          "$RUNNER_TEMP/uv/uvx" --with 'hypothesis<6.170.10' schemathesis@4.0.0 run openapi.json
-          --url "$PUBLIC_URL"
-          --exclude-method POST --exclude-path-regex '^/api/(?!v1/)|/vehicle-models/'
-          --max-examples 2 --phases examples,fuzzing
-          --checks not_a_server_error,response_schema_conformance,content_type_conformance
-          --rate-limit 3/s --request-timeout 20
+        # Tried twice, 30 s apart: the site is reached through a Cloudflare tunnel, and one dropped request
+        # (a 502 from the tunnel, 2026-11-04) failed a run on a healthy deploy. A real server error fails both.
+        run: |
+          for attempt in 1 2; do
+            "$RUNNER_TEMP/uv/uvx" --with 'hypothesis<6.170.10' schemathesis@4.0.0 run openapi.json \
+              --url "$PUBLIC_URL" \
+              --exclude-method POST --exclude-path-regex '^/api/(?!v1/)|/vehicle-models/' \
+              --max-examples 2 --phases examples,fuzzing \
+              --checks not_a_server_error,response_schema_conformance,content_type_conformance \
+              --rate-limit 3/s --request-timeout 20 && exit 0
+            [ "$attempt" = 1 ] && { echo "::warning::contract check failed once; trying again in 30 s"; sleep 30; }
+          done
+          exit 1
       - name: Clean workspace (persistent runner)
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true
