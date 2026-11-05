@@ -864,13 +864,15 @@ def pull_request_problem(top: Path, branch: str, due: str | None = "") -> tuple[
     if not isinstance(pulls, list):
         # gh is missing, signed out or offline: say so, but don't block on it.
         return None, f"Could not check `{branch}`'s pull request on GitHub (gh failed or is offline); make sure it has an open pull request with auto-merge armed."
+    if not pulls:
+        pulls = rest_open_pulls(top, branch)
     why = f", and {due}" if due else ""
     if not pulls:
         if due is None or merged_at_tip(top, branch):
             return None, None  # under every cadence limit, or merged with this exact tip: nothing to do yet
         return (
             f"Branch `{branch}` is pushed but has no open pull request{why}. Open one (`gh pr create` with `Refs #N`, "
-            "or `Closes #N` when the merge finishes the issue) and arm auto-merge (`gh pr merge <N> --auto --squash`).",
+            f"or `Closes #N` when the merge finishes the issue) and {merge_step(top, '<N>')}.",
             None,
         )
     pr = pulls[0]
@@ -879,12 +881,74 @@ def pull_request_problem(top: Path, branch: str, due: str | None = "") -> tuple[
         if due is None:
             return None, None
         return (f"Pull request #{number} for `{branch}` is a draft{why}, so nothing will merge it. "
-                f"Mark it ready (`gh pr ready {number}`) and arm auto-merge."), None
+                f"Mark it ready (`gh pr ready {number}`) and {merge_step(top, number)}."), None
     if not pr.get("autoMergeRequest"):
         if not auto_merge_allowed(top):
             return None, f"This repository turns auto-merge off, so the owner merges pull request #{number} by hand; the work is not delivered until it merges."
+        if main_requires_checks(top) is False:
+            return None, f"Pull request #{number} for `{branch}` is open; {merge_step(top, number, unprotected=True)}."
         return f"Pull request #{number} for `{branch}` has no auto-merge armed. Run `gh pr merge {number} --auto --squash`.", None
     return None, None
+
+
+def merge_step(top: Path, number: object, unprotected: bool | None = None) -> str:
+    """What to do once a pull request is open: arm auto-merge, or merge by hand after CI where nothing gates the merge."""
+    if unprotected is None:
+        unprotected = auto_merge_allowed(top) and main_requires_checks(top) is False
+    if unprotected:
+        return (f"merge it once CI passes (`gh pr checks {number}`, then `gh pr merge {number} --squash`): the default branch "
+                "requires no check, so auto-merge would merge it before CI runs (#114)")
+    return f"arm auto-merge (`gh pr merge {number} --auto --squash`)"
+
+
+def main_requires_checks(top: Path) -> bool | None:
+    """Whether the default branch requires a status check before merging; None when GitHub can't say.
+
+    Without one, auto-merge merges a pull request the moment it opens (#114). The classic protection
+    and the branch-rules endpoints both count. An unprotected branch answers 404 or no rules; a
+    free-plan private repository can have neither and answers 403. ``gh api`` prints GitHub's
+    error body, so those answers are told apart from being offline.
+    """
+    default = default_branch(top)
+    for endpoint in (f"repos/{{owner}}/{{repo}}/branches/{default}/protection/required_status_checks",
+                     f"repos/{{owner}}/{{repo}}/rules/branches/{default}"):
+        _, out = run(["gh", "api", endpoint], top, timeout=10)
+        try:
+            value = json.loads(out)
+        except ValueError:
+            return None
+        if isinstance(value, list):
+            if any(isinstance(rule, dict) and rule.get("type") == "required_status_checks" for rule in value):
+                return True
+        elif isinstance(value, dict) and ("contexts" in value or "checks" in value):
+            if value.get("contexts") or value.get("checks"):
+                return True
+        elif not (isinstance(value, dict) and str(value.get("status")) in ("403", "404")):
+            return None
+    return False
+
+
+def rest_open_pulls(top: Path, branch: str) -> list[dict]:
+    """The branch's open pull request through REST, shaped like `gh pr list`'s answer, or [].
+
+    GraphQL hides a flagged organization's pull requests while REST still lists them (#114), so an
+    empty `gh pr list` alone doesn't prove the branch has none. A fork's branch of the same name
+    doesn't count.
+    """
+    code, out = run(["gh", "api", "repos/{owner}/{repo}/pulls?state=open&per_page=100"], top, timeout=10)
+    try:
+        pulls = json.loads(out) if code == 0 else []
+    except ValueError:
+        return []
+    if not isinstance(pulls, list):
+        return []
+    for pr in pulls:
+        if not isinstance(pr, dict):
+            continue
+        head, base = pr.get("head") or {}, pr.get("base") or {}
+        if head.get("ref") == branch and (head.get("repo") or {}).get("full_name") == (base.get("repo") or {}).get("full_name"):
+            return [{"number": pr.get("number"), "isDraft": bool(pr.get("draft")), "autoMergeRequest": pr.get("auto_merge")}]
+    return []
 
 
 def auto_merge_allowed(top: Path) -> bool:

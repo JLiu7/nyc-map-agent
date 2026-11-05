@@ -18,9 +18,9 @@ permissions:
 jobs:
   close:
     if: github.event.pull_request.merged == true
-    uses: Pukujan/agent-stack-train/.github/workflows/close-on-merge.yml@496bf33e0a8327345a8e3ba19e3dc40eae47164a
+    uses: Pukujan/agent-stack-train/.github/workflows/close-on-merge.yml@c94ddab8740c13ca6157ac3b5a13c8a6bcfe53d8
     with:
-      oio_ref: 496bf33e0a8327345a8e3ba19e3dc40eae47164a
+      oio_ref: c94ddab8740c13ca6157ac3b5a13c8a6bcfe53d8
       runs_on: ${{ vars.OIO_RUNS_ON || '"ubuntu-latest"' }}
     secrets:
       CROSS_REPO_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}

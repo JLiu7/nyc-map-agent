@@ -73,7 +73,42 @@ def ontology_versions(top: Path) -> dict:
     return {"default_version": str(project["extends"]["version"]), "project_version": str(project["version"])}
 
 
+def ontology(top: Path) -> dict:
+    """The installed project ontology: the source of every priority path and its concept ID."""
+    try:
+        return json.loads((top / PROJECT_REL).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RecordError(f"no readable {PROJECT_REL.as_posix()}; install OIO here first ({exc})") from None
+
+
+def priority_entry(top: Path, path: str) -> dict:
+    """The concept this repository defines for `path`.
+
+    The record names the concept ID the project ontology declares for the path, never one derived from the path
+    itself: triage (`oio_triage.py`) compares the two and labels the issue `needs-priority-definition` when they
+    disagree, and the ontology is the only place that knows whether a path is defined at all. Writing `None` here
+    (the old behaviour) made every ranked record fail its own schema, which requires a string whenever the status is
+    `resolved` — so `--priority` could never produce a valid record.
+    """
+    project = ontology(top)
+    entry = next((p for p in project.get("priorities", []) if str(p.get("path")) == str(path)), None)
+    if entry is None:
+        defined = ", ".join(str(p.get("path")) for p in project.get("priorities", [])[:12]) or "none"
+        raise RecordError(
+            f"--priority {path!r} is not a priority path this repository defines; use one of {defined}"
+            + (" …" if len(project.get("priorities", [])) > 12 else "")
+        )
+    concept_id = str(entry.get("concept_id") or "").strip()
+    if not concept_id:
+        raise RecordError(f"--priority {path!r} has no concept_id in {PROJECT_REL.as_posix()}")
+    return {"status": "resolved", "path": str(path), "concept_id": concept_id}
+
+
 def build(top: Path, args: argparse.Namespace) -> dict:
+    # Required for a record, optional on the command line so `--self-test` can run on its own.
+    missing = [n for n in ("filer", "consequence", "affected") if not getattr(args, n)]
+    if missing:
+        raise RecordError("a record needs " + ", ".join("--" + n for n in missing))
     if not FILER_RE.match(args.filer):
         raise RecordError(f"--filer `{args.filer}` is neither `agent:<harness>/<session id>` nor a GitHub login")
     is_agent = args.filer.startswith("agent:")
@@ -99,7 +134,7 @@ def build(top: Path, args: argparse.Namespace) -> dict:
             "destination_repository": destination,
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
-        "priority": {"status": "unresolved" if args.priority is None else "resolved", "path": args.priority, "concept_id": None},
+        "priority": priority_entry(top, args.priority) if args.priority is not None else {"status": "unresolved", "path": None, "concept_id": None},
         "impact": {
             "affected": args.affected,
             "consequence": args.consequence,
@@ -151,9 +186,9 @@ def validate(top: Path, record: dict) -> None:
 
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--filer", required=True, help="agent:<harness>/<session id>, or the person's GitHub login")
-    ap.add_argument("--consequence", required=True)
-    ap.add_argument("--affected", action="append", required=True, help="who or what is affected; repeat for several")
+    ap.add_argument("--filer", help="agent:<harness>/<session id>, or the person's GitHub login")
+    ap.add_argument("--consequence")
+    ap.add_argument("--affected", action="append", help="who or what is affected; repeat for several")
     ap.add_argument("--issue-type", choices=("observational", "operational"), default="observational")
     ap.add_argument("--origin", choices=ORIGINS)
     ap.add_argument("--directing-human", help="the person who asked for this log, when one did")
@@ -166,12 +201,57 @@ def parser() -> argparse.ArgumentParser:
     for name in ("breadth", "workaround", "unresolved_risk", "change_risk", "product_outcome", "delay_cost", "smallest_useful_slice"):
         ap.add_argument("--" + name.replace("_", "-"), default="unknown")
     ap.add_argument("--out", type=Path, help="write the record here instead of printing it")
+    ap.add_argument("--self-test", action="store_true", help="check priority handling against this repository's ontology, then exit")
     return ap
+
+
+def self_test(top: Path) -> int:
+    """Check the priority handling against this repository's own ontology, without filing anything.
+
+    `--priority` used to write `concept_id: None`, so every ranked record failed its own schema
+    (`None is not of type 'string'`) and could never be written. This pins the three cases that matter: a defined
+    path resolves to the ontology's concept, an undefined one is refused with a message, and no path stays unresolved.
+    """
+    project = ontology(top)
+    failures: list[str] = []
+    defined = [str(p.get("path")) for p in project.get("priorities", []) if p.get("concept_id")]
+    if not defined:
+        failures.append("the project ontology defines no priority with a concept_id")
+    for path in defined[:3]:
+        entry = priority_entry(top, path)
+        if entry["status"] != "resolved" or not entry["concept_id"]:
+            failures.append(f"priority {path!r} did not resolve to a concept")
+        expected = next(p["concept_id"] for p in project["priorities"] if str(p["path"]) == path)
+        if entry["concept_id"] != expected:
+            failures.append(f"priority {path!r} resolved to {entry['concept_id']!r}, ontology says {expected!r}")
+    for bad in ("999999", "1.999999", "  "):
+        try:
+            priority_entry(top, bad)
+        except RecordError:
+            continue
+        failures.append(f"priority {bad!r} was accepted but the ontology does not define it")
+    # No --priority means an unresolved priority: null path and concept, which the schema requires of that branch.
+    unresolved = build(top, parser().parse_args([
+        "--filer", "agent:selftest/0", "--consequence", "x", "--affected", "y"]))["priority"]
+    if unresolved != {"status": "unresolved", "path": None, "concept_id": None}:
+        failures.append(f"an unranked record wrote {unresolved!r}, expected null path and concept")
+    if failures:
+        for line in failures:
+            print(f"oio_record: self-test: {line}", file=sys.stderr)
+        return 2
+    print(f"oio_record: self-test ok ({len(defined)} priority paths, {min(3, len(defined))} checked)")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     top = Path(git(Path.cwd(), "rev-parse", "--show-toplevel") or Path.cwd())
+    if args.self_test:
+        try:
+            return self_test(top)
+        except RecordError as exc:
+            print(f"oio_record: {exc}", file=sys.stderr)
+            return 2
     try:
         record = build(top, args)
         validate(top, record)

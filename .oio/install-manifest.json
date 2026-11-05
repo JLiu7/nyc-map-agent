@@ -16,13 +16,13 @@
     ".oio/schemas/v1/issue-log-record.schema.json": "9f8000a9058dc6c853df29472b87956dd56a744274f72efdcc27ddc50945bbdd",
     ".github/ISSUE_TEMPLATE/observational-issue.yml": "0e2a91de7d04664e89b8c614a1ca7c26ebf83443b7a98ce745d0bbc335cb2b15",
     ".github/workflows/issue-triage.yml": "1dfd3af9527cf6cc39e3941f4aad910e47e418c6d04e6824f41a533d99b5de22",
-    ".github/scripts/oio_installer.py": "02bac0cff6ad4378417268d0a6d902219ae449f51e036cdc2f89edc07eab0d7a",
+    ".github/scripts/oio_installer.py": "a2d483805a579eb6916763f95f0153d8f631595eb21c2bcf750e40cbcb5b45b0",
     ".github/scripts/oio_triage.py": "c796ce66a03c3e655b108200b24ca0015bdc17c83bf9504b32d7f57af6609c82",
-    ".github/scripts/oio_record.py": "4bb054082584898fdbe73378511082816309c2dfff4ce8d761c7a32102adcc15",
-    ".github/workflows/oio-close-on-merge.yml": "26aac2cd08590835c1262a43b9698a11e856e9728e482b580b966cd400147eb9",
-    ".github/workflows/oio-close-sweep.yml": "226fb3023d8028ec9a87bc4852a36b62e1f15190ca3ba70c1a5268f9e52bb9b5"
+    ".github/scripts/oio_record.py": "eab420b8b86b32d5df813eb048bb8ba05801bdf1c773c45fea4d469948cab60f",
+    ".github/workflows/oio-close-on-merge.yml": "8381f217a04a2691d87f2e86467c9ca4fb61b6f73c3d931e8af57bbf3fa91385",
+    ".github/workflows/oio-close-sweep.yml": "fb0d12389afbe126cd189003b7a521723cbd8e1666b499bd4f49cbf4a0a069c2"
   },
   "agents_block_sha256": "dd08b0a68f4af90c53d164dfdde8dc1996547193a2404965bf4c4adeffa5b9dc",
   "project_extension": ".oio/ontology/project.json",
-  "oio_ref": "496bf33e0a8327345a8e3ba19e3dc40eae47164a"
+  "oio_ref": "c94ddab8740c13ca6157ac3b5a13c8a6bcfe53d8"
 }

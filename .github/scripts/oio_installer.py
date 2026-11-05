@@ -803,7 +803,11 @@ def _install_in_target(target: Path, target_fs: _TargetFS, project_id: str | Non
         _target_file(target, relative)
         if manifest and relative in old_files:
             installed_data = target_fs.read_bytes(relative)
-            if installed_data is None or not _matches_recorded(installed_data, old_files[relative]):
+            # A file that already holds exactly what this install would write is not a conflict: an adopter
+            # that carried a fix ahead of the package (voice's oio_record.py) takes the release with no edit.
+            if installed_data is None or (
+                not _matches_recorded(installed_data, old_files[relative]) and installed_data != planned[relative]
+            ):
                 raise InstallError(f"managed file changed since OIO installed it: {relative}")
         elif target_fs.read_bytes(relative) is not None:
             raise InstallError(f"unmanaged file already exists at {relative}; refusing to adopt or overwrite it")
