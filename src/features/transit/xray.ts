@@ -1,17 +1,8 @@
-import { useSyncExternalStore } from "react";
 import { LEVEL_M, type XrayStation } from "./model";
+import { setXray } from "@/lib/transit/stationXray";
 
-/** Which subway station is shown in x-ray (null = off). Shared by the station panel and the map layer. */
-let xrayId: string | null = null;
-const subs = new Set<() => void>();
-export function setXray(id: string | null) {
-  xrayId = id;
-  subs.forEach((f) => f());
-}
-export const getXray = () => xrayId;
-export function useXray(): string | null {
-  return useSyncExternalStore((f) => (subs.add(f), () => subs.delete(f)), () => xrayId);
-}
+/** Which subway station is shown in x-ray lives in shared core, so the trip preview can set it too. */
+export { getXray, setXray, useXray } from "@/lib/transit/stationXray";
 
 const LEVEL_COLORS = ["#38bdf8", "#a78bfa", "#f472b6", "#fb923c", "#facc15"];
 export type Prim = { kind: "area" | "ribbon" | "shaft"; pts: Array<[number, number, number]>; width: number; color: string; order: number };

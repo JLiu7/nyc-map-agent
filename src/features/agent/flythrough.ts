@@ -17,6 +17,10 @@ export interface Segment {
   route?: string;
   /** quiet: shown on screen but not spoken (the stops in the middle of a ride). */
   callouts: Array<{ f: number; text: string; quiet?: boolean }>;
+  /** The station a descend or ascend goes through (GTFS id, as the x-ray data files it). */
+  station?: string;
+  /** Metres below the street at each point of `coords`, once the stairs are found (descend, ascend). */
+  depths?: number[];
 }
 export interface Pose { center: LngLatTuple; bearing: number; pitch: number; zoom: number }
 
@@ -31,7 +35,7 @@ export function bearing(a: LngLatTuple, b: LngLatTuple): number {
   const dx = (b[0] - a[0]) * Math.cos((a[1] * Math.PI) / 180);
   return ((Math.atan2(dx, b[1] - a[1]) * 180) / Math.PI + 360) % 360;
 }
-function cumulative(coords: LngLatTuple[]): number[] {
+export function cumulative(coords: LngLatTuple[]): number[] {
   const out = [0];
   for (let i = 1; i < coords.length; i++) out.push(out[i - 1] + dist(coords[i - 1], coords[i]));
   return out;
@@ -103,14 +107,14 @@ export function buildTimeline(trip: Trip): Segment[] {
     } else if (leg.kind === "enter") {
       const p: LngLatTuple = [leg.portal.lon, leg.portal.lat];
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
-      segs.push({ kind: "descend", label: leg.label, coords: [p, s], realS: 60, underground: true, callouts: [{ f: 0, text: leg.label }] });
+      segs.push({ kind: "descend", label: leg.label, coords: [p, s], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: leg.label }] });
     } else if (leg.kind === "ride") {
       segs.push({ kind: "ride", label: leg.label, coords: leg.coords, realS: leg.durationS, underground: leg.underground, route: leg.route, callouts: [{ f: 0, text: leg.label }, ...leg.stops.map((s, i) => ({ f: 0, at: s.at, text: s.text, quiet: !speakStop(i, leg.stops.length) }))] });
     } else {
       const p: LngLatTuple = [leg.portal.lon, leg.portal.lat];
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
       const outage = leg.portal.outage ? ` ${leg.portal.outage}` : "";
-      segs.push({ kind: "ascend", label: leg.label, coords: [s, p], realS: 60, underground: true, callouts: [{ f: 0, text: `${leg.label}.${outage}` }] });
+      segs.push({ kind: "ascend", label: leg.label, coords: [s, p], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: `${leg.label}.${outage}` }] });
     }
   }
   // Join the parts first, then place each callout on the line it ended up on.
@@ -118,6 +122,18 @@ export function buildTimeline(trip: Trip): Segment[] {
     ...s,
     callouts: s.callouts.map(({ at, ...c }) => (at ? { ...c, f: fractionOf(s.coords, at) } : c)),
   }));
+}
+
+/** Metres below the street at fraction f of a descend or ascend; 0 without stairs. */
+export function depthAt(seg: Segment, f: number): number {
+  const z = seg.depths;
+  if (!z || z.length !== seg.coords.length) return 0;
+  const cum = cumulative(seg.coords);
+  const d = Math.min(Math.max(f, 0), 1) * (cum[cum.length - 1] || 1);
+  const i = cum.findIndex((c) => c >= d);
+  if (i <= 0) return z[0];
+  const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+  return z[i - 1] + t * (z[i] - z[i - 1]);
 }
 
 /** On foot (walks, stairs in and out) the preview runs this many times faster than a ride (owner, 2026-10-27: walking was "super duper slow"). */
@@ -131,7 +147,10 @@ const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" |
  */
 export function wallSeconds(seg: Segment, speed: number): number {
   const pace = 10 / speed;
-  if (onFoot(seg)) return Math.min(12 * pace, Math.max(1.5 * pace, seg.realS / (speed * FOOT_RATE)));
+  const foot = Math.min(12 * pace, Math.max(1.5 * pace, seg.realS / (speed * FOOT_RATE)));
+  // Real stairs get time to be seen: 5 s at 10x, never slower than real time.
+  if (seg.depths) return Math.max(foot, Math.min(seg.realS / speed, 5 * pace));
+  if (onFoot(seg)) return foot;
   return Math.min(45 * pace, Math.max(3 * pace, seg.realS / speed));
 }
 

@@ -6,7 +6,12 @@ import { framePadding } from "@/lib/map/mapCover";
 import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { readMap } from "@/lib/map/mapRead";
-import { along, buildTimeline, calloutInfoAt, poseAt, wallSeconds, type Segment } from "./flythrough";
+import { applyAtmosphere, applyStreetPalette, loadStreetTextures } from "@/lib/map/basemap";
+import { approachBearing } from "@/lib/map/walk";
+import { getStreetXray, setStreetXray } from "@/lib/transit/streetXray";
+import { setXray as setStationXray } from "@/lib/transit/stationXray";
+import { along, buildTimeline, calloutInfoAt, depthAt, poseAt, wallSeconds, type Segment } from "./flythrough";
+import { blendCam, EYE_BLEND_S, eyeRig, usesEye, type Cam } from "./tripCamera";
 import { initialPlayback, isActive, playback, type Playback } from "./playback";
 import type { PlaybackSpeed, Trip } from "./schema";
 import { setMarker, setPreviewDim, setXray } from "./tripLayer";
@@ -54,6 +59,15 @@ function rideAlong(map: MapLibreMap, mode: FollowMode, at: [number, number], bea
   map.jumpTo(cam.zoom === undefined ? cam : { ...cam, zoom: zoom.next(cam.zoom, map.getZoom()) });
 }
 
+/** The camera where it is now, as a pose to ease from. */
+function camNow(map: MapLibreMap): Cam {
+  const c = map.getCenter();
+  return { center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(), elevation: map.getCenterElevation() };
+}
+
+/** An eye 1.7 m up reaches z22–23 on a tall screen; street view allows 24 (WALK_MAX_ZOOM). */
+const EYE_MAX_ZOOM = 24;
+
 export function usePlayer(onCallout?: (text: string) => void) {
   const reduced = usePrefersReducedMotion();
   const [pb, dispatch] = useReducer(playback, initialPlayback);
@@ -80,8 +94,49 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const rafId = useRef(0);
   /** The follow camera last drawn, and the steadied heading and zoom it rides with. */
   const camMode = useRef<FollowMode>("map");
+  /** Whether the last frame was drawn through the rider's eyes, so the next leg frames the map once. */
+  const camKind = useRef<"eye" | "other">("other");
   const heading = useRef<{ bearing: number; streak: number } | null>(null);
   const zoomKeep = useRef(new ZoomKeeper());
+  /**
+   * The rider's-eye camera while it drives the map: its steadied heading, the pose it
+   * eases in from and for how long so far, and the map settings it changed.
+   */
+  const eye = useRef<{ bearing: number; from: Cam | null; t: number; maxZoom: number } | null>(null);
+  /** The station shown in x-ray on the stairs, and whether the ground was see-through before. */
+  const stairs = useRef<{ station: string; streetXray: boolean } | null>(null);
+
+  const leaveEye = useCallback((map: MapLibreMap) => {
+    if (!eye.current) return;
+    map.setMaxZoom(eye.current.maxZoom);
+    applyAtmosphere(map, false);
+    applyStreetPalette(map, false);
+    eye.current = null;
+  }, []);
+  /** Show a station's insides and a see-through ground while the rider is on its stairs; null puts them back. */
+  const showStairs = useCallback((station: string | null) => {
+    if (stairs.current?.station === station) return;
+    if (stairs.current) {
+      setStationXray(null);
+      setStreetXray(stairs.current.streetXray);
+      stairs.current = null;
+    }
+    if (!station) return;
+    stairs.current = { station, streetXray: getStreetXray() };
+    setStationXray(station);
+    setStreetXray(true);
+  }, []);
+  /** Once the x-ray data is in, send the trip's stairs through the real station (same legs, new paths). */
+  const addStairs = useCallback((tripId: string, t: Segment[]) => {
+    if (!t.some((seg) => seg.station)) return;
+    void import("./stationStairs").then(async ({ loadStationInsides, withStairs }) => {
+      const xray = await loadStationInsides();
+      if (pbRef.current.tripId !== tripId || segsRef.current !== t) return;
+      const next = withStairs(t, xray);
+      segsRef.current = next;
+      setSegs(next);
+    });
+  }, []);
 
   const clearLayers = useCallback(() => {
     const map = getMapInstance();
@@ -89,7 +144,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setXray(map, false);
     setPreviewDim(map, false);
     setMarker(map, null);
-  }, []);
+    leaveEye(map);
+    showStairs(null);
+  }, [leaveEye, showStairs]);
 
   /** Put a trip in the player, paused at its start. Nothing moves until play(). */
   const load = useCallback((trip: Trip, speed?: Speed) => {
@@ -101,7 +158,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
     // A new preview starts on the calm map; a view picked during it then stays until it ends.
     setFollowMode("map");
     dispatch({ type: "load", tripId: trip.id, segCount: t.length, speed });
-  }, []);
+    pbRef.current = { ...pbRef.current, tripId: trip.id };
+    segsRef.current = t;
+    addStairs(trip.id, t);
+  }, [addStairs]);
   /** Load and play at once, for the Play button. */
   const start = useCallback((trip: Trip, speed?: Speed) => {
     if (pbRef.current.tripId !== trip.id || !isActive(pbRef.current)) load(trip, speed);
@@ -118,7 +178,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setWhere(null);
     if (pbRef.current.status !== "playing") clearLayers();
     dispatch({ type: "select", tripId: trip.id, segCount: t.length });
-  }, [clearLayers]);
+    pbRef.current = { ...pbRef.current, tripId: trip.id };
+    segsRef.current = t;
+    addStairs(trip.id, t);
+  }, [clearLayers, addStairs]);
   /** Drop the preview camera without easing the map home. Follow and Ask use this. */
   const release = useCallback(() => {
     cancelAnimationFrame(rafId.current);
@@ -177,7 +240,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
         }
         playedSpeed.current = s.speed;
       }
-      elapsed.current += (now - prev) / 1000;
+      const dt = (now - prev) / 1000;
+      elapsed.current += dt;
       prev = now;
       const total = reduced ? 3 : wallSeconds(seg, s.speed);
       const f = reduced ? 1 : Math.min(1, elapsed.current / total);
@@ -190,13 +254,36 @@ export function usePlayer(onCallout?: (text: string) => void) {
         styledSeg.current = s.seg;
         setPreviewDim(map, true);
         setXray(map, seg.underground && seg.kind !== "walk");
+        showStairs(seg.depths && seg.station ? seg.station : null);
       }
-      if (mode !== "map") {
+      const eyeLeg = mode === "map" && usesEye(seg);
+      if (!eyeLeg && eye.current) leaveEye(map);
+      if (eyeLeg) {
+        // On foot the preview sees through the rider's eyes, from the start until the train and from
+        // getting off to the door (owner, 2026-11-07); it eases in from wherever the camera was.
+        if (!eye.current) {
+          eye.current = { bearing: pose.bearing, from: reduced ? null : camNow(map), t: 0, maxZoom: map.getMaxZoom() };
+          map.setMaxZoom(EYE_MAX_ZOOM);
+          // Street view's haze and pavement: the overhead ones shimmer and fog over at eye level.
+          applyAtmosphere(map, true);
+          applyStreetPalette(map, true);
+          void loadStreetTextures(map).then(() => { if (eye.current) applyStreetPalette(map, true); }).catch(() => {});
+        }
+        const e = eye.current;
+        e.bearing = approachBearing(e.bearing, pose.bearing, dt, 4);
+        const rig = eyeRig(mark, e.bearing, depthAt(seg, f));
+        const cam = map.calculateCameraOptionsFromTo(new LngLat(...rig.eye), rig.eyeAlt, new LngLat(...rig.look), rig.lookAlt);
+        const to: Cam = { center: rig.look, zoom: cam.zoom ?? map.getZoom(), pitch: cam.pitch ?? 0, bearing: cam.bearing ?? e.bearing, elevation: rig.lookAlt };
+        e.t += dt;
+        const at = e.from && e.t < EYE_BLEND_S ? blendCam(e.from, to, e.t / EYE_BLEND_S) : to;
+        if (e.t >= EYE_BLEND_S) e.from = null;
+        map.jumpTo(at);
+      } else if (mode !== "map") {
         // A view picked from Change view: the camera rides the marker, leg after leg, until you pick Map.
         if (camMode.current !== mode) { heading.current = null; zoomKeep.current.reset(); }
         heading.current = stableHeading(heading.current?.bearing ?? null, pose.bearing, heading.current?.streak ?? 0);
         rideAlong(map, mode, mark, heading.current.bearing, seg.underground && seg.kind !== "walk" ? UNDERGROUND_M : 0, zoomKeep.current);
-      } else if (newLeg || camMode.current !== "map") {
+      } else if (newLeg || camMode.current !== "map" || camKind.current === "eye") {
         // Each leg is framed once, top-down and north up, clear of the open panels.
         frameLeg(map, seg.coords, reduced);
       } else {
@@ -204,6 +291,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
         keepInView(map, mark);
       }
       camMode.current = mode;
+      camKind.current = eyeLeg ? "eye" : "other";
       setMarker(map, mark, seg.route);
       if (seg.kind === "walk" && !seg.underground && now - place.current.at >= PLACE_MS) {
         place.current.at = now;
@@ -233,7 +321,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       alive = false;
       cancelAnimationFrame(rafId.current);
     };
-  }, [pb.status, pb.seg, pb.run, reduced]);
+  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs]);
 
   // Where the trip ended: the street and what to look for at the destination.
   useEffect(() => {
@@ -242,7 +330,14 @@ export function usePlayer(onCallout?: (text: string) => void) {
     const map = getMapInstance();
     place.current = { read: null, readAt: 0, at: 0 };
     if (end && map) setWhere(walkLine(walkPlace(readMap(map, { pois: true }).placeAt(end), end, dest.current)));
-  }, [pb.status]);
+    // Arrived on foot: rise from the rider's eyes to the map around the last stretch.
+    const last = segsRef.current.at(-1);
+    if (map && eye.current && last) {
+      leaveEye(map);
+      camKind.current = "other";
+      frameLeg(map, last.coords, reduced);
+    }
+  }, [pb.status, leaveEye, reduced]);
 
   const state: PlayerState = { ...pb, active: isActive(pb), playing: pb.status === "playing", segs, callout, where };
   return { state, load, start, select, stop, release, toggle, setSpeed, skip };
