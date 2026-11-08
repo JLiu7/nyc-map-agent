@@ -19,6 +19,7 @@ import { boardingArrivals, minutesUntil } from "./model";
 import { TONE, allLineNotices, type LineNotice } from "./lineNotices";
 import { NoticeIcon, noticeKind } from "./noticeKind";
 import { PullSheet } from "@/components/PullSheet";
+import { closeSheets } from "@/lib/store/pullSheet";
 import { useLineKeys } from "./useLineKeys";
 import type { Vehicle } from "./model";
 import type { SheetLevel } from "@/components/sheetSwipe";
@@ -234,11 +235,13 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
 
   if (sheet) {
     return (
-      <PullSheet testId="line-panel" label={`${route} line`} level={level} onLevel={setLevel}
+      // A new line is a new view: it comes to the top of the sheet even when another line was under a station.
+      <PullSheet key={route} testId="line-panel" label={`${route} line`} level={level} onLevel={setLevel} onClose={() => setSelectedLine(null)}
         header={<div className="flex items-center gap-2">
           <button type="button" data-testid="line-pill" aria-expanded={level > 0} aria-label={`Show the ${route} line`} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}
             className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]">{pillLabel}</button>
-          <button type="button" aria-label="Close line" onClick={() => setSelectedLine(null)} className="task-action task-close"><X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden /></button>
+          {/* Close empties the one phone sheet (a station under the line too); Back, drawn by the sheet, returns to it. */}
+          <button type="button" aria-label="Close line" onClick={closeSheets} className="task-action task-close"><X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden /></button>
         </div>}>
         <div ref={panelRef} data-testid="line-body" className="pull-sheet-body mt-2 flex flex-col gap-2.5 text-[#f1f5f9]">
           {actionsEl}

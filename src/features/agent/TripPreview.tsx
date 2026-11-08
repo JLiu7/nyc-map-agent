@@ -89,7 +89,7 @@ export function TripPreview(p: {
   const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} place={trip.destination.label.split(",")[0]} where={state.where} /> : null;
   // A phone: the trip rests as one line on the chat (Play, where to, how long) and pulls up, so the route stays on the map (owner, 2026-10-25).
   if (!wide) return <>
-    <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel}
+    <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel} onClose={p.onClose}
       header={<div className="flex items-center gap-2.5" data-testid="trip-heading">
         {playBtn("h-11 w-11")}
         <button type="button" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>

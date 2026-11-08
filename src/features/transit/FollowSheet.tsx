@@ -74,7 +74,7 @@ export function FollowSheet(p: FollowSheetProps) {
     slot,
   );
   return (
-    <PullSheet testId="follow-card" label={`Following ${p.route}`} level={level} onLevel={setLevel} onSide={(swipe) => setTab((at) => nextTab(TABS, at, swipe))}
+    <PullSheet testId="follow-card" label={`Following ${p.route}`} level={level} onLevel={setLevel} onClose={stopFollowing} onSide={(swipe) => setTab((at) => nextTab(TABS, at, swipe))}
       header={header}>
       {body}
     </PullSheet>

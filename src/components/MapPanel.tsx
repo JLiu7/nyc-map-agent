@@ -4,25 +4,17 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { useLeftCard, useLeftChips, useLeftColumn } from "@/lib/store/leftColumn";
 import { peekChipLabel } from "@/lib/store/panelSlot";
-import { Drawer } from "vaul";
+import { PullSheet } from "./PullSheet";
+import type { SheetLevel } from "./sheetSwipe";
 import { Button } from "@/components/ui/button";
 import type { NtaBoundary } from "@/lib/api/nta";
 import { useMapState } from "@/lib/store/MapStateContext";
-import { usePanel, type SheetSnap } from "@/lib/store/PanelContext";
+import { usePanel } from "@/lib/store/PanelContext";
 import { cn } from "@/lib/utils";
 import { PanelSearch, type PanelSearchHandle } from "./PanelSearch";
 import { FEATURES } from "@/features";
 import { LayersDrawer } from "./LayersDrawer";
 
-/**
- * Mobile peek snap: one row (title + number) plus the grab handle, raised by the
- * home chat bar's height so the bar does not hide it.
- */
-const peekAbove = (chatBar: number) => `${92 + chatBar}px`;
-/** The grab handle above the sheet's content: 8px margin and a 6px bar. */
-const SHEET_HANDLE = 14;
-const nameOf = (point: string | number | null): SheetSnap =>
-  point === 1 ? "full" : point === 0.5 ? "half" : "peek";
 
 
 /** Feature top-bar lines (hazard notice, weather) in one quiet row under the search bar. */
@@ -92,7 +84,7 @@ function TopBar({ boundaries, status, onLayers }: { boundaries: NtaBoundary[] | 
 
 /**
  * The one map panel, Google Maps style: a collapsible left panel on desktop,
- * a bottom sheet with peek / half / full snap points (vaul) on mobile. Shows
+ * the one pull sheet (peek / half / full are its three heights) on mobile. Shows
  * pushed content (`usePanel().showPanel`), else the selected place, else home.
  */
 export function MapPanel({
@@ -142,8 +134,7 @@ export function MapPanel({
   if (walkStart.walking !== walking) setWalkStart({ walking, selection });
   const pickedAtStreet = selection !== walkStart.selection && !!(selectedNtaCode || selectedBlockKey);
   const panelHidden = walking && !content && !pickedAtStreet;
-  const chatBar = typeof document === "undefined" ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue("--chat-bar-h"), 10) || 0;
-  const peek = peekAbove(chatBar);
+  const level: SheetLevel = snap === "peek" ? 0 : snap === "half" ? 1 : 2;
   const showSheet = !!(content || place) && !panelHidden && !layersOpen && !minimized;
   // The view controls sit in the map beside the desktop sheet or layers drawer,
   // and step out of the way when the phone sheet is half or full.
@@ -175,42 +166,38 @@ export function MapPanel({
   }, [home]);
   if (panelHidden) return null;
 
+  const back = () => {
+    content?.onBack?.();
+    closePanel();
+  };
+  const minimizeBtn = (
+    <button type="button" onClick={minimize} className="h-7 shrink-0 rounded-full border border-border px-[var(--sp-3)] text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      Minimize
+    </button>
+  );
+  const header = content ? (
+    <div className="flex items-start gap-2">
+      <Button type="button" size="icon" variant="ghost" aria-label="Back" className="-ml-2 h-7 w-7 shrink-0" onClick={back}>
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSnap("half")}>
+        <div className="truncate text-sm font-semibold">{content.title}</div>
+        {content.subtitle ? (
+          <div className="truncate text-[11px] text-muted-foreground">{content.subtitle}</div>
+        ) : null}
+        {content.summary}
+      </button>
+      {minimizeBtn}
+    </div>
+  ) : null;
   const body = content ? (
     <>
-      <div className="flex items-start gap-2 border-b border-border/60 p-4 pb-3">
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          aria-label="Back"
-          className="-ml-2 h-7 w-7 shrink-0"
-          onClick={() => {
-            content.onBack?.();
-            closePanel();
-          }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSnap("half")}>
-          <div className="truncate text-sm font-semibold">{content.title}</div>
-          {content.subtitle ? (
-            <div className="truncate text-[11px] text-muted-foreground">{content.subtitle}</div>
-          ) : null}
-          {content.summary}
-        </button>
-        <button type="button" onClick={minimize} className="h-7 shrink-0 rounded-full border border-border px-[var(--sp-3)] text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          Minimize
-        </button>
-      </div>
+      <div className="border-b border-border/60 p-4 pb-3">{header}</div>
       {content.details ? <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">{content.details}</div> : null}
     </>
   ) : place ? (
     <>
-      <div className="flex shrink-0 justify-end px-4 pt-2">
-        <button type="button" onClick={minimize} className="h-7 rounded-full border border-border px-[var(--sp-3)] text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          Minimize
-        </button>
-      </div>
+      <div className="flex shrink-0 justify-end px-4 pt-2">{minimizeBtn}</div>
       {place}
     </>
   ) : null;
@@ -264,34 +251,20 @@ export function MapPanel({
       {top ? <div className="absolute z-30" style={{ top: "calc(env(safe-area-inset-top) + var(--edge))", left: "max(var(--edge), env(safe-area-inset-left))", right: "max(var(--edge), env(safe-area-inset-right))" }}>{top}</div> : null}
       {drawer}
       {chip}
-      {showSheet ? <Drawer.Root
-        open
-        modal={false}
-        dismissible={false}
-        snapPoints={[peek, 0.5, 1]}
-        activeSnapPoint={snap === "peek" ? peek : snap === "half" ? 0.5 : 1}
-        setActiveSnapPoint={(point) => setSnap(nameOf(point))}
-      >
-        <Drawer.Portal>
-          <Drawer.Content
-            aria-describedby={undefined}
-            data-testid="details-sheet"
-            className="fixed inset-x-0 bottom-0 z-40 flex h-full max-h-[97%] flex-col rounded-t-2xl pb-[env(safe-area-inset-bottom)] border border-border bg-card shadow-2xl outline-none"
-          >
-            <Drawer.Title className="sr-only">Map panel</Drawer.Title>
-            <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
-            {/* The sheet is 97% of the screen tall and slides down by half for "half", so its lower part is
-                off screen and the chat bar covers its bottom edge. The list only gets the part you can see, or its
-                last rows (the J, L and SI lines) can never scroll into view (owner report, 2026-10-25). */}
-            <div
-              className={cn("flex min-h-0 flex-1 flex-col", snap === "full" ? "overflow-y-auto" : "overflow-hidden")}
-              style={snap === "peek" ? undefined : { maxHeight: `calc(${snap === "half" ? 47 : 97}dvh - ${SHEET_HANDLE}px - var(--chat-bar-h, 0px))` }}
-            >
-              {body}
+      {/* The phone's one sheet (owner, 2026-11-07): a line or a train opened from here comes up as the
+          sheet's next view, and Back brings this one back (src/lib/store/pullSheet.ts). */}
+      {showSheet ? (
+        <PullSheet testId="details-sheet" label={content?.title ?? "Place"} level={level} onLevel={(l) => setSnap(l === 0 ? "peek" : l === 1 ? "half" : "full")}
+          onClose={content ? back : minimize} ownBack={Boolean(content)}
+          header={content ? header : (
+            <div className="flex items-center gap-2 px-1 pb-1">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">Place</span>
+              {minimizeBtn}
             </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root> : null}
+          )}>
+          <div className="pull-sheet-body text-card-foreground">{content ? (content.details ? <div className="pt-2">{content.details}</div> : null) : place}</div>
+        </PullSheet>
+      ) : null}
     </>
   );
 }

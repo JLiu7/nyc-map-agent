@@ -55,7 +55,7 @@ export function ExitTask(p: {
   </>;
   // A phone: the station and your exit rest as one line on the chat and pull up, so the map keeps the station, you and the way out (owner, 2026-10-25).
   if (!wide) return (
-    <PullSheet testId="exit-sheet" label={`${p.pack.station.name} exits`} level={level} onLevel={setLevel}
+    <PullSheet testId="exit-sheet" label={`${p.pack.station.name} exits`} level={level} onLevel={setLevel} onClose={p.onClose}
       header={<div className="flex items-center gap-2.5">
         <button type="button" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>
           <span className="flex items-center gap-2"><span className="truncate text-[15px] font-bold">{p.pack.station.name}</span>{offline}</span>

@@ -67,7 +67,7 @@ export interface SearchHit {
 /** A search source, e.g. transit stations. Return [] when it has nothing. */
 export type SearchProvider = (query: string) => SearchHit[];
 
-export type SheetSnap = "peek" | "half" | "full";
+type SheetSnap = "peek" | "half" | "full";
 
 interface PanelValue {
   content: PanelContent | null;

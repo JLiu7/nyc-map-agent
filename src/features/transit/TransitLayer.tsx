@@ -406,6 +406,8 @@ export default function TransitLayer() {
       showPanel({ id: `transit:station:${system}:${id}`, title: name, subtitle: `${SYSTEM_LABELS[system]} station`, details: <StationDetails system={system} id={id} /> }),
     [showPanel],
   );
+  // Handle for the browser tests (open a station the way a map tap does) in dev and the e2e build only.
+  useEffect(() => { if (import.meta.env.DEV || import.meta.env.VITE_E2E) Object.assign(window, { __openStation: openStation }); }, [openStation]);
   useEffect(() => {
     if (!panelOpen) return;
     showPanel({ id: "transit:status", title: "Service status", subtitle: "Live MTA feeds, refreshed every 15 s", details: <TransitStatusDetails /> });

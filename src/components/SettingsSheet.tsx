@@ -15,7 +15,7 @@ export default function SettingsSheet({ onClose }: { onClose: () => void }) {
   const t = useMenuT();
   const [level, setLevel] = useState<SheetLevel>(1);
   return (
-    <PullSheet testId="settings-sheet" label={t("settings")} level={level} onLevel={(l) => (l ? setLevel(l) : onClose())}
+    <PullSheet testId="settings-sheet" label={t("settings")} level={level} onLevel={(l) => (l ? setLevel(l) : onClose())} onClose={onClose}
       header={
         <div className="flex min-h-12 items-center gap-3 px-1">
           <Settings className="h-5 w-5 shrink-0 text-slate-300" aria-hidden />

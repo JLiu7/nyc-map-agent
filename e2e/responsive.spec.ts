@@ -196,6 +196,42 @@ for (const size of SIZES) {
       await page.waitForTimeout(800);
       await expectLayout(page);
     });
+
+    // Owner, 2026-11-07: the station sheet and the line sheet stacked and cut each other off. A phone has one
+    // sheet: the line comes up as its next view, Back returns to the station, and Close empties it (#53).
+    test("a station, one of its lines, and back", async ({ page }) => {
+      const phone = size.width < 640;
+      const sheets = page.locator(".pull-sheet");
+      await open(page);
+      await page.waitForFunction(() => typeof (window as unknown as { __openStation?: unknown }).__openStation === "function", null, { timeout: slow(15_000) });
+      await page.evaluate(() => (window as unknown as { __openStation: (s: string, id: string, name: string) => void }).__openStation("subway", "G13", "Elmhurst Av"));
+      const station = page.getByTestId("details-sheet");
+      await expect(station).toBeVisible();
+      if (phone) await station.getByTestId("sheet-grip").click();
+      await page.getByRole("button", { name: "Show only the M line" }).click();
+      const line = page.getByTestId("line-panel");
+      await expect(line).toBeVisible();
+      if (!phone) {
+        await expectLayout(page);
+        return;
+      }
+      await expect(station).toHaveCount(0);
+      await expect(sheets).toHaveCount(1);
+      await expectLayout(page);
+
+      await line.getByTestId("sheet-back").click();
+      await expect(line).toHaveCount(0);
+      await expect(station).toBeVisible();
+      await expect(page.getByRole("button", { name: "Show only the M line" })).toBeVisible();
+      await expect(sheets).toHaveCount(1);
+      await expectLayout(page);
+
+      await page.getByRole("button", { name: "Show only the M line" }).click();
+      await expect(sheets).toHaveCount(1);
+      await line.getByRole("button", { name: "Close line" }).click();
+      await expect(sheets).toHaveCount(0);
+      await expect(station).toHaveCount(0);
+    });
   });
 }
 
