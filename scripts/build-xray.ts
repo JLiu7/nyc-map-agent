@@ -7,13 +7,15 @@
  *   OSM_PBF=/path/new-york-latest.osm.pbf pnpm build:xray
  *
  * Needs public/transit/subway.json (pnpm build:transit) for station points.
- * Output is committed; rerun when OSM coverage improves.
+ * Output is committed; rerun when OSM coverage improves. Hand-made complexes in
+ * scripts/xray-overrides/ replace OSM's (see xray-overrides.ts).
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseLevel, type XrayStation, type XrayWay } from "../src/features/transit/model";
+import { applyXrayOverrides, loadOverrides } from "./xray-overrides";
 
 const pbf = process.env.OSM_PBF;
 if (!pbf) throw new Error("Set OSM_PBF to a New York OSM extract (e.g. Geofabrik new-york-latest.osm.pbf)");
@@ -79,6 +81,8 @@ for (const line of readFileSync(join(dir, "f.geojsonseq"), "utf8").split("\n")) 
 // Only stations with platforms below ground are worth an x-ray.
 for (const id of Object.keys(out)) if (!out[id].ways.some((w) => w.k === "platform")) delete out[id];
 console.log("underground stations", stations.length);
+// Hand-made layouts for complexes OSM gets wrong (scripts/xray-overrides/).
+applyXrayOverrides(out, loadOverrides());
 writeFileSync("public/transit/xray.json", JSON.stringify(out));
 const n = Object.values(out);
 console.log(`xray: ${n.length} stations, ${n.reduce((a, s) => a + s.ways.length, 0)} ways, ${n.reduce((a, s) => a + s.elevators.length, 0)} elevators`);
