@@ -7,9 +7,9 @@ import type { SheetLevel } from "@/components/sheetSwipe";
 import { useMenuT } from "@/lib/i18n/menuText";
 
 /**
- * On a phone's home, language and the QR code come up from behind the chat
- * from the Settings chip, so the top right keeps only view, zoom and north
- * (owner, 2026-10-25). Swiping it all the way down closes it.
+ * On a phone's home, the model and the QR code come up from behind the chat
+ * from the Settings chip (owner, 2026-10-25); language is here too, and also
+ * the rail's chip (#54). Swiping it all the way down closes it.
  */
 export default function SettingsSheet({ onClose }: { onClose: () => void }) {
   const t = useMenuT();

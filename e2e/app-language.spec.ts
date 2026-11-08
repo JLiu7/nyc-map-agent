@@ -27,9 +27,9 @@ for (const [width, height] of [[375, 667], [320, 568]]) {
     expect(box!.x + box!.width).toBeLessThanOrEqual(width);
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/zh-home-${width}.png` });
 
-    // A phone has no menu row; language comes up from behind the chat in Settings, and follows too.
+    // A phone has no menu row; language is the rail's chip (#54) and sits in Settings too, and both follow.
     await expect(page.getByTestId("menu-row")).toHaveCount(0);
-    await expect(page.getByTestId("lang-chip")).toBeHidden();
+    await expect(page.getByTestId("lang-chip").getByLabel("语言")).toBeAttached();
     await page.getByTestId("settings-chip").click();
     const sheet = page.getByTestId("settings-sheet");
     await expect(sheet.getByLabel("语言")).toBeVisible();

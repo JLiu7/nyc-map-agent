@@ -16,8 +16,7 @@ import { LiveLayerRows } from "./LiveLayerRows";
 
 /**
  * Agent-first map chrome (#370, #372): one column of quick buttons at the top
- * right (Change view, zoom, north; on a phone also the language until it moves
- * into a sheet), the view menu, and Center on my location just above the chat.
+ * right (Change view, zoom, north; on a phone also Layers and the language), the view menu, and Center on my location just above the chat.
  * Everything else comes up from behind the chat (owner, 2026-10-25). Layers and
  * every other menu live in the top-left menu row (MenuRow).
  */
@@ -74,7 +73,8 @@ export function QrButton({ wide }: { wide?: boolean } = {}) {
 
 /**
  * Phones only: the language, as a small chip in the rail. The menu row with Settings is gone on a
- * phone, and someone who does not read English must still be able to switch (owner, 2026-10-25).
+ * phone, and someone who does not read English must still be able to switch (owner, 2026-10-25;
+ * it sat in the wider-screens column and showed nowhere until #54). Wider screens pick it in Settings.
  * A native select sits over the chip, so a phone opens its own picker.
  */
 function LangChip() {
@@ -396,11 +396,10 @@ export function MapChrome() {
       <ZoomButtons map={map} />
       {map ? <Compass map={map} bearing={bearing} /> : null}
       <PhoneLayers open={layersOpen} onOpen={(v) => setOpenMenu(v ? "layers" : null)} />
-      {/* On a phone, language and the QR code come up from behind the chat (the Settings chip). */}
-      <div className="hidden flex-col items-end gap-2.5 sm:flex">
-        <LangChip />
-        <QrButton />
-      </div>
+      {/* Language stays in sight on a phone (#54): the Settings chip sat past the edge of the task row. */}
+      <LangChip />
+      {/* The QR code: wider screens here, a phone in Settings. */}
+      <div className="hidden sm:flex"><QrButton /></div>
     </div>
     <LocateButton map={map} className="sheet-locate corner-locate absolute z-40" />
     </>

@@ -24,8 +24,8 @@ test("a phone is chat-first: no menu row, and language comes up from behind the 
   const bar = (await page.getByTestId("agent-bar").boundingBox())!;
   expect(locate.y + locate.height).toBeLessThanOrEqual(bar.y);
   expect(bar.y - (locate.y + locate.height)).toBeLessThan(160);
-  // The top right keeps only view, zoom and north; language and the QR code are in Settings.
-  await expect(page.getByTestId("lang-chip")).toBeHidden();
+  // The language chip stays in the rail (#54); language and the QR code are in Settings as well.
+  await expect(page.getByTestId("lang-chip")).toBeVisible();
   await page.getByTestId("settings-chip").click();
   const sheet = page.getByTestId("settings-sheet");
   await expect(sheet.getByRole("button", { name: "Show the app's QR code" })).toBeVisible();

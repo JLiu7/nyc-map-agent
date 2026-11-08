@@ -160,6 +160,25 @@ for (const size of SIZES) {
       expect(sent.at(-1)?.profile).toBe("dev");
     });
 
+    // Language is one tap from the home screen on every size (#54): the phone rail's chip, or Settings on wider screens.
+    test("changing the language", async ({ page }) => {
+      await open(page);
+      const phone = size.width < 640;
+      if (phone) {
+        const chip = page.getByTestId("lang-chip");
+        await expect(chip).toBeVisible();
+        await expectLayout(page);
+        await chip.getByLabel("Language").selectOption("es");
+        await expect(chip.getByLabel("Idioma")).toHaveValue("es");
+      } else {
+        await page.getByTestId("menu-settings").click();
+        await page.getByTestId("settings-panel").getByLabel("Language").selectOption("es");
+        await page.keyboard.press("Escape");
+      }
+      await expect(page.getByRole("button", { name: "Baño" })).toBeVisible();
+      await expectLayout(page);
+    });
+
     test("home with the transit layers drawn", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();
