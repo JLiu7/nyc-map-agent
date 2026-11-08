@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStreetContext, closeAsk, openAsk } from "@/lib/agent/streetContext";
 import { followedTrain } from "@/lib/transit/follow";
 import { setMapInstance } from "@/lib/map/mapInstance";
@@ -139,7 +139,14 @@ interface Eye {
   lat: number;
   bearing: number;
   pitch: number;
+  /** Feet height in metres inside a station: below 0 underground, above it on an elevated platform. */
+  z?: number;
+  /** On a station's stairs and floors rather than the street. */
+  inside?: boolean;
 }
+
+/** Feet this far below the street and the eye is under it: the station's own view takes over. */
+const UNDERGROUND_M = 1.2;
 
 /**
  * Camera options for an eye 1.7 m above the pavement. MapLibre 5 derives the
@@ -150,7 +157,10 @@ function eyeCamera(map: MaplibreMapInstance, eye: Eye): CameraOptions {
   // Aim at a point on the look ray: the pavement when looking down, a point
   // in the air when looking level or up (pitch > 90). The centre is unclamped
   // from the ground while walking, so the aim point can sit above it.
-  const { ahead, height } = lookTarget(eye.pitch, EYE_HEIGHT_M);
+  // On an elevated platform the eye is simply higher; underground the map keeps it at the pavement
+  // (MapLibre will not go lower) and StationInside draws the view.
+  const eyeAlt = EYE_HEIGHT_M + Math.max(eye.z ?? 0, 0);
+  const { ahead, height } = lookTarget(eye.pitch, eyeAlt);
   const rad = (eye.bearing * Math.PI) / 180;
   const cosLat = Math.cos((eye.lat * Math.PI) / 180);
   const to: [number, number] = [
@@ -158,11 +168,15 @@ function eyeCamera(map: MaplibreMapInstance, eye: Eye): CameraOptions {
     eye.lat + (ahead * Math.cos(rad)) / 111_320,
   ];
   const toAlt = height;
-  return map.calculateCameraOptionsFromTo(new LngLat(eye.lon, eye.lat), EYE_HEIGHT_M, new LngLat(to[0], to[1]), toAlt);
+  return map.calculateCameraOptionsFromTo(new LngLat(eye.lon, eye.lat), eyeAlt, new LngLat(to[0], to[1]), toAlt);
 }
 import { useMapState } from "@/lib/store/MapStateContext";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { WalkControls } from "./WalkControls";
+import { stationFinder, type NearStation } from "@/lib/map/stationNear";
+import { toLngLat, toLocal, walkIn } from "@/lib/map/stationWalk";
+// three.js stays out of the boot chunk: the view below the street loads when you first go down.
+const StationInside = lazy(() => import("./StationInside").then((m) => ({ default: m.StationInside })));
 import { useQuickLayer } from "@/lib/quickLayers";
 import { QuickLayers } from "./QuickLayers";
 import { MapChrome } from "./MapChrome";
@@ -327,6 +341,13 @@ export function MapView({
   /** The walker's eye pose; the camera is derived from it every frame. */
   const eyeRef = useRef<Eye | null>(null);
   const getEye = useCallback(() => eyeRef.current, []);
+  // Dev-only handle for headless QA: where the walker stands, and how high.
+  useEffect(() => {
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E) Object.assign(window, { __eye: getEye });
+  }, [getEye]);
+  /** The station you are walking beside or through, and whether you are under the street in it. */
+  const [stationHere, setStationHere] = useState<NearStation | null>(null);
+  const [underground, setUnderground] = useState(false);
 
   const {
     layer,
@@ -1536,6 +1557,9 @@ export function MapView({
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerUp);
     let routeDistance = 0;
+    const stations = stationFinder();
+    let station: NearStation | null = null;
+    let below = false;
     const tick = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
@@ -1548,6 +1572,16 @@ export function MapView({
       }
       let moved = lookDirty;
       lookDirty = false;
+      // Standing still beside a station when its model first loads: pick it up now, not one step too late.
+      if (!station && eye.z === undefined) {
+        const here = stations.near(eye.lon, eye.lat);
+        if (here) {
+          station = here;
+          setStationHere(here);
+          eye.z = 0;
+          eye.inside = false;
+        }
+      }
       if (followed) {
         // Following directions: advance along the polyline at walking pace
         // (Shift / sprint still runs), turning smoothly into each segment.
@@ -1567,10 +1601,32 @@ export function MapView({
           input,
           dt,
         );
-        eye.lon = next.lon;
-        eye.lat = next.lat;
+        // Beside a station its floors decide where you can stand: onto a stair top takes you down
+        // (or up) it, and its walls and platform edges stop you. Inside one, you stay in it.
+        const near = eye.inside && station ? station : stations.near(next.lon, next.lat);
+        if (near) {
+          const m = near.model;
+          const [x0, y0] = toLocal(m, eye.lon, eye.lat);
+          const [x1, y1] = toLocal(m, next.lon, next.lat);
+          const at = walkIn(m, { x: x0, y: y0, z: eye.z ?? 0, inside: eye.inside ?? false }, x1 - x0, y1 - y0);
+          [eye.lon, eye.lat] = toLngLat(m, at.x, at.y);
+          eye.z = at.z;
+          eye.inside = at.inside;
+        } else {
+          eye.lon = next.lon;
+          eye.lat = next.lat;
+        }
         eye.bearing = next.bearing;
+        if (near !== station) {
+          station = near;
+          setStationHere(near);
+        }
         moved = true;
+      }
+      const under = (eye.z ?? 0) < -UNDERGROUND_M;
+      if (under !== below) {
+        below = under;
+        setUnderground(under);
       }
       if (moved) {
         // The camera is re-derived from the eye every frame: moving cancels
@@ -1588,6 +1644,8 @@ export function MapView({
 
     return () => {
       cancelAnimationFrame(frame);
+      setStationHere(null);
+      setUnderground(false);
       held.clear();
       walkPad.current = WALK_IDLE;
       window.removeEventListener("keydown", onKeyDown);
@@ -1602,6 +1660,24 @@ export function MapView({
     // `describeAt` comes through a ref so a data refresh cannot tear down the
     // loop and drop the keys the walker is holding.
   }, [ready, walking, stopWalk, followingRoute, setFollowingRoute]);
+
+  // An elevated station is drawn on the map while you walk beside it, so its platform is there to climb to.
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!ready || !map || !stationHere?.model.elevated) return;
+    const here = stationHere;
+    let id: string | null = null;
+    let gone = false;
+    void import("@/lib/map/three/stationScene").then(({ createStationLayer, STATION_LAYER }) => {
+      if (gone || map.getLayer(STATION_LAYER)) return;
+      map.addLayer(createStationLayer(here.model, here.tracks));
+      id = STATION_LAYER;
+    });
+    return () => {
+      gone = true;
+      if (id && map.getLayer(id)) map.removeLayer(id);
+    };
+  }, [ready, stationHere]);
 
   // Walking directions: one GeoJSON source holding the line and both ends.
   useEffect(() => {
@@ -1810,6 +1886,11 @@ export function MapView({
             openAsk(buildStreetContext({ lon: c.lng, lat: c.lat, heading: m.getBearing(), followedTrain: followedTrain() }));
           }}
         />
+      ) : null}
+      {walking && underground && stationHere && mapRef.current ? (
+        <Suspense fallback={null}>
+          <StationInside station={stationHere} getEye={getEye} fov={mapRef.current.getMap().getVerticalFieldOfView()} />
+        </Suspense>
       ) : null}
       {walking && ready && mapRef.current ? (
         <StreetMiniMap main={mapRef.current.getMap()} getEye={getEye} onExit={stopWalk} onMap={() => showView("map")} filters={inset} />

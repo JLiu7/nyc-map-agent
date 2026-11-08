@@ -302,7 +302,7 @@ export default function TransitLayer() {
   }, [map, walking]);
   // Dev-only: lets headless QA enter street level at a point.
   useEffect(() => {
-    if (import.meta.env.DEV) (window as unknown as { __walk?: unknown }).__walk = startWalk;
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E) (window as unknown as { __walk?: unknown }).__walk = startWalk;
   }, [startWalk]);
   const { on, set, panelOpen, setPanelOpen, busPage, busLines: pickedLines, busNear, busCap, setBusLines } = useTransitToggles();
   const { content, showPanel, setDrawerOpen, setSnap, drawerOpen } = usePanel();
