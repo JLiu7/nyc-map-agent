@@ -4,6 +4,8 @@ Before changing anything people see in the app, read `docs/DESIGN_RULES.md` (the
 
 To continue the agent-first build, start from `docs/PDD.md`: what is built, what remains, how to check it, and how to ship it. Design frames are in `docs/design/frames/`.
 
+Speech routing and fallbacks (which machine hears and speaks for this app, and what happens when they are all full) are changed only in `voice-agent-research`'s `demo/live-site/speech/gateway/routes.toml` (its `docs/speech-gateway.md`, section "Switch or upgrade routing"), never in this repository. Change them only when the owner asks, and never switch cloud speech on by yourself.
+
 For where the work stands right now (what merged, what is in flight, which worktree belongs to which pull request, what comes next), read `checkpoints/CURRENT.md`. Nothing updates it automatically: any pull request that finishes, starts or abandons a piece of work updates its "Completed recently", "In flight" and "Next" sections in the same pull request.
 
 <!-- acs:boot:start -->

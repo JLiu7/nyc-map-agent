@@ -6,6 +6,7 @@
  * soon as it is made. We pass that stream straight through. Kokoro has voices for English, Spanish,
  * French and Chinese of the app's languages; any other answers 415 and the browser speaks it as before.
  * TTS_BASE_URL overrides the server when speech-to-text lives elsewhere. Nothing is stored or logged.
+ * Like speech-to-text, every request names the app to the speech gateway with X-Speech-Project.
  *
  * The speech server keeps one stack of models in memory and swaps when another app asks for a different
  * one, which costs the next rider about 6 s of silence. `startVoiceKeeper` asks it to load our stack
@@ -23,6 +24,7 @@ const limiter = createLimiter({ windowMax: 400, windowMs: 3_600_000, burstMax: 3
 export const ttsConfig = (env = process.env) => ({
   base: (env.TTS_BASE_URL || (env.STT_PROTOCOL === "speech" ? env.STT_BASE_URL : "") || "").replace(/\/$/, ""),
   stack: env.TTS_STACK || env.STT_STACK || "multilingual",
+  project: env.STT_PROJECT || "nyc-map",
 });
 
 const json = (body: unknown, status: number) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -34,7 +36,7 @@ export function ttsLang(tag: unknown): string | null {
 }
 
 export async function speak(req: Request, f: typeof fetch = fetch, env = process.env): Promise<Response> {
-  const { base, stack } = ttsConfig(env);
+  const { base, stack, project } = ttsConfig(env);
   if (!base) return json({ error: "no voice server" }, 503);
   if (!limiter.take(clientIp(req.headers)).ok) return json({ error: "too many" }, 429);
   const body = (await req.json().catch(() => null)) as { text?: unknown; lang?: unknown } | null;
@@ -46,7 +48,7 @@ export async function speak(req: Request, f: typeof fetch = fetch, env = process
   try {
     res = await f(`${base}/tts`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-speech-project": project },
       body: JSON.stringify({ text, stack, lang }),
       signal: AbortSignal.any([req.signal, AbortSignal.timeout(20_000)]),
     });
@@ -61,10 +63,10 @@ export async function speak(req: Request, f: typeof fetch = fetch, env = process
 
 /** Ask the speech server to have our stack loaded. True when it answered 2xx; never throws. */
 export async function warmVoice(f: typeof fetch = fetch, env = process.env): Promise<boolean> {
-  const { base, stack } = ttsConfig(env);
+  const { base, stack, project } = ttsConfig(env);
   if (!base) return false;
   try {
-    const res = await f(`${base}/load?stack=${encodeURIComponent(stack)}`, { method: "POST", signal: AbortSignal.timeout(60_000) });
+    const res = await f(`${base}/load?stack=${encodeURIComponent(stack)}`, { method: "POST", headers: { "x-speech-project": project }, signal: AbortSignal.timeout(60_000) });
     return res.ok;
   } catch {
     return false;

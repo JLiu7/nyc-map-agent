@@ -27,15 +27,15 @@ areas, segment times and block tiles failed with "relation does not exist" or 40
 
 ### Voice (speech-to-text)
 
-The mic in Brave, Firefox and on phones records a turn in the browser, converts it to a 16 kHz WAV and posts it to `/api/stt`. The server sends it to the copilot speech server on the Pro (launchd `com.pukujan.copilot-speech`, port 8799, repository `chatbots`), which runs Whisper large-v3-turbo on the Apple GPU for many languages. The Pro's `copilot-speech-tunnel` forwards it to the VPS's `127.0.0.1:18799`, and a socat bridge re-offers that on the Docker gateway, so the app reaches it at `http://host.docker.internal:18799`. The env file sets:
+The mic in Brave, Firefox and on phones records a turn in the browser, converts it to a 16 kHz WAV and posts it to `/api/stt`. The server sends it to the shared speech gateway on the VPS (Komodo stack `speech-gateway`, from the `voice-agent-research` repository), which listens on the Docker gateway at port 18800 and passes each request to a speech server with room: Whisper large-v3-turbo on the Windows PC first, then the copilot speech server on the Pro. Spoken answers (`/api/tts`) and the voice keeper's `/load` use the same address. Every request carries `X-Speech-Project: nyc-map` (`STT_PROJECT`), and no call id, since each turn is one request. The env file sets:
 
 ```
-STT_BASE_URL=http://host.docker.internal:18799
+STT_BASE_URL=http://host.docker.internal:18800
 STT_PROTOCOL=speech
 STT_STACK=multilingual
 ```
 
-Nothing goes to an outside service. Two things to know: the speech server holds one voice stack at a time, so the first voice turn after the copilot used another stack waits about 30 seconds while Whisper loads; and if the Pro sleeps or the tunnel drops, voice says it is unavailable while typing keeps working. Check it from the VPS with `curl -s http://127.0.0.1:18799/health`.
+Nothing goes to an outside service. Which machine takes a language, and what happens when every machine is full, is decided in the gateway's `demo/live-site/speech/gateway/routes.toml` in `voice-agent-research` (its `docs/speech-gateway.md`), not here. For `nyc-map` a full gateway answers 503 at once and the mic says voice is unavailable while typing keeps working; there is no cloud speech fallback. Check it from the VPS with `curl -s http://127.0.0.1:18800/health`, and `curl -s http://127.0.0.1:18800/routes` for the live routes.
 
 ### Public route
 

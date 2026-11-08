@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-03, 21:30 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-08, 15:45 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## Completed recently
+
+- **Voice on the live site reached Whisper through a socat bridge on port 18799 that is being removed.** Speech-to-text, spoken answers and the voice keeper now go to the shared speech gateway on the VPS (`STT_BASE_URL=http://host.docker.internal:18800` in `~/apps/nyc-map-agent.env`), and every request says `X-Speech-Project: nyc-map` (`STT_PROJECT`). The gateway sends multilingual turns to the Windows PC first, then the Pro. Routing and fallbacks live in `voice-agent-research`'s gateway `routes.toml`, not here (AGENTS.md).
 
 - **A phone showed no way to choose the language (#54).** The rail's language chip sat in the wider-screens column and showed nowhere, and the Settings chip is past the right edge of the task row. The chip now sits under Layers on a phone and opens the phone's own picker; the same stored language drives the app's text, the agent's reply language and the voice. Not done: asking once on first launch when the phone's language is not one of the eight, which waits for the owner's call under `docs/DESIGN_RULES.md`.
 

@@ -63,13 +63,13 @@ Not checked: whether Cloudflare keeps request logs for our account, and whether 
 
 ## What happens to your voice
 
-Speaking a question takes the same road as typing one, plus one stop at the end. The recording never goes to a company: it goes to a speech server on the owner's own MacBook Pro, which runs Whisper, an open speech model, on its own graphics chip.
+Speaking a question takes the same road as typing one, plus one stop at the end. The recording never goes to a company: our speech gateway sends it to a speech server on one of the owner's machines (the Windows PC first, the MacBook Pro when that one is busy), which runs Whisper, an open speech model, on its own graphics chip.
 
 ```mermaid
 graph TD
   P[Phone records one turn] -->|16 kHz WAV| S[Our server]
-  S -->|audio| T[Tunnel to the Pro]
-  T --> W[Whisper on the Pro]
+  S -->|audio| T[Speech gateway on our server]
+  T --> W[Whisper on the Windows PC or the Pro]
   W -->|words and language| S
   S -->|words, masked| X[Our trace store]
 ```
@@ -78,11 +78,11 @@ The same flow as a list, in case the diagram does not render:
 
 1. The phone records one turn and stops by itself after a short silence (`src/lib/voice/serverStt.ts:37-41`). It decodes the clip and resamples it to a 16 kHz mono WAV, because the speech server reads WAV and not the format a browser records (`src/lib/voice/serverStt.ts:122-136`).
 2. The phone posts that one file to `/api/stt` on our server, with the language you picked or `auto` (`src/lib/voice/serverStt.ts:141-154`). The recording is capped at 2 megabytes, about a minute of speech (`server/features/agent/stt.ts:27`).
-3. Our server passes the file to the speech server named by `STT_BASE_URL` and keeps no copy (`server/features/agent/stt.ts:63-98`). On the live site that address is a tunnel the Pro opens to our server, so the audio goes from one of the owner's machines to another.
-4. Whisper large-v3-turbo, running on the Pro, returns the words and the language it heard. Our server sends them back to the phone, where they become the question you would otherwise have typed.
+3. Our server passes the file to the speech server named by `STT_BASE_URL` and keeps no copy (`server/features/agent/stt.ts:63-98`). On the live site that address is the speech gateway on the same server, which forwards the file over the owner's private network (or the Pro's tunnel) to a speech server, so the audio goes from one of the owner's machines to another.
+4. Whisper large-v3-turbo, running on the Windows PC or the Pro, returns the words and the language it heard. Our server sends them back to the phone, where they become the question you would otherwise have typed.
 5. The words are also written to our trace store, the same place a typed question's words go (`server/features/agent/stt.ts:81`). Email addresses, birth dates and social security numbers are replaced with `[email]`, `[dob]` and `[ssn]` before anything leaves the server (`server/lib/tracing.ts:20-22`).
 
-Two consequences worth knowing. The speech server holds one voice model at a time, so the first voice question after the owner used it for something else waits about half a minute while the model loads. And if the Pro is asleep or its tunnel is down, the microphone says voice is unavailable while typing keeps working.
+Two consequences worth knowing. The speech server holds one voice model at a time, so the first voice question after the owner used it for something else waits about half a minute while the model loads. And if both machines are busy or unreachable, the microphone says voice is unavailable while typing keeps working; no cloud service takes over.
 
 ## What reaches the language model
 

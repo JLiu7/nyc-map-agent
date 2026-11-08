@@ -4,8 +4,9 @@
  * browser records one short turn and posts it here; we pass it to the speech
  * server named by STT_BASE_URL and return the text. STT_PROTOCOL says how it
  * talks: "openai" (default, any OpenAI-compatible Whisper server) or "speech"
- * (the copilot's speech server on the MacBook Pro: POST /stt?stack=&lang=,
- * STT_STACK picks the models, "multilingual" is Whisper large-v3-turbo).
+ * (our speech API: POST /stt?stack=&lang=, STT_STACK picks the models, "multilingual" is Whisper
+ * large-v3-turbo). On the VPS that is the shared speech gateway, which picks the server; we name ourselves
+ * with X-Speech-Project (STT_PROJECT, default "nyc-map") and send no call id, since each turn is one request.
  * The audio is not stored or logged. STT_API_KEY is optional, read here only and
  * never sent to the client; without STT_BASE_URL this answers 503 and the app
  * says voice isn't available. No hosted service is the default. With `lang=auto` (phones, no language
@@ -22,6 +23,7 @@ const sttConfig = () => ({
   model: process.env.STT_MODEL || MODEL,
   protocol: process.env.STT_PROTOCOL === "speech" ? ("speech" as const) : ("openai" as const),
   stack: process.env.STT_STACK || "multilingual",
+  project: process.env.STT_PROJECT || "nyc-map",
 });
 /** About a minute of compressed speech; a voice turn is a few seconds. */
 export const MAX_BYTES = 2_000_000;
@@ -61,7 +63,7 @@ export function whisperConfidence(segments: unknown): number | null {
 }
 
 export async function transcribe(form: FormData, headers: Headers, fetchImpl: typeof fetch = fetch): Promise<Response> {
-  const { key, base, model, protocol, stack } = sttConfig();
+  const { key, base, model, protocol, stack, project } = sttConfig();
   if (!base) return json({ error: "stt_unavailable" }, 503);
   const audio = form.get("audio");
   if (!(audio instanceof Blob) || audio.size === 0) return json({ error: "invalid_query", issues: ["audio: a recording is required"] }, 400);
@@ -83,7 +85,7 @@ export async function transcribe(form: FormData, headers: Headers, fetchImpl: ty
     const auth: Record<string, string> = key ? { authorization: `Bearer ${key}` } : {};
     // The speech server swaps its models in on the first call of a stack, which takes about 30 seconds.
     const r = protocol === "speech"
-      ? await fetchImpl(`${base}/stt?stack=${encodeURIComponent(stack)}${lang ? `&lang=${lang}` : ""}`, { method: "POST", headers: { ...auth, "content-type": audio.type || "audio/wav" }, body: audio, signal: AbortSignal.timeout(60_000) })
+      ? await fetchImpl(`${base}/stt?stack=${encodeURIComponent(stack)}${lang ? `&lang=${lang}` : ""}`, { method: "POST", headers: { ...auth, "content-type": audio.type || "audio/wav", "x-speech-project": project }, body: audio, signal: AbortSignal.timeout(60_000) })
       : await fetchImpl(`${base}/audio/transcriptions`, { method: "POST", headers: auth, body: out, signal: AbortSignal.timeout(20_000) });
     if (!r.ok) { span(false); return json({ error: "stt_failed" }, 502); }
     const d = (await r.json()) as { text?: string; language?: string; segments?: unknown; confidence?: unknown };
