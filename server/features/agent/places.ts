@@ -80,6 +80,8 @@ export function matchLandmark(text: string): Landmark | null {
   return LANDMARKS.find((l) => l.aliases.some((a) => norm(a) === q)) ?? null;
 }
 
+const STATION_WORD = / (station|stop|subway station)$/;
+
 /** "86 St (4 5 6 trains)" → the name and the trains; the form a place read-back writes back into the question. */
 const TRAINS = /\s*\(([1-7A-Z ]+?) trains?\)/;
 
@@ -91,10 +93,13 @@ const TRAINS = /\s*\(([1-7A-Z ]+?) trains?\)/;
 export function matchStation(text: string, stations: Station[]): Station | null {
   const trains = TRAINS.exec(text)?.[1].split(" ").filter(Boolean) ?? [];
   const bare = text.replace(TRAINS, "");
-  const q = norm(bare).replace(/ (station|stop|subway station)$/, "");
-  if (q.length < 3) return null;
   const borough = boroughOf(bare);
-  return stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r)) && (!borough || !s.borough || s.borough === borough)) ?? null;
+  const named = (q: string) =>
+    q.length < 3 ? null : stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r)) && (!borough || !s.borough || s.borough === borough)) ?? null;
+  // "Fulton Street Station, Fulton Street & Broadway, Manhattan": the part before the comma says
+  // it is a station, so it is matched alone. Without "station" it may be an address, and is not.
+  const head = norm(bare.split(",")[0]);
+  return named(norm(bare).replace(STATION_WORD, "")) ?? (STATION_WORD.test(head) ? named(head.replace(STATION_WORD, "")) : null);
 }
 
 export interface GeoCandidate { label: string; at: LngLatTuple; confidence: number }

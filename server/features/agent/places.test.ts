@@ -35,6 +35,14 @@ describe("geocode landmarks and stations", () => {
     expect(matchStation("Fulton St, Queens", fulton)).toBeNull();
   });
 
+  // Planning the trip, the model wrote "Fulton Street Station, Fulton Street & Broadway, Manhattan" (#79).
+  it("a station named before its cross streets is that station; a bare name before a comma is left to the address search", () => {
+    const fulton = [{ ...st("Fulton St", [-74.0076, 40.7104]), id: "m", borough: "M" }, { ...st("Fulton St", [-73.9754, 40.6872]), id: "bk", borough: "Bk" }];
+    expect(matchStation("Fulton Street Station, Fulton Street & Broadway, Manhattan", fulton)?.id).toBe("m");
+    expect(matchStation("Fulton St station, Lafayette Ave, Brooklyn", fulton)?.id).toBe("bk");
+    expect(matchStation("Fulton St, 14 Fulton St, Manhattan", fulton)).toBeNull();
+  });
+
   it("Grand Central beats GeoSearch's Esplanade Gardens", async () => {
     const geosearch = vi.fn().mockResolvedValue([esplanade]);
     const p = await geocode("Grand Central", { stations: () => Promise.resolve(stations), geosearch });
