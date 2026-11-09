@@ -1,0 +1,406 @@
+{
+ "oneShuttle": {
+  "id": "lmm:planned_work:35985",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "No [1] between Dyckman St, Upper Manhattan and Van Cortlandt Park-242 St, Bronx",
+  "description": "[1] trains run between Dyckman St and South Ferry, every 8 minutes (days/evenings).\n\n[shuttle bus icon] Free shuttle buses run between Van Cortlandt Park-242 St and Dyckman St.\nTransfer between [1] and [shuttle bus icon] buses at Dyckman St [accessibility icon] or between [A] and [shuttle bus icon] buses at Inwood-207 St [accessibility icon].\nSee a map of this service change.",
+  "agency": "MTASBWY",
+  "routes": [
+   "1"
+  ],
+  "stops": [
+   "101",
+   "103",
+   "104",
+   "106",
+   "107"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35985",
+    "route": "1",
+    "kind": "suspended",
+    "names": [
+     "Dyckman St",
+     "Van Cortlandt Park-242 St"
+    ],
+    "toward": null,
+    "notice": "No 1 trains between Dyckman St and Van Cortlandt Park-242 St"
+   }
+  ],
+  "skipNames": [
+   "Dyckman St, Upper Manhattan",
+   "Van Cortlandt Park-242 St"
+  ],
+  "replacement": []
+ },
+ "aBranch": {
+  "id": "lmm:planned_work:35728",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "In Queens, no [A] between Rockaway Blvd and Ozone Park-Lefferts Blvd\nLefferts Blvd [A] trains are rerouted to Howard Beach-JFK Airport",
+  "description": "[A] trains run between Inwood-207 St and Howard Beach-JFK Airport or Far Rockaway-Mott Av.\n\n[shuttle bus icon] Free shuttle buses make stops between Rockaway Blvd and Ozone Park-Lefferts Blvd, stopping at 104 St and 111 St.\nTransfer between [A] and [shuttle bus icon] at Rockaway Blvd.\nSee a map of this service change.",
+  "agency": "MTASBWY",
+  "routes": [
+   "A"
+  ],
+  "stops": [
+   "A65",
+   "A64",
+   "A63",
+   "A61"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35728",
+    "route": "A",
+    "kind": "suspended",
+    "names": [
+     "Rockaway Blvd",
+     "Ozone Park-Lefferts Blvd"
+    ],
+    "toward": null,
+    "notice": "No A trains between Rockaway Blvd and Ozone Park-Lefferts Blvd"
+   }
+  ],
+  "skipNames": [
+   "Rockaway Blvd",
+   "Ozone Park-Lefferts Blvd"
+  ],
+  "replacement": []
+ },
+ "aSkip": {
+  "id": "lmm:planned_work:35348",
+  "kind": "planned",
+  "type": "Planned - Stops Skipped",
+  "reroute": true,
+  "text": "In Manhattan, uptown [A] local skips 72 St, 81 St-Museum of Natural History, 86 St, 96 St, 103 St, Cathedral Pkwy-110 St and 116 St",
+  "description": "For service to these stations, take the [A] to 125 St and transfer to a downtown [A] or [D].\n\nFor service from these stations, take the [A] or [D] to 59 St-Columbus Circle and transfer to an uptown [A].\n\nSchedule reminder: [A] skips these stations days and evenings.\n\nNote: Downtown [D] runs local from 125 St to 59 St-Columbus Circle during this time.",
+  "agency": "MTASBWY",
+  "routes": [
+   "A"
+  ],
+  "stops": [
+   "A24",
+   "A22",
+   "A21",
+   "A20",
+   "A19",
+   "A18",
+   "A17",
+   "A16",
+   "A15"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35348",
+    "route": "A",
+    "kind": "skip",
+    "names": [
+     "72 St",
+     "81 St-Museum of Natural History",
+     "86 St",
+     "96 St",
+     "103 St",
+     "Cathedral Pkwy-110 St",
+     "116 St"
+    ],
+    "toward": "Uptown",
+    "notice": "Skipped Uptown-bound"
+   }
+  ],
+  "skipNames": [
+   "72 St",
+   "81 St-Museum of Natural History",
+   "86 St",
+   "96 St",
+   "103 St",
+   "Cathedral Pkwy-110 St",
+   "116 St"
+  ],
+  "replacement": []
+ },
+ "dLocal": {
+  "id": "lmm:planned_work:35346",
+  "kind": "planned",
+  "type": "Planned - Express to Local",
+  "reroute": true,
+  "text": "In Manhattan, downtown [D] runs local from 125 St to 59 St-Columbus Circle",
+  "description": "",
+  "agency": "MTASBWY",
+  "routes": [
+   "D"
+  ],
+  "stops": [
+   "A16",
+   "A17",
+   "A18",
+   "A19",
+   "A20",
+   "A21",
+   "A22",
+   "A15",
+   "A12",
+   "A11"
+  ],
+  "changes": [],
+  "skipNames": [],
+  "replacement": []
+ },
+ "jSuspended": {
+  "id": "lmm:planned_work:35326",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "No [J] between Myrtle Av and Broad St",
+  "description": "[J] runs between Jamaica Center-York College and Myrtle Av, the last stop.\n\n[shuttle bus icon] Free T432 shuttle buses run between Myrtle Av and Delancey St-Essex St.\n\nSee a map of this service change.\n\nTravel Alternatives:\nFor service between Brooklyn and Manhattan, take the [A][C] or [L].\n\nFor Lower Manhattan, take the [4][5][6] to/from nearby stops.\n\nWhen exiting at Myrtle Av or Delancey St-Essex St, get a GO ticket to re-enter the subway.\n\nBrooklyn transfer stations:\nBroadway Junction [J] and [A][C][L]\nMyrtle Av [shuttle bus icon] [J][M]\nManhattan transfer stations:\nDelancey St-Essex St [shuttle bus icon] [F]\nBleecker St/B'way-Lafayette St [accessibility icon] | [4] local, [6] and [F]\nBrooklyn Bridge-City Hall [accessibility icon] | [4][5][6]\n14 St-Union Sq [4][5][6] and [L]\nTravel tip:\nThe B39 bus provides service between Williamsburg Bridge Plaza and Delancey St-Essex St [J] station days and evenings.\n\nNote: No [M] between Myrtle Av and Delancey St-Essex St during this time.",
+  "agency": "MTASBWY",
+  "routes": [
+   "J"
+  ],
+  "stops": [
+   "M23",
+   "M22",
+   "M21",
+   "M20",
+   "M19",
+   "M18",
+   "M16",
+   "M14",
+   "M13",
+   "M12",
+   "M11"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35326",
+    "route": "J",
+    "kind": "suspended",
+    "names": [
+     "Myrtle Av",
+     "Broad St"
+    ],
+    "toward": null,
+    "notice": "No J trains between Myrtle Av and Broad St"
+   }
+  ],
+  "skipNames": [
+   "Myrtle Av",
+   "Broad St",
+   "Delancey St-Essex St"
+  ],
+  "replacement": [
+   "T432"
+  ]
+ },
+ "oneCorners": {
+  "id": "lmm:planned_work:35985",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "No [1] between Dyckman St, Upper Manhattan and Van Cortlandt Park-242 St, Bronx",
+  "description": "[1] trains run between Dyckman St and South Ferry, every 8 minutes (days/evenings).\n\n[shuttle bus icon] Free shuttle buses run between Van Cortlandt Park-242 St and Dyckman St.\nTransfer between [1] and [shuttle bus icon] buses at Dyckman St [accessibility icon] or between [A] and [shuttle bus icon] buses at Inwood-207 St [accessibility icon].\nSee a map of this service change.",
+  "agency": "MTASBWY",
+  "routes": [
+   "1"
+  ],
+  "stops": [
+   "101",
+   "103",
+   "104",
+   "106",
+   "107"
+  ],
+  "start": 1794025800,
+  "end": 1794218400,
+  "period": "Nov 6 - 9, Fri 11:30 PM to Mon 5:00 AM",
+  "directionIds": [
+   0
+  ],
+  "direction": "",
+  "via": [],
+  "skipNames": [
+   "Dyckman St, Upper Manhattan",
+   "Van Cortlandt Park-242 St"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35985",
+    "route": "1",
+    "kind": "suspended",
+    "names": [
+     "Dyckman St",
+     "Van Cortlandt Park-242 St"
+    ],
+    "toward": null,
+    "notice": "No 1 trains between Dyckman St and Van Cortlandt Park-242 St"
+   }
+  ],
+  "replacement": [],
+  "alternatives": [
+   {
+    "stop": "101",
+    "notes": "[shuttle bus icon] Broadway at 242 St"
+   },
+   {
+    "stop": "103",
+    "notes": "[shuttle bus icon] Broadway at 238 St"
+   },
+   {
+    "stop": "104",
+    "notes": "[shuttle bus icon] W 231 St at Broadway (S/B)\n[shuttle bus icon] Broadway at 231 St (N/B)"
+   },
+   {
+    "stop": "106",
+    "notes": "[shuttle bus icon] W 225 St at Broadway (S/B)\n[shuttle bus icon] Broadway at 225 St (N/B)"
+   },
+   {
+    "stop": "107",
+    "notes": "[shuttle bus icon] Broadway at 215 St"
+   },
+   {
+    "stop": "A02",
+    "notes": "[accessibility icon] | [A]\n[shuttle bus icon] Broadway at 207 St"
+   },
+   {
+    "stop": "109",
+    "notes": "[accessibility icon] (1) | [1][A]\n[shuttle bus icon] Broadway at Dyckman St (A)\n[shuttle bus icon] Nagle Av at Dyckman St (1)"
+   }
+  ]
+ },
+ "jCorners": {
+  "id": "lmm:planned_work:35571",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "No [J] between Myrtle Av and Broad St",
+  "description": "[J] runs between Jamaica Center-York College and Myrtle Av, the last stop.\n\n[shuttle bus icon] Free T432 shuttle buses run between Myrtle Av and Delancey St-Essex St.\n\nTravel Alternatives:\nFor service between Brooklyn and Manhattan, take the [A][C] or [L].\n\nFor Lower Manhattan, take the [4][5][6] to/from nearby stops.\n\nWhen exiting at Myrtle Av or Delancey St-Essex St, get a GO ticket to re-enter the subway.\n\nBrooklyn transfer stations:\nBroadway Junction [J] and [A][C][L]\nMyrtle Av [shuttle bus icon] [J][M]\nManhattan transfer stations:\nDelancey St-Essex St [shuttle bus icon] [F]\nBleecker St/B'way-Lafayette St [accessibility icon] | [4] local, [6] and [F]\nBrooklyn Bridge-City Hall [accessibility icon] | [4][5][6]\n14 St-Union Sq [4][5][6] and [L]\nTravel tip:\nThe B39 bus provides service between Williamsburg Bridge Plaza and Delancey St-Essex St [J] station days and evenings.\n\nNote: No [M] between Myrtle Av and Delancey St-Essex St during this time.",
+  "agency": "MTASBWY",
+  "routes": [
+   "J"
+  ],
+  "stops": [
+   "M23",
+   "M22",
+   "M21",
+   "M20",
+   "M19",
+   "M18",
+   "M16",
+   "M14",
+   "M13",
+   "M12",
+   "M11"
+  ],
+  "start": 1794630600,
+  "end": 1794823200,
+  "period": "Nov 13 - 16 and Nov 20 - 23, Fri 11:30 PM to Mon 5:00 AM",
+  "directionIds": [
+   1
+  ],
+  "direction": "",
+  "via": [],
+  "skipNames": [
+   "Myrtle Av",
+   "Broad St",
+   "Delancey St-Essex St"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35571",
+    "route": "J",
+    "kind": "suspended",
+    "names": [
+     "Myrtle Av",
+     "Broad St"
+    ],
+    "toward": null,
+    "notice": "No J trains between Myrtle Av and Broad St"
+   }
+  ],
+  "replacement": [
+   "T432"
+  ],
+  "alternatives": [
+   {
+    "stop": "M11",
+    "notes": "[J][M]\n[shuttle bus icon] Broadway at Myrtle Av\nIf you're exiting at this station, get a GO ticket for re-entry into the subway."
+   },
+   {
+    "stop": "M12",
+    "notes": "[shuttle bus icon] Broadway at Flushing Av"
+   },
+   {
+    "stop": "M13",
+    "notes": "[shuttle bus icon] Broadway at Lorimer St"
+   },
+   {
+    "stop": "M14",
+    "notes": "[shuttle bus icon] Broadway at Hooper St"
+   },
+   {
+    "stop": "M16",
+    "notes": "[shuttle bus icon] Broadway at Havemeyer St (to Delancey St-Essex St)\n[shuttle bus icon] Broadway at Marcy Av (to Myrtle Av)"
+   },
+   {
+    "stop": "M18",
+    "notes": "[F]\n[shuttle bus icon] Delancey St at Essex St\n\nIf you're exiting at this station, get a GO ticket for re-entry into the subway."
+   }
+  ]
+ },
+ "sevenMain": {
+  "id": "lmm:planned_work:35778",
+  "kind": "planned",
+  "type": "Planned - Part Suspended",
+  "reroute": true,
+  "text": "In Queens, no [7] at Flushing-Main St",
+  "description": "[7] runs between 34 St-Hudson Yards and Mets-Willets Point, the last stop.\n\n[shuttle bus icon] Free T321 shuttle buses run between Mets-Willets Point and Flushing-Main St.\nTransfer between the [7] and [shuttle bus icon] at Mets-Willets Point.\nNote: [7] service operates every 8 minutes, days and evenings.",
+  "agency": "MTASBWY",
+  "routes": [
+   "7"
+  ],
+  "stops": [
+   "701"
+  ],
+  "start": 1794645900,
+  "end": 1794798000,
+  "period": "Nov 14 - 15, Sat 3:45 AM to Sun 10:00 PM",
+  "directionIds": [
+   0
+  ],
+  "direction": "",
+  "via": [],
+  "skipNames": [
+   "Mets-Willets Point",
+   "Flushing-Main St"
+  ],
+  "changes": [
+   {
+    "alertId": "lmm:planned_work:35778",
+    "route": "7",
+    "kind": "skip",
+    "names": [
+     "Flushing-Main St"
+    ],
+    "toward": null,
+    "notice": "No 7 trains"
+   }
+  ],
+  "replacement": [
+   "T321"
+  ],
+  "alternatives": [
+   {
+    "stop": "702",
+    "notes": "[7]\n[shuttle bus icon] Roosevelt Av at station entrance"
+   },
+   {
+    "stop": "701",
+    "notes": "[shuttle bus icon] Roosevelt Av at Main St"
+   }
+  ]
+ }
+}

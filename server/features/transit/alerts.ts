@@ -19,6 +19,8 @@ export type MercuryAlert = {
       alert_type?: string;
       human_readable_active_period?: Translated;
       affected_stations?: Entity[];
+      /** Per station: where its shuttle bus stops, or what to do there ("St Nicholas Av at 168 St"). */
+      station_alternative?: Array<{ affected_entity?: Entity; notes?: Translated }>;
     };
   };
 };
@@ -50,6 +52,8 @@ export type SlimAlert = {
   changes: ServiceChange[];
   /** Bus routes named as the replacement ("T102 shuttle buses"). */
   replacement: string[];
+  /** The MTA's note for each affected station, usually where its shuttle bus stops (#55). */
+  alternatives: Array<{ stop: string; notes: string }>;
 };
 
 const en = (t?: Translated) => t?.translation?.find((x) => x.language === "en")?.text ?? "";
@@ -132,5 +136,9 @@ export function slimAlert(e: MercuryAlert, now: number, until = now): SlimAlert 
     skipNames: uniq([...parseProse(all, routes[0]).skipNames, ...repl.between]),
     changes: serviceChanges({ id: e.id, text, routes }),
     replacement: repl.routes,
+    alternatives: (merc?.station_alternative ?? []).flatMap((x) => {
+      const notes = en(x.notes).trim();
+      return x.affected_entity?.stop_id && notes ? [{ stop: x.affected_entity.stop_id, notes }] : [];
+    }),
   };
 }

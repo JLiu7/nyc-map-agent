@@ -343,6 +343,8 @@ export type TransitAlert = {
   description?: string; start?: number; end?: number; period?: string; direction?: string; directionIds?: number[]; via?: string[]; skipNames?: string[]; changes?: ServiceChange[];
   /** Bus routes standing in for this train, when the alert names a shuttle. */
   replacement?: string[];
+  /** The MTA's note for each affected station, usually where its shuttle bus stops (#55). */
+  alternatives?: Array<{ stop: string; notes: string }>;
 };
 export type Outage = { id: string; station: string; routes: string[]; stops: string[]; equipment: "Elevator" | "Escalator"; serving: string; reason: string; since: string; back: string; ada: "yes" | "no" | "not-ada"; alternative: string };
 type AlertsBody = { at: number; alerts: TransitAlert[]; outages: Outage[] };

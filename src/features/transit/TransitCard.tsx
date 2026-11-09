@@ -454,10 +454,10 @@ export function FollowCard({ vehicle }: { vehicle: Vehicle }) {
       dest={dest ? <p data-testid="follow-dest" className="px-1 text-[13px] text-slate-300">To {dest.name}</p> : destLoading ? <p className="px-1 text-[13px]">Loading destination…</p> : null}
       notices={notices}
       noticeCount={notices.length}
-      actions={<div className="grid grid-cols-2 gap-2">
+      // No "Other ways": trips are asked in the chat (owner, 2026-11-07).
+      actions={<div className="grid grid-cols-1 gap-2">
         {vehicle.system === "bus" ? <button type="button" className="task-action bg-sky-500" onClick={() => ask(`Where should I get off the ${vehicle.route} bus for my trip?`)}>Where to get off</button> : <button type="button" className="task-action" onClick={() => { if (stationHelp) { setFollowed(null); stationHelp(headId ? stationOf(vehicle.system === "bus" ? "subway" : vehicle.system, headId) : undefined); } else ask(`Which exit should I take at ${headName}?`); }}>Exit help</button>}
-        <button type="button" className="task-action task-secondary" onClick={() => ask(`What are the other ways to make my ${vehicle.route} trip?`)}>Other ways</button>
-        {onFoot ? <button type="button" data-testid="get-off" className="task-action col-span-2 bg-[#c6f702] text-[#121212]" onClick={getOff}>Get off and walk</button> : null}
+        {onFoot ? <button type="button" data-testid="get-off" className="task-action bg-[#c6f702] text-[#121212]" onClick={getOff}>Get off and walk</button> : null}
       </div>}
     />;
   }

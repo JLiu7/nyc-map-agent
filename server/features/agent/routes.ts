@@ -33,7 +33,7 @@ export const DEFAULT_MODEL = "cb/deepseek-v4.1-flash";
 // The prompt lives in prompt.ts; re-exported for existing importers.
 export { contextLine, systemPrompt } from "./prompt";
 
-function defaultModel(only?: string, run?: RunLog, profile: Profile = "dev"): LanguageModel {
+export function defaultModel(only?: string, run?: RunLog, profile: Profile = "dev"): LanguageModel {
   const log = (m: string) => { console.warn(m); run?.note(m); };
   // Smart (#35): the hosted providers, healthy ones first; each call goes to that provider's own URL.
   const smart = !only && profile === "smart" ? byHealth(smartProviders()) : [];

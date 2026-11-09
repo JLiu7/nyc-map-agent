@@ -45,3 +45,18 @@ describe("MTA alert slimming", () => {
     expect(a.via).toEqual([]);
   });
 });
+
+describe("station notes (#55)", () => {
+  it("keeps each station's shuttle note from the Mercury extension", () => {
+    const a = slimAlert({ id: "x", alert: {
+      active_period: [{ start: 0 }],
+      informed_entity: [{ agency_id: "MTASBWY", route_id: "1", stop_id: "104" }],
+      header_text: { translation: [{ text: "No [1] between Dyckman St and Van Cortlandt Park-242 St", language: "en" }] },
+      "transit_realtime.mercury_alert": { station_alternative: [
+        { affected_entity: { stop_id: "104" }, notes: { translation: [{ text: "[shuttle bus icon] Broadway at 231 St (N/B)", language: "en" }, { text: "<p>…</p>", language: "en-html" }] } },
+        { affected_entity: { stop_id: "105" }, notes: { translation: [] } },
+      ] },
+    } }, 10)!;
+    expect(a.alternatives).toEqual([{ stop: "104", notes: "[shuttle bus icon] Broadway at 231 St (N/B)" }]);
+  });
+});

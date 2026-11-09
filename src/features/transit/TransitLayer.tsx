@@ -50,7 +50,7 @@ import { showView } from "@/lib/map/viewChange";
 import { FollowCard, SkipDetails, StationDetails, stopName } from "./TransitCard";
 import { FollowMiniMap } from "./FollowMiniMap";
 import { TransitStatusDetails } from "./TransitStatus";
-import { alertGeometry, endLabel, setAlertFocus, stationChanges, useAlertFocus } from "./alertFocus";
+import { alertGeometry, endLabel, setAlertFocus, stationChanges, useAlertFocus, useWalkFocus } from "./alertFocus";
 import { LinesDrawer } from "./LinesDrawer";
 import { BusStopDetails } from "./BusStopDetails";
 import { busStopAt } from "@/lib/map/busStops";
@@ -71,6 +71,7 @@ import { LineChooser } from "./LineChooser";
 /** Layers a click on the map should hand to transit instead of the area pick. */
 const TRANSIT_CLICK_LAYERS = ["transit-skip", "transit-alert-skipped", "transit-bus-badge-follow", "transit-bullet", "transit-bus-badge", "transit-bus-badge-full", "transit-bus-badge-selected", "transit-vehicle-2d", "transit-vehicle-hit", "transit-vehicle-hit-stop", "transit-vehicle-hit-raised", "transit-access", "transit-entrance", "transit-line-stop", "transit-line-stop-name", "transit-station-label", "transit-station-raised", "transit-station"];
 
+type Pos2 = [number, number];
 const MAX_VEHICLES = 400;
 const RAISED_LIFT_EM = 2.8;
 /** In 3D, a train's route bullet sits this far above its point so the box under it stays visible (#366). */
@@ -309,6 +310,7 @@ export default function TransitLayer() {
   const meta = useTransitMeta();
   const rail = (["subway", "lirr", "mnr"] as SystemId[]).filter((s) => on.has(s));
   const alertFocus = useAlertFocus();
+  const walkFocus = useWalkFocus();
   const pins = useBusPins();
   const busLines = useBusLines(Boolean(busPage) || drawerOpen);
   const lineList = useMemo(() => (pickedLines.length ? pickedLines : routesForPage(busLines.data?.groups, busPage)), [pickedLines, busLines.data, busPage]);
@@ -631,11 +633,13 @@ export default function TransitLayer() {
 
   // Alert focus (#253): fly to the affected stretch, dim the rest, Back restores the camera.
   // A shuttle named by the alert replaces every other bus on the map.
+  // The notice walk's travel tip (#55) shows the buses it names ("take the M4 or M104") while it is said.
+  const walkBus = walkFocus?.bus.join(",") ?? "";
   useEffect(() => {
-    const routes = alertFocus?.replacement ?? [];
+    const routes = walkBus ? walkBus.split(",") : alertFocus?.replacement ?? [];
     const applied = setShuttleBuses(alertFocus?.id ?? null, routes);
     if (applied && routes.length && !busWanted) set("bus", true);
-  }, [alertFocus, busWanted, set]);
+  }, [alertFocus, walkBus, busWanted, set]);
   const alertGeo = useMemo(() => {
     const sub = statics.find((s) => s.system === "subway");
     return alertFocus && sub ? alertGeometry(alertFocus, sub) : null;
@@ -656,6 +660,24 @@ export default function TransitLayer() {
       })),
     };
   }, [alertGeo, alertFocus]);  
+  // The notice walk (#55): the step's stations ringed, and where the shuttle bus stops, in the MTA's words.
+  const walkFc = useMemo<{ lit: GeoJSON.FeatureCollection; corners: GeoJSON.FeatureCollection; bounds: [Pos2, Pos2] | null }>(() => {
+    const sub = statics.find((s) => s.system === "subway");
+    const at = (id: string) => sub?.stations.features.find((f) => f.properties.id === id)?.geometry.coordinates as Pos2 | undefined;
+    const pts = (walkFocus?.ids ?? []).map(at).filter((p): p is Pos2 => Boolean(p));
+    const byStation = new Map<string, string[]>();
+    for (const c of walkFocus?.corners ?? []) byStation.set(c.id, [...(byStation.get(c.id) ?? []), c.text]);
+    const corners = [...byStation].flatMap(([id, texts]) => {
+      const p = at(id);
+      return p ? [{ type: "Feature" as const, properties: { label: `Shuttle bus\n${texts.join("\n")}` }, geometry: { type: "Point" as const, coordinates: p } }] : [];
+    });
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    return {
+      lit: { type: "FeatureCollection", features: pts.map((p) => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: p } })) },
+      corners: { type: "FeatureCollection", features: corners },
+      bounds: pts.length ? [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]] : null,
+    };
+  }, [walkFocus, staticKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const followedRef = useRef(followedKey);
   // A selected line's panel covers the top (phone) or right (desktop): frame alerts around it.
   const lineSelRef = useRef(false);
@@ -685,6 +707,13 @@ export default function TransitLayer() {
       savedCam.current = null;
     }
   }, [map, alertGeo, alertFocus]);
+  // Each step of the walk moves the camera to its stations; the alert's own framing above comes back with Back.
+  useEffect(() => {
+    if (!map || !walkFc.bounds || !alertFocus || followedRef.current) return;
+    const wide = window.innerWidth >= 768;
+    const pad = framePadding(map, lineSelRef.current ? (wide ? { top: 90, bottom: 120, left: 80, right: 460 } : { top: 90, bottom: 24, left: 30, right: 72 }) : wide ? { top: 90, bottom: 60, left: 440, right: 80 } : { top: 90, bottom: Math.round(window.innerHeight * 0.45), left: 30, right: 30 });
+    map.fitBounds(walkFc.bounds, { padding: pad, maxZoom: 15.5, duration: 900, bearing: 0, pitch: 0 });
+  }, [map, walkFc, alertFocus]);
   // The alert card owns the focus: once it leaves the panel (Back, Esc, another pick), clear it.
   const shownAlert = useRef<string | null>(null);
   useEffect(() => {
@@ -1482,6 +1511,15 @@ export default function TransitLayer() {
             <Layer id="transit-alert-end" type="symbol"
               layout={{ "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.4], "text-allow-overlap": true, "text-max-width": 14 }}
               paint={{ "text-color": theme.dark ? "#7dd3fc" : "#0369a1", "text-halo-color": theme.land, "text-halo-width": 2 }} />
+          </Source>
+          <Source id="transit-walk-lit" type="geojson" data={walkFc.lit}>
+            <Layer id="transit-walk-lit" type="circle"
+              paint={{ "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 9, 16, 16], "circle-color": "rgba(96,165,250,0.18)", "circle-stroke-color": "#60a5fa", "circle-stroke-width": 3 }} />
+          </Source>
+          <Source id="transit-walk-corners" type="geojson" data={walkFc.corners}>
+            <Layer id="transit-walk-corner" type="symbol"
+              layout={{ "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "bottom", "text-offset": [0, -1.6], "text-allow-overlap": true, "text-max-width": 16 }}
+              paint={{ "text-color": theme.dark ? "#fcd34d" : "#92400e", "text-halo-color": theme.land, "text-halo-width": 2 }} />
           </Source>
           <Source id="transit-alert-reroute" type="geojson" data={alertFc.reroute}>
             <Layer id="transit-alert-reroute" type="line" layout={{ "line-join": "round" }}

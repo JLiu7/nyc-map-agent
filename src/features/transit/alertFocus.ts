@@ -19,6 +19,21 @@ export function useAlertFocus(): TransitAlert | null {
   return useSyncExternalStore((f) => (subs.add(f), () => subs.delete(f)), () => focused, () => focused);
 }
 
+/**
+ * The notice walk's current step (#55): the map frames these stations, marks the shuttle bus corners
+ * with the MTA's own words, and shows the buses a travel tip names. Null between steps and when it stops.
+ */
+type WalkFocus = { ids: string[]; corners: Array<{ id: string; text: string }>; bus: string[] };
+let walk: WalkFocus | null = null;
+const walkSubs = new Set<() => void>();
+export function setWalkFocus(w: WalkFocus | null): void {
+  walk = w;
+  walkSubs.forEach((f) => f());
+}
+export function useWalkFocus(): WalkFocus | null {
+  return useSyncExternalStore((f) => (walkSubs.add(f), () => walkSubs.delete(f)), () => walk, () => walk);
+}
+
 type Pos = [number, number];
 export type AlertGeometry = {
   /** Affected stretch of each informed line. */

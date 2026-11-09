@@ -88,6 +88,24 @@ export const TTS_ROUTE = createRoute({
   },
 });
 
+export const TRANSLATE_ROUTE = createRoute({
+  method: "post",
+  path: "/api/agent/translate",
+  summary: "A service notice's short steps in the rider's language; station, street and line names stay as written",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ lang: z.enum(["es", "zh", "ru", "bn", "ht", "fr", "ko"]), lines: z.array(z.string().max(400)).min(1).max(24) }) } },
+    },
+  },
+  responses: {
+    200: { description: "The lines, translated, in the same order", content: { "application/json": { schema: z.object({ lines: z.array(z.string()) }) } } },
+    400: { description: "No lines, too many, or not one of the app's other languages", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
+    502: { description: "The model failed", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
 /** POST /api/agent: the smart-mode trip agent. Body mirrors src/features/agent/schema.ts `requestBody`. */
 export const AGENT_ROUTE = createRoute({
   method: "post",

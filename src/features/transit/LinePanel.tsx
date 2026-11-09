@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFlag } from "@/lib/flags";
 import { useLeftCard } from "@/lib/store/leftColumn";
@@ -23,6 +23,9 @@ import { closeSheets } from "@/lib/store/pullSheet";
 import { useLineKeys } from "./useLineKeys";
 import type { Vehicle } from "./model";
 import type { SheetLevel } from "@/components/sheetSwipe";
+
+// Loaded with the first notice opened, so the line panel itself stays small.
+const NoticeDiagram = lazy(() => import("./NoticeDiagram"));
 
 const GLASS = "border border-[rgba(148,163,184,0.18)] bg-[rgba(15,23,42,0.6)] backdrop-blur-[10px]";
 
@@ -111,10 +114,12 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
   // The day goes with the line: closing it (or another line) starts again from now.
   useEffect(() => () => setLineDay(null), []);
   const [picked, setPicked] = useState<string | null>(null);
+  // The notice opened by a tap, which starts its spoken walk; one opened for an answer stays quiet.
+  const [tapped, setTapped] = useState<string | null>(null);
   // A new line starts with every notice closed; opened from an answer about its trouble, with that trouble open.
   const trouble = useSelectedLine()?.trouble ?? false;
   const troubleNotice = trouble ? notices.find((n) => n.alert && n.tone !== "access" && n.stations.length) ?? notices.find((n) => n.alert && n.tone !== "access") : undefined;
-  useEffect(() => setPicked(null), [route]);
+  useEffect(() => { setPicked(null); setTapped(null); }, [route]);
   useEffect(() => { if (troubleNotice) setPicked(troubleNotice.id); }, [route, troubleNotice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelEl, setPanelEl] = useState<HTMLElement | null>(null);
@@ -139,7 +144,7 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
   const ride = useSelectedLine()?.ride;
   const now = useNow(Boolean(ride));
   const board = ride && sys ? boardingArrivals(sys, data.subway?.live, route, ride.from, ride.to, now) : null;
-  const { seedChat, setChatOpen, walking } = useMapState();
+  const { walking } = useMapState();
   // Arrows step along the line, train or station, and across to another line; Escape leaves it.
   useLineKeys(map, route, useSelectedLine()?.train ?? null, sys, trains, walking);
   const info = sys?.routes[route];
@@ -184,13 +189,19 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
           </div>
         ) : null;
   const noticesEl = (inSheet: boolean) => count ? (
-          <ul className={`line-notices flex ${inSheet ? "" : picked ? "max-h-[min(236px,30dvh)]" : "max-h-[150px]"} min-h-0 flex-col gap-2 ${inSheet ? "" : "overflow-y-auto overscroll-contain"} pr-1.5`} aria-label={`${route} line notices`}>
+          <ul className={`line-notices flex ${inSheet ? "" : picked ? "max-h-[min(380px,45dvh)]" : "max-h-[150px]"} min-h-0 flex-col gap-2 ${inSheet ? "" : "overflow-y-auto overscroll-contain"} pr-1.5`} aria-label={`${route} line notices`}>
             {notices.map((n) => {
               const open = n.id === picked;
               const tone = TONE[n.tone];
               return (
-                <li key={n.id}>
-                  <button type="button" aria-expanded={open} data-notice={n.id} onClick={() => setPicked(open ? null : n.id)}
+                <li key={n.id} className="flex flex-col gap-1.5">
+                  <button type="button" aria-expanded={open} data-notice={n.id} onClick={(e) => {
+                      setPicked(open ? null : n.id);
+                      setTapped(open ? null : n.id);
+                      // An alert opens as its diagram under the title: bring both into the sheet's view.
+                      const row = e.currentTarget.parentElement;
+                      if (!open && n.alert) requestAnimationFrame(() => row?.scrollIntoView({ block: "start", behavior: "smooth" }));
+                    }}
                     className="flex w-full items-start gap-2.5 rounded-[14px] border px-3 py-2.5 text-left text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
                     style={{ borderColor: open ? "rgba(96,165,250,0.6)" : "rgba(148,163,184,0.16)", background: open ? "rgba(37,99,235,0.22)" : "rgba(15,23,42,0.35)" }}>
                     <NoticeIcon kind={noticeKind(`${n.title} ${n.body}`, { kind: n.alert?.kind ?? (n.tone === "delay" ? "delay" : undefined), reroute: n.alert?.reroute })} color={tone.dot} className="mt-[2px] h-4 w-4 shrink-0" />
@@ -198,10 +209,12 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
                       {/* Closed: one line each; the full text opens on tap. */}
                       <span className={`font-semibold ${open ? "" : "truncate"}`}>{n.title}</span>
                       {n.meta ? <span className={`text-[13px] text-[#cbd5e1] ${open ? "" : "truncate"}`}>{n.meta}</span> : null}
-                      {open && n.body !== n.title ? <span className="mt-1 whitespace-pre-line text-[13px] leading-[1.45] text-[#e2e8f0]">{n.body}</span> : null}
+                      {open && !n.alert && n.body !== n.title ? <span className="mt-1 whitespace-pre-line text-[13px] leading-[1.45] text-[#e2e8f0]">{n.body}</span> : null}
                     </span>
                     <span aria-hidden className="mt-0.5 text-[#a5b4cb] transition-transform" style={{ transform: `rotate(${open ? 180 : 0}deg)` }}>⌄</span>
                   </button>
+                  {/* A service alert opens as its stretch of line, read aloud when tapped (owner, 2026-11-07). */}
+                  {open && n.alert ? <Suspense fallback={null}><NoticeDiagram alert={n.alert} sys={sys} route={route} color={color} auto={tapped === n.id} /></Suspense> : null}
                 </li>
               );
             })}
@@ -220,17 +233,12 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
   );
   const noneEl = day && !ahead.isLoading && !count
     ? <p className="text-[13px] text-[#cbd5e1]" data-testid="line-day-none">No planned work on the {route} {onWeekend ? "this weekend" : `for ${day.label}`}.</p> : null;
+  // No "Other ways" here: trips are asked in the chat (owner, 2026-11-07).
   const actionsEl = (
-    <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => { seedChat(`What are other ways to go instead of the ${route} train right now?`); setChatOpen(true); }}
-            className="h-9 rounded-[18px] bg-[#2563eb] text-[13px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-            Other ways
-          </button>
-          <button type="button" onClick={onFollow}
-            className="h-9 rounded-[18px] border border-[rgba(148,163,184,0.3)] bg-transparent text-[13px] font-semibold text-[#f1f5f9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]">
-            Follow a train
-          </button>
-        </div>
+    <button type="button" onClick={onFollow}
+      className="h-9 w-full shrink-0 rounded-[18px] border border-[rgba(148,163,184,0.3)] bg-transparent text-[13px] font-semibold text-[#f1f5f9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]">
+      Follow a train
+    </button>
   );
 
   if (sheet) {
