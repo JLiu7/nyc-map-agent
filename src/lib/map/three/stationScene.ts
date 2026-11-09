@@ -9,6 +9,7 @@ import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
 import { CELL_M, floorRuns, floorsAt, outline, rooms, STAIR_W, toLocal, trainway, treads, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
+import { placeSigns, type Bullet, type Sign, type SignInfo } from "../stationSigns";
 
 /** Floor to ceiling below the street. */
 const CEILING_M = 3.2;
@@ -23,7 +24,7 @@ const BED_M = 3;
 const COLORS = {
   floor: 0x8f8a84,
   platform: 0xb9b4ad,
-  wall: 0xe8e4dc,
+  wall: 0xffffff,
   ceiling: 0x6b665f,
   edge: 0xf5c518,
   drop: 0x2a2724,
@@ -37,13 +38,21 @@ const COLORS = {
 /** Quads collected into one mesh per colour. */
 class Quads {
   readonly pos: number[] = [];
+  readonly uv: number[] = [];
   /** Corners in order around the quad. */
   add(a: number[], b: number[], c: number[], d: number[]) {
     this.pos.push(...a, ...b, ...c, ...a, ...c, ...d);
   }
+  /** A wall from its foot a-b up to c-d, its texture laid in metres: along the wall, and up from z = 0 so rows line up. */
+  wall(a: number[], b: number[], c: number[], d: number[]) {
+    this.add(a, b, c, d);
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    this.uv.push(0, a[2], len, b[2], len, c[2], 0, a[2], len, c[2], 0, d[2]);
+  }
   mesh(color: number, opts: THREE.MeshLambertMaterialParameters = {}) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
+    if (this.uv.length) g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
     g.computeVertexNormals();
     return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide, ...opts }));
   }
@@ -147,10 +156,114 @@ function trainMesh(color: string): THREE.Group {
   return train;
 }
 
-function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip): { group: THREE.Group; update: () => void } {
+/** One repeat of the wall tile: 15 by 7.5 cm white tiles in running bond, this many metres square. */
+const TILE_M = 0.6;
+/** The coloured band along the walls, from and to these heights above the floor. */
+const TRIM = { from: 2.15, to: 2.4, line: 2.5, lineTo: 2.55 };
+
+/** White glazed tile with grey grout, a little uneven from tile to tile. */
+function tileTexture(): THREE.Texture | null {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  const [cols, rows] = [4, 8];
+  const [w, h] = [c.width / cols, c.height / rows];
+  ctx.fillStyle = "#b9b4a9";
+  ctx.fillRect(0, 0, c.width, c.height);
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let r = 0; r < rows; r++)
+    for (let k = -1; k < cols; k++) {
+      const x = k * w + (r % 2 ? w / 2 : 0);
+      const v = 236 - Math.round(rand() * 10);
+      ctx.fillStyle = `rgb(${v},${v - 3},${v - 10})`;
+      ctx.fillRect(x + 2, r * h + 2, w - 4, h - 4);
+    }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / TILE_M, 1 / TILE_M);
+  t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** A sign's face drawn once per wording: black, a white rule across the top, white lettering and the lines' bullets. */
+const SIGN = { px: 128, height: 0.5, font: '600 60px "Helvetica Neue", Helvetica, Arial, sans-serif' };
+function signTexture(s: Sign): { tex: THREE.Texture; width: number } | null {
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  const words = s.kind === "exit" ? "Exit" : s.kind === "name" ? s.name : "";
+  const r = 38, gap = 12, pad = 34;
+  ctx.font = SIGN.font;
+  const textW = words ? ctx.measureText(words).width : 0;
+  const bulletsW = s.routes.length * (2 * r + gap);
+  c.width = Math.ceil(pad * 2 + textW + (words && s.routes.length ? 40 : 0) + bulletsW - (s.routes.length ? gap : 0));
+  c.height = SIGN.px;
+  ctx.fillStyle = "#111214";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 12, c.width, 4);
+  ctx.font = SIGN.font;
+  ctx.textBaseline = "middle";
+  ctx.fillText(words, pad, c.height / 2 + 8);
+  let x = pad + textW + (words && s.routes.length ? 40 : 0) + r;
+  for (const b of s.routes) {
+    bullet(ctx, b, x, c.height / 2 + 8, r);
+    x += 2 * r + gap;
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return { tex, width: (SIGN.height * c.width) / c.height };
+}
+
+function bullet(ctx: CanvasRenderingContext2D, b: Bullet, x: number, y: number, r: number) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = b.color;
+  ctx.fill();
+  ctx.fillStyle = b.text;
+  ctx.textAlign = "center";
+  ctx.font = `700 ${b.short.length > 1 ? 34 : 52}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  ctx.fillText(b.short, x, y + 3);
+  ctx.textAlign = "start";
+}
+
+/** The station's signs, one face (or two, back to back) per sign; faces with the same wording share a texture. */
+function signMeshes(m: StationModel, info: SignInfo): THREE.Object3D[] {
+  const faces = new Map<string, { mat: THREE.Material; geo: THREE.PlaneGeometry } | null>();
+  const out: THREE.Object3D[] = [];
+  for (const s of placeSigns(m, info)) {
+    const key = `${s.kind}|${s.name}|${s.routes.map((b) => b.short).join(",")}`;
+    if (!faces.has(key)) {
+      const t = signTexture(s);
+      // Upright and facing -y before it is turned.
+      faces.set(key, t ? { mat: new THREE.MeshBasicMaterial({ map: t.tex }), geo: new THREE.PlaneGeometry(t.width, SIGN.height).rotateX(Math.PI / 2) } : null);
+    }
+    const face = faces.get(key);
+    if (!face) continue;
+    for (const turn of s.back ? [0, Math.PI] : [0]) {
+      const mesh = new THREE.Mesh(face.geo, face.mat);
+      const a = s.angle + turn;
+      mesh.position.set(s.x + Math.cos(a) * 0.02, s.y + Math.sin(a) * 0.02, s.z);
+      mesh.rotation.z = a + Math.PI / 2;
+      out.push(mesh);
+    }
+  }
+  return out;
+}
+
+function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip, signs?: SignInfo): { group: THREE.Group; update: () => void } {
   const group = new THREE.Group();
   const under = !m.elevated;
-  const [floor, platform, ceiling, wall, edge, drop, bed, rail, railing, canopy] = Array.from({ length: 10 }, () => new Quads());
+  const [floor, platform, ceiling, wall, edge, drop, bed, rail, railing, canopy, trim] = Array.from({ length: 11 }, () => new Quads());
+  /** A wall below the street: tile, with the station's coloured band along it. */
+  const tiled = (a: number[], b: number[], foot: [number, number], top: number) => {
+    wall.wall([a[0], a[1], foot[0]], [b[0], b[1], foot[1]], [b[0], b[1], b[2] + top], [a[0], a[1], a[2] + top]);
+    for (const [lo, hi] of [[TRIM.from, TRIM.to], [TRIM.line, TRIM.lineTo]]) trim.add([a[0], a[1], a[2] + lo], [b[0], b[1], b[2] + lo], [b[0], b[1], b[2] + hi], [a[0], a[1], a[2] + hi]);
+  };
 
   const platformRuns: Array<{ x: number; y: number; z: number }> = [];
   for (const g of m.pieces) {
@@ -173,8 +286,8 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     }
     // Below the street the rooms' outlines (further down) are the walls; only stair sides come from here.
     if (under && !w.stair) continue;
-    const top = under ? CEILING_M : RAIL_M;
-    (under ? wall : railing).add([a[0], a[1], w.z1], [b[0], b[1], w.z2], [b[0], b[1], w.z2 + top], [a[0], a[1], w.z1 + top]);
+    if (under) tiled([a[0], a[1], w.z1], [b[0], b[1], w.z2], [w.z1, w.z2], CEILING_M);
+    else railing.add([a[0], a[1], w.z1], [b[0], b[1], w.z2], [b[0], b[1], w.z2 + RAIL_M], [a[0], a[1], w.z1 + RAIL_M]);
   }
 
   // Below the street each floor is a room: the trainway beside its platforms, a ceiling over both, walls round it.
@@ -189,7 +302,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
       bed.add([x0, y0, zb], [x1, y0, zb], [x1, y1, zb], [x0, y1, zb]);
     }
     for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75))) {
-      wall.add([w.x1, w.y1, w.z1 - TRACK_DROP_M], [w.x2, w.y2, w.z2 - TRACK_DROP_M], [w.x2, w.y2, w.z2 + CEILING_M], [w.x1, w.y1, w.z1 + CEILING_M]);
+      tiled([w.x1, w.y1, w.z1], [w.x2, w.y2, w.z2], [w.z1 - TRACK_DROP_M, w.z2 - TRACK_DROP_M], CEILING_M);
     }
   });
 
@@ -211,7 +324,8 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     floor.mesh(COLORS.floor),
     platform.mesh(COLORS.platform),
     ceiling.mesh(COLORS.ceiling),
-    wall.mesh(COLORS.wall),
+    wall.mesh(COLORS.wall, { map: under ? tileTexture() : null }),
+    trim.mesh(new THREE.Color(signs?.trim ?? "#2f6b45").getHex(), { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     edge.mesh(COLORS.edge),
     drop.mesh(COLORS.drop),
     bed.mesh(COLORS.bed),
@@ -228,6 +342,8 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     steps.forEach((t, i) => mesh.setMatrixAt(i, mx.compose(new THREE.Vector3(t.x, t.y, t.z), q.setFromAxisAngle(zAxis, t.angle), new THREE.Vector3(t.run + 0.02, STAIR_W, 0.35))));
     group.add(mesh);
   }
+
+  if (signs) group.add(...signMeshes(m, signs));
 
   group.add(new THREE.AmbientLight(0xffffff, (under ? 0.6 : 0.5) * LEGACY_LIGHT));
   const sun = new THREE.DirectionalLight(0xffffff, 0.45 * LEGACY_LIGHT);
@@ -255,7 +371,9 @@ function disposeGroup(g: THREE.Object3D) {
     if (!(o instanceof THREE.Mesh)) return;
     const mesh = o as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
     mesh.geometry.dispose();
-    mesh.material.dispose();
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    mat.map?.dispose();
+    mat.dispose();
   });
 }
 
@@ -265,11 +383,11 @@ export const STATION_LAYER = "station-walk";
  * An elevated station drawn on the map itself, so street view can stand on the
  * platform over the real city: the camera is simply raised to platform height.
  */
-export function createStationLayer(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip): CustomLayerInterface {
+export function createStationLayer(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip, signs?: SignInfo): CustomLayerInterface {
   let renderer: THREE.WebGLRenderer;
   const scene = new THREE.Scene();
   const camera = new THREE.Camera();
-  const { group, update } = buildStationScene(m, tracks, trip);
+  const { group, update } = buildStationScene(m, tracks, trip, signs);
   scene.add(group);
   const origin = MercatorCoordinate.fromLngLat(m.origin, 0);
   const s = origin.meterInMercatorCoordinateUnits();
@@ -301,13 +419,13 @@ type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: numbe
  * walker's feet and looks where the map's street view looks. Returns the
  * function that stops it.
  */
-export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number, trip?: StationTrip): () => void {
+export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number, trip?: StationTrip, signs?: SignInfo): () => void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1b1a19);
   scene.fog = new THREE.Fog(0x1b1a19, 20, 120);
-  const { group, update } = buildStationScene(m, tracks, trip);
+  const { group, update } = buildStationScene(m, tracks, trip, signs);
   scene.add(group);
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 400);
   camera.up.set(0, 0, 1);

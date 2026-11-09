@@ -1675,7 +1675,7 @@ export function MapView({
     let gone = false;
     void import("@/lib/map/three/stationScene").then(({ createStationLayer, STATION_LAYER }) => {
       if (gone || map.getLayer(STATION_LAYER)) return;
-      map.addLayer(createStationLayer(here.model, here.tracks));
+      map.addLayer(createStationLayer(here.model, here.tracks, undefined, here.signs));
       id = STATION_LAYER;
     });
     return () => {

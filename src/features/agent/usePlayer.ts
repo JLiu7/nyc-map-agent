@@ -158,10 +158,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
     const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train };
     void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
       if (inside.current !== view) return;
-      const { model, tracks } = walk.station;
+      const { model, tracks, signs } = walk.station;
       if (model.elevated) {
         if (map.getLayer(STATION_LAYER)) return;
-        map.addLayer(createStationLayer(model, tracks, trip));
+        map.addLayer(createStationLayer(model, tracks, trip, signs));
         view.stop = () => { if (map.getLayer(STATION_LAYER)) map.removeLayer(STATION_LAYER); };
         return;
       }
@@ -171,7 +171,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       canvas.className = "pointer-events-none absolute inset-0 z-[1] h-full w-full";
       canvas.style.display = "none";
       map.getContainer().appendChild(canvas);
-      const unmount = mountStationView(canvas, model, tracks, () => view.eye, map.getVerticalFieldOfView(), trip);
+      const unmount = mountStationView(canvas, model, tracks, () => view.eye, map.getVerticalFieldOfView(), trip, signs);
       view.canvas = canvas;
       view.stop = () => { unmount(); canvas.remove(); };
     });

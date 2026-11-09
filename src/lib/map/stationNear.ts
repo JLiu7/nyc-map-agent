@@ -4,12 +4,15 @@
  * elevated.json above it) and the subway's entrances and track shapes once,
  * the first time street view asks.
  */
+import { bulletsFor, trimFor, type SignInfo } from "./stationSignWords";
 import { buildStation, toLocal, type StationModel, type WalkStation } from "./stationWalk";
 
 type P = [number, number];
 type Sub = {
   entrances: { features: Array<{ properties: { id: string; kind: string }; geometry: { coordinates: P } }> };
   shapes: Record<string, { c: P[]; g: string[] }>;
+  stations?: { features: Array<{ properties: { id: string; name: string; routes: string } }> };
+  routes?: Record<string, { short: string; color: string; text: string }>;
 };
 type Entry = { key: string; ids: string[]; box: [number, number, number, number]; st: WalkStation; elevated: boolean };
 
@@ -21,6 +24,8 @@ export interface NearStation {
   model: StationModel;
   /** Track centrelines through the station, in the model's local metres. */
   tracks: P[][];
+  /** What the station's signs say: its name, its lines and where their tracks run. */
+  signs: SignInfo;
 }
 
 let loading: Promise<{ entries: Entry[]; sub: Sub }> | null = null;
@@ -46,16 +51,21 @@ function load() {
   }));
 }
 
-/** Track centrelines inside the model's floors' extent, split where they leave it. Only the station's kind of track. */
-function tracksFor(m: StationModel, sub: Sub): P[][] {
+/**
+ * Track centrelines inside the model's floors' extent, split where they leave it. Only the station's kind of track.
+ * `lines` keeps each line's own runs (express runs under their line), so a platform's signs can name the lines beside it.
+ */
+function tracksFor(m: StationModel, sub: Sub): { tracks: P[][]; lines: SignInfo["lines"] } {
   const xs = m.pieces.flatMap((g) => [g.x0, g.x0 + g.nx * 0.5]), ys = m.pieces.flatMap((g) => [g.y0, g.y0 + g.ny * 0.5]);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const out: P[][] = [];
+  const lines: SignInfo["lines"] = [];
   const seen = new Set<string>();
-  for (const s of Object.values(sub.shapes ?? {})) {
+  for (const [route, s] of Object.entries(sub.shapes ?? {})) {
     let run: P[] = [];
     const flush = () => {
       const key = run.length > 1 ? `${run[0].map((v) => v.toFixed(0)).join()}|${run.at(-1)!.map((v) => v.toFixed(0)).join()}` : "";
+      if (run.length > 1) lines.push({ route: /^[0-9A-Z]X$/.test(route) ? route[0] : route, c: run });
       if (key && !seen.has(key)) { seen.add(key); out.push(run); }
       run = [];
     };
@@ -67,7 +77,17 @@ function tracksFor(m: StationModel, sub: Sub): P[][] {
     });
     flush();
   }
-  return out;
+  return { tracks: out, lines };
+}
+
+/** The signs' words for the stations `ids` share a model with. */
+function signsFor(key: string, ids: string[], sub: Sub, lines: SignInfo["lines"]): SignInfo {
+  const byId = new Map((sub.stations?.features ?? []).map((f) => [f.properties.id, f.properties]));
+  const stations = ids.flatMap((id) => {
+    const s = byId.get(id);
+    return s ? [{ name: s.name, routes: bulletsFor(s.routes, sub.routes ?? {}) }] : [];
+  });
+  return { stations, lines, trim: trimFor(key) };
 }
 
 const built = new Map<string, NearStation | null>();
@@ -79,7 +99,11 @@ function find(data: { entries: Entry[]; sub: Sub }, lon: number, lat: number): N
     const ids = new Set(e.ids);
     const doors = data.sub.entrances?.features.filter((f) => ids.has(f.properties.id) && /Stair|Escalator|Elevator/.test(f.properties.kind)).map((f) => f.geometry.coordinates) ?? [];
     const model = buildStation(e.st, { entrances: doors });
-    built.set(e.key, model ? { key: e.key, model, tracks: tracksFor(model, data.sub) } : null);
+    if (!model) built.set(e.key, null);
+    else {
+      const { tracks, lines } = tracksFor(model, data.sub);
+      built.set(e.key, { key: e.key, model, tracks, signs: signsFor(e.key, e.ids, data.sub, lines) });
+    }
   }
   return built.get(e.key) ?? null;
 }

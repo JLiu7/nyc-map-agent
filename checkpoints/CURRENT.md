@@ -6,7 +6,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-08, 19:30 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-09, 07:00 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## In flight
 
@@ -14,6 +14,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Walk a station on a phone once #71's pull request deploys, and fix the jagged edges next.** Stations below the street now have white tile walls with a trim band and MTA-style signs (name, Exit, line bullets; task NMA-0031). Floors and ceilings are still drawn in 0.5 m strips that miss the straightened walls, so dark sawtooth gaps show along their edges; drawing them from the same traced outline as the walls should close those. Uptown and downtown labels need the MTA station list.
 - **Walk under the FDR at South St and along a side street on a phone once #67's pull request deploys.** The deck should sit overhead on columns and the sidewalks should reach the buildings.
 - **Watch a subway trip preview on a phone once #65's pull request deploys.** The walk in should show the walls and the cyan line, the train should pull in beside the platform, and the step text should read in full above the controls.
 - **After #62 merges, walk into Fulton St and an elevated station on a phone.** Check that the stairs feel right with the on-screen pad, and that the view below the street keeps up on a mid-range phone.
