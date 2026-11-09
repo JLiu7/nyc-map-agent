@@ -137,7 +137,7 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
       const nowLocal = toNyLocal(clock);
       // Data sources and their age, plus the "no guessing" check (#375); one "sources" line before "done".
       const audit = new AnswerAudit([nowLocal, contextLine(context) ?? "", ...messages.filter((m) => m.role === "user").map((m) => m.content)]);
-      const tools = makeTools({ location, now: clock, emit: (command) => send({ type: "command", command }), actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), answered: questionsAnswered(messages), say: (line, language) => { closing.line = line; closing.lang = riderLanguage(lastAsked, language); }, drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
+      const tools = makeTools({ location, now: clock, emit: (command) => { run.command(command); send({ type: "command", command }); }, actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), answered: questionsAnswered(messages), say: (line, language) => { closing.line = line; closing.lang = riderLanguage(lastAsked, language); }, drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
       // Restrooms and line status still get a real answer with no model (#199).
       const lastAsked = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
       run.input = lastAsked;
@@ -214,12 +214,12 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
             // "tool" stays for older clients; "step" pairs a start with its end (#370).
             send({ type: "tool", name: part.toolName });
             send({ type: "step", id: part.toolCallId.slice(0, 100), name: part.toolName, status: "start" });
-            run.stepStart(part.toolCallId, part.toolName);
+            run.stepStart(part.toolCallId, part.toolName, part.input);
           } else if (part.type === "tool-result") {
             audit.toolResult(part.toolName, part.output);
             send({ type: "step", id: part.toolCallId.slice(0, 100), name: part.toolName, status: "done" });
-            run.stepEnd(part.toolCallId, true);
-          } else if (part.type === "tool-error") { run.stepEnd(part.toolCallId, false); send({ type: "step", id: part.toolCallId.slice(0, 100), name: part.toolName, status: "error" }); }
+            run.stepEnd(part.toolCallId, true, part.output);
+          } else if (part.type === "tool-error") { run.stepEnd(part.toolCallId, false, part.error); send({ type: "step", id: part.toolCallId.slice(0, 100), name: part.toolName, status: "error" }); }
           else if (part.type === "error") {
             const left = hold.rest(false);
             if (left) { answerText += left; send({ type: "text", text: left }); }

@@ -5,13 +5,23 @@
  * A request still running after STUCK_MS is written as "stuck" straight away, so a
  * hang shows up even if it never finishes. The log and the row never record the
  * question, the answer or a location; the finished turn also goes to Phoenix as a
- * trace (server/lib/tracing.ts), with the question and answer masked.
+ * trace (server/lib/tracing.ts), with the question and answer masked. The trace alone
+ * also carries what each tool was given and returned, and every map command sent to
+ * the phone, so a wrong place can be traced to the step that chose it.
  */
 import { randomUUID } from "node:crypto";
 import { octoQuery } from "../../../api/_lib/octo";
 import { exportTrace, type SpanSpec } from "../../lib/tracing";
 
 const STUCK_MS = 45_000;
+/** A tool's input or result in the trace is cut to this many characters. */
+const DETAIL_CHARS = 4_000;
+
+function clip(value: unknown): string {
+  let text: string;
+  try { text = typeof value === "string" ? value : JSON.stringify(value) ?? ""; } catch { text = String(value); }
+  return text.length > DETAIL_CHARS ? `${text.slice(0, DETAIL_CHARS)}…` : text;
+}
 
 type RunOutcome = "done" | "error" | "stuck" | "aborted";
 interface RunStep { name: string; ms: number; status: "done" | "error" | "running"; atMs?: number }
@@ -51,8 +61,11 @@ export class RunLog {
   private readonly started: number;
   private firstStep: number | null = null;
   private firstText: number | null = null;
-  private readonly open = new Map<string, { name: string; at: number }>();
+  private readonly open = new Map<string, { name: string; at: number; input: string }>();
   private readonly steps: RunStep[] = [];
+  /** For the trace only: each finished step's input and result, in the order of `steps`. */
+  private readonly details: Array<{ input: string; output: string }> = [];
+  private readonly commands: Array<{ atMs: number; command: string }> = [];
   private readonly notes: string[] = [];
   private ended = false;
   private readonly stuckTimer: ReturnType<typeof setTimeout>;
@@ -73,17 +86,24 @@ export class RunLog {
     this.stuckTimer.unref?.();
   }
 
-  stepStart(id: string, name: string): void {
+  stepStart(id: string, name: string, input?: unknown): void {
     const at = this.now();
     this.firstStep ??= at - this.started;
-    this.open.set(id, { name, at });
+    this.open.set(id, { name, at, input: input === undefined ? "" : clip(input) });
   }
 
-  stepEnd(id: string, ok: boolean): void {
+  /** `output` is the tool's result, or its error when `ok` is false. */
+  stepEnd(id: string, ok: boolean, output?: unknown): void {
     const s = this.open.get(id);
     if (!s) return;
     this.open.delete(id);
     this.steps.push({ name: s.name, ms: this.now() - s.at, status: ok ? "done" : "error", atMs: s.at - this.started });
+    this.details.push({ input: s.input, output: output === undefined ? "" : clip(output instanceof Error ? output.message : output) });
+  }
+
+  /** A map command sent to the phone (flyTo, showRoute, …). */
+  command(command: unknown): void {
+    this.commands.push({ atMs: this.now() - this.started, command: clip(command) });
   }
 
   text(chunk = ""): void {
@@ -111,9 +131,11 @@ export class RunLog {
   private trace(outcome: RunOutcome, usage: { inputTokens: number; outputTokens: number } | null): void {
     const r = this.record(outcome, usage);
     const end = this.started + r.totalMs;
-    const tools: SpanSpec[] = r.steps.map((s) => {
+    const tools: SpanSpec[] = r.steps.map((s, i) => {
       const start = this.started + (s.atMs ?? 0);
-      return { name: s.name, kind: "TOOL", start, end: start + s.ms, error: s.status === "error", attributes: { "tool.name": s.name } };
+      const d = this.details[i];
+      const io = d ? { "input.value": d.input, "input.mime_type": "application/json", "output.value": d.output, "output.mime_type": "application/json" } : {};
+      return { name: s.name, kind: "TOOL", start, end: start + s.ms, error: s.status === "error", attributes: { "tool.name": s.name, ...io } };
     });
     const llm: SpanSpec[] = r.model === "none" ? [] : [{
       name: "model", kind: "LLM", start: this.started, end,
@@ -121,7 +143,10 @@ export class RunLog {
     }];
     exportTrace({
       name: "agent turn", kind: "CHAIN", start: this.started, end, error: outcome !== "done", children: [...llm, ...tools],
-      attributes: { "input.value": this.input, "output.value": this.output, outcome, "first_text_ms": r.firstTextMs ?? -1, notes: r.notes.join("; ") },
+      attributes: {
+        "input.value": this.input, "output.value": this.output, outcome, "first_text_ms": r.firstTextMs ?? -1, notes: r.notes.join("; "),
+        "map.commands": this.commands.map((c) => `+${c.atMs}ms ${c.command}`).join("\n"),
+      },
     }, this.session);
   }
 

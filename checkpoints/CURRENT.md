@@ -14,6 +14,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Read a Fulton Street trace once #75's pull request deploys.** A wrong place on the map could not be traced to the step that chose it, because traces named each step but not what it looked up. Tool spans now carry each step's input and result, and the turn lists every map command sent (task NMA-0033). Ask "fulton street manhattan", then read the trace through Octo's read route to see which place the lookup picked.
 - **Walk a station on a phone once #71's and #73's pull requests deploy.** Stations below the street now have white tile walls with a trim band and MTA-style signs (name, Exit, line bullets; task NMA-0031), and floors, ceilings and track beds reach every wall, so the jagged gaps along wall tops and feet are gone (NMA-0032). Still open: uptown and downtown labels (they need the MTA station list), and stair treads that show small steps against the sloping stair walls.
 - **Walk under the FDR at South St and along a side street on a phone once #67's pull request deploys.** The deck should sit overhead on columns and the sidewalks should reach the buildings.
 - **Watch a subway trip preview on a phone once #65's pull request deploys.** The walk in should show the walls and the cyan line, the train should pull in beside the platform, and the step text should read in full above the controls.

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { RunLog, type RunRecord } from "./runLog";
+import { exportTrace, type SpanSpec } from "../../lib/tracing";
+
+vi.mock("../../lib/tracing", () => ({ exportTrace: vi.fn() }));
 
 const clock = () => {
   let t = 1_000;
@@ -48,5 +51,30 @@ describe("RunLog", () => {
     const run = new RunLog("m", () => Promise.resolve(), Date.now, vi.fn(), 60_000);
     expect(Object.keys(run.record("done", null)).sort()).toEqual(["firstStepMs", "firstTextMs", "id", "inputTokens", "model", "notes", "outcome", "outputTokens", "startedAt", "steps", "totalMs"]);
     run.finish("done", null);
+  });
+
+  it("traces what each tool was given and returned, and the map commands sent, but keeps them out of the log and the row", () => {
+    const c = clock();
+    const write = vi.fn<(r: RunRecord) => Promise<void>>(() => Promise.resolve());
+    const log = vi.fn();
+    const run = new RunLog("m", write, c.now, log, 60_000);
+    run.stepStart("t1", "geocode", { text: "fulton street manhattan" });
+    c.tick(100); run.stepEnd("t1", true, { label: "Fulton St station", at: [-74.0076, 40.7104] });
+    run.stepStart("t2", "flyTo", { place: "Fulton St" });
+    c.tick(50); run.command({ type: "flyTo", lon: -74.0076, lat: 40.7104 });
+    run.stepEnd("t2", false, new Error("Could not find it"));
+    run.stepStart("t3", "transit_plan", { to: "x".repeat(5_000) });
+    run.stepEnd("t3", true, "ok");
+    run.finish("done", null);
+
+    const root = vi.mocked(exportTrace).mock.calls.at(-1)![0];
+    const tool = (name: string) => root.children!.find((s: SpanSpec) => s.name === name)!.attributes!;
+    expect(tool("geocode")["input.value"]).toBe('{"text":"fulton street manhattan"}');
+    expect(tool("geocode")["output.value"]).toContain("Fulton St station");
+    expect(tool("flyTo")["output.value"]).toBe("Could not find it");
+    expect(String(tool("transit_plan")["input.value"]).length).toBe(4_001);
+    expect(root.attributes!["map.commands"]).toBe('+150ms {"type":"flyTo","lon":-74.0076,"lat":40.7104}');
+    expect(JSON.stringify(write.mock.calls[0][0])).not.toContain("fulton");
+    expect(log.mock.calls[0][0]).not.toContain("-74.0076");
   });
 });
