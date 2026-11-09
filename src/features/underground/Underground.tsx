@@ -822,7 +822,7 @@ export default function Underground() {
     }
     if (!nearby && !subwayTrip) return null;
     return (
-      <div className="pointer-events-auto absolute bottom-[8.5rem] left-3 z-40">
+      <div className="pointer-events-auto absolute bottom-[calc(10rem+var(--playback-h,0px))] left-3 z-40">
         <Button type="button" size="sm" variant="secondary" className="shadow-md" onClick={() => enterStation()}>
           <TrainFront className="mr-1.5 h-4 w-4" aria-hidden />
           I'm in the station{!subwayTrip && nearby ? ` (${nearby.name})` : ""}

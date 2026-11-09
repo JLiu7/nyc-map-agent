@@ -10,7 +10,7 @@ import { applyAtmosphere, applyStreetPalette, loadStreetTextures } from "@/lib/m
 import { approachBearing } from "@/lib/map/walk";
 import { getStreetXray, setStreetXray } from "@/lib/transit/streetXray";
 import { setXray as setStationXray } from "@/lib/transit/stationXray";
-import { along, buildTimeline, calloutInfoAt, depthAt, poseAt, wallSeconds, type Segment } from "./flythrough";
+import { along, buildTimeline, calloutInfoAt, cumulative, depthAt, moveAt, poseAt, waitAt, wallSeconds, type InsideWalk, type Segment } from "./flythrough";
 import { blendCam, EYE_BLEND_S, eyeRig, usesEye, type Cam } from "./tripCamera";
 import { initialPlayback, isActive, playback, type Playback } from "./playback";
 import type { PlaybackSpeed, Trip } from "./schema";
@@ -68,6 +68,40 @@ function camNow(map: MapLibreMap): Cam {
 /** An eye 1.7 m up reaches z22–23 on a tall screen; street view allows 24 (WALK_MAX_ZOOM). */
 const EYE_MAX_ZOOM = 24;
 
+/** Below this depth the station is drawn at eye level over the map, as in street view. */
+const INSIDE_M = -1.2;
+/** How far off the trip's train first shows, metres from its stop to its middle: its front a few hundred metres up the tunnel. */
+const TRAIN_APPROACH_M = 340;
+
+/** Metres the trip's train is past its stop (negative: still pulling in), or null when it is not in the station. */
+function trainAt(seg: Segment, wait: number | null): number | null {
+  if (wait === null) return null;
+  if (seg.kind === "ascend") return TRAIN_APPROACH_M * wait * wait;
+  const s = Math.min(1, wait / 0.6);
+  return -TRAIN_APPROACH_M * (1 - s) * (1 - s);
+}
+
+/**
+ * Compass bearing for watching the train on the platform: towards the track,
+ * turned up the line to where it comes in from (or, getting off, where it leaves to).
+ */
+function faceTrain(walk: InsideWalk, leaving: boolean): number {
+  const [dx, dy] = [walk.track.at[0] - walk.board[0], walk.track.at[1] - walk.board[1]];
+  const d = Math.hypot(dx, dy) || 1, along = leaving ? 1 : -1;
+  // Mostly up the line, so the train shows coming in from the tunnel rather than as a wall of car side.
+  const [vx, vy] = [(dx / d) * 0.45 + Math.cos(walk.track.angle) * along, (dy / d) * 0.45 + Math.sin(walk.track.angle) * along];
+  return ((Math.atan2(vx, vy) * 180) / Math.PI + 360) % 360;
+}
+
+/** Look down a flight going down, up one going up, a little down on the level so the guide line shows. */
+function lookPitch(seg: Segment, f: number): number {
+  const len = cumulative(seg.coords).at(-1) || 1;
+  const dz = depthAt(seg, Math.min(1, f + 0.01)) - depthAt(seg, f);
+  return Math.max(62, Math.min(96, 80 + (Math.atan2(dz, 0.01 * len) * 180) / Math.PI));
+}
+
+type StationEye = { lon: number; lat: number; bearing: number; pitch: number; z: number };
+
 export function usePlayer(onCallout?: (text: string) => void) {
   const reduced = usePrefersReducedMotion();
   const [pb, dispatch] = useReducer(playback, initialPlayback);
@@ -105,6 +139,43 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const eye = useRef<{ bearing: number; from: Cam | null; t: number; maxZoom: number } | null>(null);
   /** The station shown in x-ray on the stairs, and whether the ground was see-through before. */
   const stairs = useRef<{ station: string; streetXray: boolean } | null>(null);
+  /** A station walked at eye level: the leg, the eye and train it draws each frame, its canvas below the street, and how to take it down. */
+  const inside = useRef<{ seg: Segment; eye: StationEye | null; train: number | null; canvas: HTMLCanvasElement | null; stop: () => void } | null>(null);
+  const hideInside = useCallback(() => {
+    inside.current?.stop();
+    inside.current = null;
+  }, []);
+  /**
+   * Draw a station leg's walls, guide line and train (owner, 2026-11-08): below the street on a
+   * canvas over the map, as street view does; an elevated platform on the map itself.
+   */
+  const showInside = useCallback((map: MapLibreMap, seg: Segment) => {
+    const walk = seg.inside;
+    if (inside.current?.seg === seg || !walk) return;
+    hideInside();
+    const view: NonNullable<typeof inside.current> = { seg, eye: null, train: null, canvas: null, stop: () => {} };
+    inside.current = view;
+    const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train };
+    void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
+      if (inside.current !== view) return;
+      const { model, tracks } = walk.station;
+      if (model.elevated) {
+        if (map.getLayer(STATION_LAYER)) return;
+        map.addLayer(createStationLayer(model, tracks, trip));
+        view.stop = () => { if (map.getLayer(STATION_LAYER)) map.removeLayer(STATION_LAYER); };
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.setAttribute("aria-hidden", "true");
+      canvas.dataset.testid = "trip-station-inside";
+      canvas.className = "pointer-events-none absolute inset-0 z-[1] h-full w-full";
+      canvas.style.display = "none";
+      map.getContainer().appendChild(canvas);
+      const unmount = mountStationView(canvas, model, tracks, () => view.eye, map.getVerticalFieldOfView(), trip);
+      view.canvas = canvas;
+      view.stop = () => { unmount(); canvas.remove(); };
+    });
+  }, [hideInside]);
 
   const leaveEye = useCallback((map: MapLibreMap) => {
     if (!eye.current) return;
@@ -126,13 +197,12 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setStationXray(station);
     setStreetXray(true);
   }, []);
-  /** Once the x-ray data is in, send the trip's stairs through the real station (same legs, new paths). */
+  /** Once the stations are in, send the trip's stairs through the real station (same legs, new paths). */
   const addStairs = useCallback((tripId: string, t: Segment[]) => {
     if (!t.some((seg) => seg.station)) return;
-    void import("./stationStairs").then(async ({ loadStationInsides, withStairs }) => {
-      const xray = await loadStationInsides();
+    void import("./stationWalks").then(async ({ withStationWalks }) => {
+      const next = await withStationWalks(t);
       if (pbRef.current.tripId !== tripId || segsRef.current !== t) return;
-      const next = withStairs(t, xray);
       segsRef.current = next;
       setSegs(next);
     });
@@ -146,7 +216,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setMarker(map, null);
     leaveEye(map);
     showStairs(null);
-  }, [leaveEye, showStairs]);
+    hideInside();
+  }, [leaveEye, showStairs, hideInside]);
 
   /** Put a trip in the player, paused at its start. Nothing moves until play(). */
   const load = useCallback((trip: Trip, speed?: Speed) => {
@@ -203,6 +274,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const on = isActive(pb);
   useEffect(() => { setPreviewing(on); }, [on]);
   useEffect(() => () => setPreviewing(false), []);
+  useEffect(() => hideInside, [hideInside]);
 
   useEffect(() => {
     bindPreviewRelease(release);
@@ -245,7 +317,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
       prev = now;
       const total = reduced ? 3 : wallSeconds(seg, s.speed);
       const f = reduced ? 1 : Math.min(1, elapsed.current / total);
-      const pose = poseAt(seg, f);
+      // A station leg walks, then stands on the platform for the train (or the other way round).
+      const fm = moveAt(seg, f);
+      const wait = waitAt(seg, f);
+      const depth = depthAt(seg, fm);
+      const pose = poseAt(seg, fm);
       const mark = seg.kind === "ride" ? along(seg.coords, f) : pose.center;
       const mode = followMode();
       const newLeg = styledSeg.current !== s.seg;
@@ -253,9 +329,13 @@ export function usePlayer(onCallout?: (text: string) => void) {
         // getStyle() serialises the whole style: once per leg, never per frame.
         styledSeg.current = s.seg;
         setPreviewDim(map, true);
-        setXray(map, seg.underground && seg.kind !== "walk");
-        showStairs(seg.depths && seg.station ? seg.station : null);
+        // Inside a station walked at eye level the walls show the way, not an x-ray (owner, 2026-11-08).
+        setXray(map, seg.underground && seg.kind !== "walk" && !seg.inside);
+        showStairs(seg.depths && seg.station && !seg.inside ? seg.station : null);
       }
+      // The walk through the station can arrive after its leg has started.
+      if (seg.inside) showInside(map, seg);
+      else if (inside.current) hideInside();
       const eyeLeg = mode === "map" && usesEye(seg);
       if (!eyeLeg && eye.current) leaveEye(map);
       if (eyeLeg) {
@@ -270,8 +350,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
           void loadStreetTextures(map).then(() => { if (eye.current) applyStreetPalette(map, true); }).catch(() => {});
         }
         const e = eye.current;
-        e.bearing = approachBearing(e.bearing, pose.bearing, dt, 4);
-        const rig = eyeRig(mark, e.bearing, depthAt(seg, f));
+        // On the platform, turn to face the track the train comes in on.
+        e.bearing = approachBearing(e.bearing, seg.inside && wait !== null ? faceTrain(seg.inside, seg.kind === "ascend") : pose.bearing, dt, 4);
+        const rig = eyeRig(mark, e.bearing, depth, !seg.inside);
         const cam = map.calculateCameraOptionsFromTo(new LngLat(...rig.eye), rig.eyeAlt, new LngLat(...rig.look), rig.lookAlt);
         const to: Cam = { center: rig.look, zoom: cam.zoom ?? map.getZoom(), pitch: cam.pitch ?? 0, bearing: cam.bearing ?? e.bearing, elevation: rig.lookAlt };
         e.t += dt;
@@ -289,6 +370,12 @@ export function usePlayer(onCallout?: (text: string) => void) {
       } else {
         // Then the map stays still while the marker moves, and glides only when it nears the edge.
         keepInView(map, mark);
+      }
+      const view = inside.current;
+      if (view) {
+        view.eye = { lon: mark[0], lat: mark[1], bearing: eye.current?.bearing ?? pose.bearing, pitch: wait !== null ? 86 : lookPitch(seg, fm), z: depth };
+        view.train = trainAt(seg, wait);
+        if (view.canvas) view.canvas.style.display = eyeLeg && depth < INSIDE_M ? "" : "none";
       }
       camMode.current = mode;
       camKind.current = eyeLeg ? "eye" : "other";
@@ -321,7 +408,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       alive = false;
       cancelAnimationFrame(rafId.current);
     };
-  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs]);
+  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs, showInside, hideInside]);
 
   // Where the trip ended: the street and what to look for at the destination.
   useEffect(() => {

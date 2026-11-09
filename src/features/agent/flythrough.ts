@@ -1,3 +1,4 @@
+import type { NearStation } from "@/lib/map/stationNear";
 import type { LngLatTuple, Trip } from "./schema";
 
 /**
@@ -21,6 +22,23 @@ export interface Segment {
   station?: string;
   /** Metres below the street at each point of `coords`, once the stairs are found (descend, ascend). */
   depths?: number[];
+  /** Seconds on the platform: waiting for the train at a descend's end, watching it pull out at an ascend's start. */
+  waitS?: number;
+  /** The walk through the station's walkable model, when one was found (./stationWalks). */
+  inside?: InsideWalk;
+}
+
+/** A descend or ascend walked through the station's model at eye level, walls and all, along a guide line. */
+export interface InsideWalk {
+  station: NearStation;
+  /** The way through, in the model's local metres (x east, y north, z the floor), street end first on a descend. */
+  guide: Array<[number, number, number]>;
+  /** Where the rider stands for the train, local metres. */
+  board: [number, number];
+  /** The track the train stops on: its point beside `board` and the way the train runs (radians from east). */
+  track: { at: [number, number]; angle: number };
+  /** The line's colour, for the train's stripe and the boarding spot. */
+  color: string;
 }
 export interface Pose { center: LngLatTuple; bearing: number; pitch: number; zoom: number }
 
@@ -124,6 +142,32 @@ export function buildTimeline(trip: Trip): Segment[] {
   }));
 }
 
+/** Share of a leg spent standing on the platform. */
+/** The least of a station leg's play time spent on the platform, so a short wait still shows the train come and go. */
+const WAIT_SHARE = { descend: 0.3, ascend: 0.2 };
+
+/** The share of a station leg spent on the platform waiting: the train pulling in, or out. */
+export const waitShare = (seg: Segment) =>
+  seg.waitS ? Math.min(0.9, Math.max(seg.kind === "ascend" ? WAIT_SHARE.ascend : WAIT_SHARE.descend, seg.waitS / (seg.realS || 1))) : 0;
+
+/**
+ * How far along its path the rider is at fraction f of a leg: a descend walks
+ * then waits at the platform, an ascend waits (the train pulling out) then walks.
+ */
+export function moveAt(seg: Segment, f: number): number {
+  const w = waitShare(seg);
+  if (!w) return f;
+  return seg.kind === "ascend" ? Math.max(0, (f - w) / (1 - w)) : Math.min(1, f / (1 - w));
+}
+
+/** How far through the wait on the platform the rider is at fraction f (0..1), or null while walking. */
+export function waitAt(seg: Segment, f: number): number | null {
+  const w = waitShare(seg);
+  if (!w) return null;
+  if (seg.kind === "ascend") return f < w ? f / w : null;
+  return f > 1 - w ? (f - (1 - w)) / w : null;
+}
+
 /** Metres below the street at fraction f of a descend or ascend; 0 without stairs. */
 export function depthAt(seg: Segment, f: number): number {
   const z = seg.depths;
@@ -148,8 +192,9 @@ const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" |
 export function wallSeconds(seg: Segment, speed: number): number {
   const pace = 10 / speed;
   const foot = Math.min(12 * pace, Math.max(1.5 * pace, seg.realS / (speed * FOOT_RATE)));
-  // Real stairs get time to be seen: 5 s at 10x, never slower than real time.
-  if (seg.depths) return Math.max(foot, Math.min(seg.realS / speed, 5 * pace));
+  // Real stairs get time to be seen: 5 s at 10x, never slower than real time. A walk through the
+  // station at eye level, with the wait for the train, gets 14 s.
+  if (seg.depths) return Math.max(foot, Math.min(seg.realS / speed, (seg.inside ? 14 : 5) * pace));
   if (onFoot(seg)) return foot;
   return Math.min(45 * pace, Math.max(3 * pace, seg.realS / speed));
 }

@@ -32,7 +32,7 @@ export function MapCompass() {
   return (
     <div
       className="absolute z-20 flex items-center gap-[var(--sp-2)]"
-      style={{ right: "max(var(--edge), env(safe-area-inset-right))", bottom: "calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--sp-6) + var(--chat-bar-h, 0px))" }}
+      style={{ right: "max(var(--edge), env(safe-area-inset-right))", bottom: "calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--sp-6) + var(--chat-bar-h, 0px) + var(--playback-h, 0px))" }}
       aria-label="Map orientation"
       role="group"
     >

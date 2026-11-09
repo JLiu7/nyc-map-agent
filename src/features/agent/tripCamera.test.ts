@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blendCam, eyeRig, LOOK_AHEAD_M, usesEye, type Cam } from "./tripCamera";
-import { buildTimeline, depthAt, wallSeconds, type Segment } from "./flythrough";
+import { buildTimeline, depthAt, moveAt, waitAt, wallSeconds, type Segment } from "./flythrough";
 import { withStairs, type StationInside } from "./stationStairs";
 import type { LngLatTuple, Trip } from "./schema";
 
@@ -50,6 +50,49 @@ describe("eyeRig", () => {
 
   it("never puts the eye below the street", () => {
     for (const z of [0, -0.5, -1, -1.5, -2, -3, -5, -10, -20]) expect(eyeRig(O, 45, z).eyeAlt).toBeGreaterThan(0);
+  });
+
+  it("stays with the rider in a station walked at eye level: no chase from above, and up onto an elevated platform", () => {
+    const deep = eyeRig(O, 0, -10, false);
+    expect(deep.eyeAlt).toBeLessThan(1.7);
+    expect(metresNorth(deep.eye)).toBeCloseTo(0, 3);
+    const up = eyeRig(O, 90, 10, false);
+    expect(up.eyeAlt).toBeCloseTo(11.7);
+    expect(up.lookAlt).toBe(10);
+    expect(metresEast(up.look)).toBeCloseTo(LOOK_AHEAD_M, 1);
+  });
+});
+
+describe("a station leg's wait on the platform", () => {
+  const down = seg({ kind: "descend", depths: [0, -10], realS: 100, waitS: 25 });
+  const up = seg({ kind: "ascend", depths: [-10, 0], realS: 100, waitS: 25 });
+
+  it("walks down first, then stands on the platform for the train", () => {
+    // A quarter of the time is less than the least wait on the way down, so it gets 30%.
+    expect(moveAt(down, 0.35)).toBeCloseTo(0.5);
+    expect(moveAt(down, 0.7)).toBe(1);
+    expect(moveAt(down, 0.9)).toBe(1);
+    expect(waitAt(down, 0.5)).toBeNull();
+    expect(waitAt(down, 0.85)).toBeCloseTo(0.5);
+  });
+
+  it("gives a short wait enough of the leg to see the train come in", () => {
+    const quick = seg({ kind: "descend", depths: [0, -10], realS: 200, waitS: 10 });
+    expect(waitAt(quick, 0.69)).toBeNull();
+    expect(waitAt(quick, 0.85)).toBeCloseTo(0.5);
+  });
+
+  it("watches the train pull out first, then walks up", () => {
+    expect(moveAt(up, 0.1)).toBe(0);
+    expect(moveAt(up, 0.625)).toBeCloseTo(0.5);
+    expect(waitAt(up, 0.125)).toBeCloseTo(0.5);
+    expect(waitAt(up, 0.5)).toBeNull();
+  });
+
+  it("walks the whole leg when there is no wait", () => {
+    const plain = seg({ kind: "descend", depths: [0, -10] });
+    expect(moveAt(plain, 0.4)).toBe(0.4);
+    expect(waitAt(plain, 0.9)).toBeNull();
   });
 });
 

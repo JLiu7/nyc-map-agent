@@ -107,7 +107,7 @@ export function ViewSwitcher() {
     <div
       data-testid="view-switcher"
       style={{ display: "var(--controls-display, flex)" }}
-      className={`pointer-events-none absolute bottom-[calc(var(--edge)+96px+var(--chat-bar-h,0px))] left-[max(var(--edge),var(--sheet-left,0px))] right-[var(--edge)] z-[35] lg:bottom-[calc(var(--edge)+36px+var(--chat-bar-h,0px))] lg:right-[calc(var(--edge)+340px)] ${home ? "sm:left-[calc(min(380px,42vw)+24px)]" : ""}`}
+      className={`pointer-events-none absolute bottom-[calc(var(--edge)+96px+var(--chat-bar-h,0px)+var(--playback-h,0px))] left-[max(var(--edge),var(--sheet-left,0px))] right-[var(--edge)] z-[35] lg:bottom-[calc(var(--edge)+36px+var(--chat-bar-h,0px)+var(--playback-h,0px))] lg:right-[calc(var(--edge)+340px)] ${home ? "sm:left-[calc(min(380px,42vw)+24px)]" : ""}`}
     >
       <div ref={outerRef} className="flex w-full min-w-0 justify-center">
         <div

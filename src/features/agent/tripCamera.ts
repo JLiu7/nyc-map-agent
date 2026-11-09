@@ -51,18 +51,23 @@ function offset(at: LngLatTuple, east: number, north: number): LngLatTuple {
  * pedestrian's eye; going down it sinks, then rises behind the rider and looks
  * down at them through the dimmed ground. The aim is moved up its ray to the
  * ground, where the map centre has to sit.
+ *
+ * Without `dive` (a station walked at eye level, drawn over the map below the
+ * street) the eye only sinks to the ground, and above the street it climbs
+ * with the rider to an elevated platform.
  */
-export function eyeRig(at: LngLatTuple, bearing: number, depth = 0): EyeRig {
+export function eyeRig(at: LngLatTuple, bearing: number, depth = 0, dive = true): EyeRig {
   const r = (bearing * Math.PI) / 180, fx = Math.sin(r), fy = Math.cos(r);
   const z = Math.min(0, depth);
-  const s = smooth((-z - SINK_M) / DIVE_M);
+  const up = dive ? 0 : Math.max(0, depth);
+  const s = dive ? smooth((-z - SINK_M) / DIVE_M) : 0;
   const lerp = (a: number, b: number) => a + (b - a) * s;
   const ahead = offset(at, fx * LOOK_AHEAD_M, fy * LOOK_AHEAD_M);
   const behind = offset(at, -fx * CHASE_BACK_M, -fy * CHASE_BACK_M);
   const eye: LngLatTuple = [lerp(at[0], behind[0]), lerp(at[1], behind[1])];
-  const eyeAlt = lerp(Math.max(EYE_FLOOR_M, EYE_HEIGHT_M + z), CHASE_UP_M);
+  const eyeAlt = lerp(Math.max(EYE_FLOOR_M, EYE_HEIGHT_M + z), CHASE_UP_M) + up;
   let look: LngLatTuple = [lerp(ahead[0], at[0]), lerp(ahead[1], at[1])];
-  let lookAlt = z;
+  let lookAlt = z + up;
   if (lookAlt < 0) {
     const t = eyeAlt / (eyeAlt - lookAlt);
     look = [eye[0] + (look[0] - eye[0]) * t, eye[1] + (look[1] - eye[1]) * t];

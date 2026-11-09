@@ -42,7 +42,7 @@ const RUN_PER_RISE = 1.6;
 const ENTRANCE_M = 15;
 
 const FLOOR = 1;
-const PLATFORM = 2;
+export const PLATFORM = 2;
 type CellKind = typeof FLOOR | typeof PLATFORM;
 
 /** One floor or one flight of stairs: a cell grid in local metres. */

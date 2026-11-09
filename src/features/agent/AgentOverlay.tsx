@@ -32,6 +32,7 @@ import { publishActiveTrip } from "@/lib/transit/activeTrip";
 import { clearTripBuses, revealTripBuses } from "@/lib/transit/busReveal";
 import { setFollowed } from "@/lib/transit/follow";
 import { usePanel } from "@/lib/store/PanelContext";
+import { useCssHeight } from "@/lib/useCssHeight";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { useSpeech } from "@/lib/voice/useSpeech";
@@ -1077,15 +1078,19 @@ function SpeedPicker({ speed, onSpeed, label }: { speed: Speed; onSpeed: (s: Spe
 
 /** The one slim preview bar: play/pause, speed, skip leg, close. No tooltips. */
 function PlaybackBar(p: { playing: boolean; speed: Speed; callout: string; step: string; onToggle: () => void; onSpeed: (s: Speed) => void; onSkip: () => void; onClose: () => void }) {
+  // Its height as --playback-h, so the compass and the station button step above it.
+  const publish = useCssHeight("--playback-h");
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-1/2 z-[70] flex w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-1 rounded-full border bg-card/95 px-2 py-1 shadow-lg backdrop-blur-md" role="region" aria-label="Trip preview">
+    <div ref={publish} className="pointer-events-auto fixed bottom-4 left-1/2 z-[70] flex w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 flex-wrap items-center gap-1 rounded-2xl border bg-card/95 px-2 py-1 shadow-lg backdrop-blur-md sm:flex-nowrap sm:rounded-full" role="region" aria-label="Trip preview">
       <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label={p.playing ? "Pause preview" : "Play preview"} onClick={p.onToggle}>
         {p.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </Button>
       <SpeedPicker speed={p.speed} onSpeed={p.onSpeed} label="Playback speed" />
       <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label="Skip to next leg" onClick={p.onSkip}><SkipForward className="h-4 w-4" /></Button>
-      <div className="min-w-0 flex-1 truncate px-1 text-sm" aria-live="polite">{p.callout}</div>
-      <Badge variant="secondary" className="tabular-nums">{p.step}</Badge>
+      {/* On a phone the step's words get a line of their own above the controls, not cut to "W…". */}
+      <div className="order-first min-w-0 basis-full px-1 pt-0.5 text-sm sm:order-none sm:flex-1 sm:basis-auto sm:truncate sm:pt-0" aria-live="polite">{p.callout}</div>
+      <span className="flex-1 sm:hidden" aria-hidden />
+      <Badge variant="secondary" className="tabular-nums max-[359px]:hidden">{p.step}</Badge>
       <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label="Close preview" onClick={p.onClose}><X className="h-4 w-4" /></Button>
     </div>
   );

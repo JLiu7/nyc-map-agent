@@ -60,7 +60,94 @@ function ribbon(q: Quads, line: Array<[number, number]>, w: number, z: number, o
   }
 }
 
-function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>): THREE.Group {
+/**
+ * A trip preview's walk through the station: the guide line to the train, the
+ * spot to stand on, and the train itself. `train` says where the train is each
+ * frame: metres its middle is past the stop the way it runs (negative still
+ * coming in), or null when there is none.
+ */
+interface StationTrip {
+  guide: Array<[number, number, number]>;
+  board: [number, number];
+  track: { at: [number, number]; angle: number };
+  color: string;
+  train: () => number | null;
+}
+
+/** The guide line: bright, unlit, a little above the floor so stair treads do not cover it. */
+const GUIDE = { color: 0x22d3ee, width: 0.45, lift: 0.14, arrowEvery: 3 };
+/** A train: cars this long, wide and tall, with a gap between, its floor at the platform's height. */
+const CAR = { length: 18.3, width: 3.05, height: 3.6, gap: 0.8, count: 9, floor: -0.95 };
+
+/** The guide line along the trip's way, with arrows pointing on, and a ring where the rider waits. */
+function guideMeshes(trip: StationTrip, boardZ: number): THREE.Object3D[] {
+  const line: number[] = [], arrows: number[] = [];
+  const g = trip.guide;
+  let carried = 0;
+  for (let i = 1; i < g.length; i++) {
+    const [a, b] = [g[i - 1], g[i]];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 0.01) continue;
+    const [ux, uy] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    const [nx, ny] = [-uy * GUIDE.width / 2, ux * GUIDE.width / 2];
+    const [za, zb] = [a[2] + GUIDE.lift, b[2] + GUIDE.lift];
+    line.push(a[0] + nx, a[1] + ny, za, b[0] + nx, b[1] + ny, zb, b[0] - nx, b[1] - ny, zb, a[0] + nx, a[1] + ny, za, b[0] - nx, b[1] - ny, zb, a[0] - nx, a[1] - ny, za);
+    // Chevrons every few metres, carried over from one stretch to the next.
+    for (let d = GUIDE.arrowEvery - carried; d < len; d += GUIDE.arrowEvery) {
+      const t = d / len, [x, y, zz] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, za + (zb - za) * t + 0.01];
+      const [tip, back, side] = [0.3, 0.25, 0.32];
+      arrows.push(x + ux * tip, y + uy * tip, zz, x - ux * back - uy * side, y - uy * back + ux * side, zz, x - ux * back + uy * side, y - uy * back - ux * side, zz);
+    }
+    carried = (carried + len) % GUIDE.arrowEvery;
+  }
+  const mesh = (pos: number[], color: number) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, fog: false }));
+  };
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(trip.color), side: THREE.DoubleSide, fog: false }));
+  ring.position.set(trip.board[0], trip.board[1], boardZ + GUIDE.lift + 0.02);
+  return [mesh(line, GUIDE.color), mesh(arrows, 0xffffff), ring];
+}
+
+/** A car's doors along each side, and the lights on the train's ends. */
+const DOOR = { perCar: 4, width: 1.3, height: 2.0 };
+
+/** The trip's train: silver cars with a window band, doors and a stripe in the line's colour, headlights in front and red lights behind, centred on its middle. */
+function trainMesh(color: string): THREE.Group {
+  const train = new THREE.Group();
+  const total = CAR.count * CAR.length + (CAR.count - 1) * CAR.gap;
+  const body = new THREE.BoxGeometry(CAR.length, CAR.width, CAR.height);
+  const band = new THREE.BoxGeometry(CAR.length - 1, CAR.width + 0.04, 0.9);
+  const stripe = new THREE.BoxGeometry(CAR.length - 0.2, CAR.width + 0.06, 0.22);
+  const door = new THREE.BoxGeometry(DOOR.width, CAR.width + 0.08, DOOR.height);
+  const cab = new THREE.BoxGeometry(0.1, CAR.width - 0.7, 1.0);
+  const lamp = new THREE.BoxGeometry(0.1, 0.35, 0.22);
+  const [metal, glass, paint, doors] = [0xb9bec5, 0x1c2630, color, 0x868c94].map((c) => new THREE.MeshLambertMaterial({ color: new THREE.Color(c) }));
+  // Lights are unlit, so they glow in the tunnel.
+  const [head, tail] = [0xfff6d8, 0xff3030].map((c) => new THREE.MeshBasicMaterial({ color: c, fog: false }));
+  const add = (geo: THREE.BoxGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    train.add(mesh);
+  };
+  for (let k = 0; k < CAR.count; k++) {
+    const x = -total / 2 + CAR.length / 2 + k * (CAR.length + CAR.gap);
+    add(body, metal, x, 0, CAR.floor + CAR.height / 2);
+    add(band, glass, x, 0, 1.5);
+    add(stripe, paint, x, 0, 0.35);
+    for (let d = 0; d < DOOR.perCar; d++) add(door, doors, x + CAR.length * ((d + 0.5) / DOOR.perCar - 0.5), 0, DOOR.height / 2);
+  }
+  // The train runs towards +x: a windscreen and headlights on the front, red lights on the back.
+  for (const [end, light] of [[1, head], [-1, tail]] as const) {
+    const x = end * (total / 2 + 0.05);
+    add(cab, glass, x, 0, 1.6);
+    for (const y of [-1, 1]) add(lamp, light, x, y * (CAR.width / 2 - 0.45), 0.5);
+  }
+  return train;
+}
+
+function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip): { group: THREE.Group; update: () => void } {
   const group = new THREE.Group();
   const under = !m.elevated;
   const [floor, platform, ceiling, wall, edge, drop, bed, rail, railing, canopy] = Array.from({ length: 10 }, () => new Quads());
@@ -146,7 +233,21 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   const sun = new THREE.DirectionalLight(0xffffff, 0.45 * LEGACY_LIGHT);
   sun.position.set(0.3, -0.5, 1);
   group.add(sun);
-  return group;
+
+  if (!trip) return { group, update: () => {} };
+  const boardZ = trip.guide.length ? trip.guide.reduce((z, p) => (Math.hypot(p[0] - trip.board[0], p[1] - trip.board[1]) < 1 ? p[2] : z), trip.guide[trip.guide.length - 1][2]) : 0;
+  group.add(...guideMeshes(trip, boardZ));
+  const train = trainMesh(trip.color);
+  train.rotation.z = trip.track.angle;
+  train.visible = false;
+  group.add(train);
+  const [dx, dy] = [Math.cos(trip.track.angle), Math.sin(trip.track.angle)];
+  const update = () => {
+    const off = trip.train();
+    train.visible = off !== null;
+    if (off !== null) train.position.set(trip.track.at[0] + dx * off, trip.track.at[1] + dy * off, boardZ);
+  };
+  return { group, update };
 }
 
 function disposeGroup(g: THREE.Object3D) {
@@ -164,11 +265,11 @@ export const STATION_LAYER = "station-walk";
  * An elevated station drawn on the map itself, so street view can stand on the
  * platform over the real city: the camera is simply raised to platform height.
  */
-export function createStationLayer(m: StationModel, tracks: Array<Array<[number, number]>>): CustomLayerInterface {
+export function createStationLayer(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip): CustomLayerInterface {
   let renderer: THREE.WebGLRenderer;
   const scene = new THREE.Scene();
   const camera = new THREE.Camera();
-  const group = buildStationScene(m, tracks);
+  const { group, update } = buildStationScene(m, tracks, trip);
   scene.add(group);
   const origin = MercatorCoordinate.fromLngLat(m.origin, 0);
   const s = origin.meterInMercatorCoordinateUnits();
@@ -185,6 +286,7 @@ export function createStationLayer(m: StationModel, tracks: Array<Array<[number,
     },
     render(_gl, args) {
       camera.projectionMatrix = new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix as unknown as number[]).multiply(local);
+      update();
       renderer.resetState();
       renderer.render(scene, camera);
     },
@@ -199,13 +301,13 @@ type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: numbe
  * walker's feet and looks where the map's street view looks. Returns the
  * function that stops it.
  */
-export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number): () => void {
+export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number, trip?: StationTrip): () => void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1b1a19);
   scene.fog = new THREE.Fog(0x1b1a19, 20, 120);
-  const group = buildStationScene(m, tracks);
+  const { group, update } = buildStationScene(m, tracks, trip);
   scene.add(group);
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 400);
   camera.up.set(0, 0, 1);
@@ -229,6 +331,7 @@ export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tra
       const b = (eye.bearing * Math.PI) / 180, p = (eye.pitch * Math.PI) / 180;
       camera.position.set(x, y, z);
       camera.lookAt(look.set(x + Math.sin(b) * Math.sin(p), y + Math.cos(b) * Math.sin(p), z - Math.cos(p)));
+      update();
       renderer.render(scene, camera);
     }
     frame = requestAnimationFrame(tick);

@@ -70,23 +70,32 @@ function tracksFor(m: StationModel, sub: Sub): P[][] {
   return out;
 }
 
+const built = new Map<string, NearStation | null>();
+/** The station whose box holds (lon, lat), built once and shared by every caller. */
+function find(data: { entries: Entry[]; sub: Sub }, lon: number, lat: number): NearStation | null {
+  const e = data.entries.find((s) => lon >= s.box[0] && lon <= s.box[2] && lat >= s.box[1] && lat <= s.box[3]);
+  if (!e) return null;
+  if (!built.has(e.key)) {
+    const ids = new Set(e.ids);
+    const doors = data.sub.entrances?.features.filter((f) => ids.has(f.properties.id) && /Stair|Escalator|Elevator/.test(f.properties.kind)).map((f) => f.geometry.coordinates) ?? [];
+    const model = buildStation(e.st, { entrances: doors });
+    built.set(e.key, model ? { key: e.key, model, tracks: tracksFor(model, data.sub) } : null);
+  }
+  return built.get(e.key) ?? null;
+}
+
 /** A finder that answers synchronously: the station at (lon, lat), or null while loading or away from every station. */
 export function stationFinder() {
   let data: { entries: Entry[]; sub: Sub } | null = null;
   void load().then((d) => (data = d)).catch(() => {});
-  const built = new Map<string, NearStation | null>();
   return {
     near(lon: number, lat: number): NearStation | null {
-      if (!data) return null;
-      const e = data.entries.find((s) => lon >= s.box[0] && lon <= s.box[2] && lat >= s.box[1] && lat <= s.box[3]);
-      if (!e) return null;
-      if (!built.has(e.key)) {
-        const ids = new Set(e.ids);
-        const doors = data.sub.entrances?.features.filter((f) => ids.has(f.properties.id) && /Stair|Escalator|Elevator/.test(f.properties.kind)).map((f) => f.geometry.coordinates) ?? [];
-        const model = buildStation(e.st, { entrances: doors });
-        built.set(e.key, model ? { key: e.key, model, tracks: tracksFor(model, data.sub) } : null);
-      }
-      return built.get(e.key) ?? null;
+      return data ? find(data, lon, lat) : null;
     },
   };
+}
+
+/** The station at (lon, lat) once the data is in; null away from every station or when it cannot load. */
+export function stationAt(lon: number, lat: number): Promise<NearStation | null> {
+  return load().then((d) => find(d, lon, lat)).catch(() => null);
 }
