@@ -44,6 +44,7 @@
     "e2e": "playwright test",
     "build:xray": "tsx scripts/build-xray.ts",
     "build:elevated": "tsx scripts/build-elevated.ts",
+    "build:corners": "tsx scripts/build-corners.ts",
     "build:xray-overrides": "tsx scripts/xray-overrides.ts"
   },
   "dependencies": {

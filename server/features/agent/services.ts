@@ -11,6 +11,7 @@ import type { FeedAlert, LiveVehicle, TroubleStation } from "../../../src/lib/tr
 import type { LngLatTuple, RestroomSpot } from "../../../src/features/agent/schema";
 import { bestCandidate, matchLandmark, matchStation, type GeoCandidate } from "./places";
 import { distM, openDataEntrances, type Station } from "./transit";
+import { findCorner, parseCorner, type Corner } from "./corner";
 import { noteSource } from "./freshness";
 import { cached } from "../../lib/ttlCache";
 import { openAt } from "./hours";
@@ -34,7 +35,7 @@ const geoSchema = z.object({
   features: z.array(z.object({ geometry: z.object({ coordinates: z.tuple([z.number(), z.number()]) }), properties: z.object({ label: z.string(), confidence: z.number().optional() }) })),
 });
 export interface Place { label: string; at: LngLatTuple }
-interface GeocodeDeps { stations?: () => Promise<Station[]>; geosearch?: (text: string) => Promise<GeoCandidate[]>; shops?: (text: string) => Promise<Place | null> }
+interface GeocodeDeps { stations?: () => Promise<Station[]>; geosearch?: (text: string) => Promise<GeoCandidate[]>; shops?: (text: string) => Promise<Place | null>; corner?: (corner: Corner) => Place | null }
 
 /**
  * A shop, restaurant or other named business by name ("Aldi at Rego Park"). NYC
@@ -71,7 +72,7 @@ async function geosearchCandidates(text: string): Promise<GeoCandidate[]> {
   return data.features.map((f) => ({ label: f.properties.label.replace(/, USA$/, ""), at: f.geometry.coordinates, confidence: f.properties.confidence ?? 0 }));
 }
 
-/** Curated landmarks, then GTFS station names, then GeoSearch (highest confidence). */
+/** Curated landmarks, then GTFS station names, then street corners, then businesses, then GeoSearch (highest confidence). */
 export async function geocode(text: string, deps: GeocodeDeps = {}): Promise<Place | null> {
   const lm = matchLandmark(text);
   if (lm) return { label: lm.label, at: lm.at };
@@ -80,6 +81,15 @@ export async function geocode(text: string, deps: GeocodeDeps = {}): Promise<Pla
     if (st) return { label: `${st.name} station`, at: st.at };
   } catch {
     // Station list unavailable: fall through to GeoSearch.
+  }
+  const corner = parseCorner(text);
+  if (corner) {
+    try {
+      const at = (deps.corner ?? findCorner)(corner);
+      if (at) return at;
+    } catch {
+      // Corner table unreadable: fall through to GeoSearch.
+    }
   }
   try {
     const shop = await (deps.shops ?? nominatimBusiness)(text);
