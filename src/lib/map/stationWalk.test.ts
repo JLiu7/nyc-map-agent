@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStation, floorUnder, reachableShare, streetTops, toLngLat, toLocal, walkIn, walls, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
+import { buildStation, drawn, floorsAt, floorUnder, outline, reachableShare, rooms, streetTops, toLngLat, toLocal, walkIn, walls, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
 
 // Metres east/north of a point in Lower Manhattan, as lon/lat.
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
@@ -138,4 +138,47 @@ describe("the committed stations", () => {
       expect(full / built).toBeGreaterThan(0.8);
     }, 120_000);
   }
+});
+
+describe("drawn", () => {
+  /** A passage and a platform at an angle to the grid, so their cells step along every wall. */
+  const slanted: WalkStation = {
+    ways: [
+      way("steps", [[0, 0], [6, -6]], 0, -1),
+      way("corridor", [[6, -6], [30, -20]], -1),
+      way("steps", [[30, -20], [36, -26]], -1, -2),
+      way("platform", [[20, -60], [70, 10]], -2),
+    ],
+  };
+  type Run = ReturnType<typeof drawn>["floors"][number];
+  const covers = (runs: Run[], x: number, y: number, z: number) => runs.some((r) => Math.abs(r.z - z) < 0.1 && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + 0.5);
+
+  it("reaches every wall with floor and ceiling, leaving no gap along its foot or top", () => {
+    const m = buildStation(slanted)!;
+    const { floors, ceilings, beds } = drawn(m);
+    let points = 0;
+    const missed: string[] = [];
+    for (const room of rooms(m)) {
+      for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75))) {
+        const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+        for (let t = 0.1; t <= 0.9; t += 0.25 / Math.max(len, 1)) {
+          const [x, y] = [w.x1 + (w.x2 - w.x1) * t, w.y1 + (w.y2 - w.y1) * t];
+          points++;
+          if (!covers([...floors, ...beds], x, y, w.z1)) missed.push(`floor ${x.toFixed(1)},${y.toFixed(1)}`);
+          if (!covers(ceilings, x, y, w.z1)) missed.push(`ceiling ${x.toFixed(1)},${y.toFixed(1)}`);
+        }
+      }
+    }
+    expect(points).toBeGreaterThan(200);
+    expect(missed).toEqual([]);
+  });
+
+  it("keeps the floor off the tracks and out of the stairwell", () => {
+    const m = buildStation(slanted)!;
+    const { floors } = drawn(m);
+    // Over the track beside the platform, 3 m past its edge, there is no floor at platform height.
+    const [px, py] = toLocal(m, ...ll(45, -25));
+    const [ex, ey] = [px + 0.707 * 6, py - 0.707 * 6];
+    expect(covers(floors, ex, ey, -10)).toBe(false);
+  });
 });

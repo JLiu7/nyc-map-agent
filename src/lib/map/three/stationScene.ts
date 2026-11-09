@@ -7,16 +7,14 @@
 import * as THREE from "three";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
-import { CELL_M, floorRuns, floorsAt, outline, rooms, STAIR_W, toLocal, trainway, treads, walls, type StationModel } from "../stationWalk";
+import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_W, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
 import { placeSigns, type Bullet, type Sign, type SignInfo } from "../stationSigns";
 
-/** Floor to ceiling below the street. */
-const CEILING_M = 3.2;
 /** Railing height on an elevated platform or stair. */
 const RAIL_M = 1.1;
-/** Platform edge above the track bed. */
-const TRACK_DROP_M = 1.2;
+/** The yellow strip along a platform's edge: this far in from the edge line, and this far out over the track. */
+const EDGE = { inside: 0.45, over: 0.35 };
 /** Track gauge (1,435 mm) and track bed width. */
 const GAUGE_M = 1.435;
 const BED_M = 3;
@@ -265,23 +263,27 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     for (const [lo, hi] of [[TRIM.from, TRIM.to], [TRIM.line, TRIM.lineTo]]) trim.add([a[0], a[1], a[2] + lo], [b[0], b[1], b[2] + lo], [b[0], b[1], b[2] + hi], [a[0], a[1], a[2] + hi]);
   };
 
+  const surfaces = drawn(m);
+  const flat = (q: Quads, r: { x: number; y: number; w: number }, z: number) => q.add([r.x, r.y, z], [r.x + r.w, r.y, z], [r.x + r.w, r.y + CELL_M, z], [r.x, r.y + CELL_M, z]);
   const platformRuns: Array<{ x: number; y: number; z: number }> = [];
-  for (const g of m.pieces) {
-    if (g.stair) continue;
-    for (const r of floorRuns(g)) {
-      const q = r.kind === 2 ? platform : floor;
-      const [x0, x1, y0, y1] = [r.x, r.x + r.w, r.y, r.y + CELL_M];
-      q.add([x0, y0, r.z], [x1, y0, r.z], [x1, y1, r.z], [x0, y1, r.z]);
-      if (!under && r.kind === 2) canopy.add([x0, y0, r.z + 3.6], [x1, y0, r.z + 3.6], [x1, y1, r.z + 3.6], [x0, y1, r.z + 3.6]);
-      if (r.kind === 2) platformRuns.push({ x: r.x + r.w / 2, y: r.y, z: r.z });
-    }
+  for (const r of surfaces.floors) {
+    flat(r.kind === 2 ? platform : floor, r, r.z);
+    if (!under && r.kind === 2) flat(canopy, r, r.z + 3.6);
+    if (r.kind === 2) platformRuns.push({ x: r.x + r.w / 2, y: r.y, z: r.z });
   }
   for (const w of walls(m)) {
     const [a, b] = [[w.x1, w.y1], [w.x2, w.y2]];
     if (w.edge) {
-      // The platform's edge: a yellow strip on the floor and the drop to the track bed.
-      ribbon(edge, [[a[0], a[1]], [b[0], b[1]]], 0.6, w.z1 + 0.01);
-      drop.add([a[0], a[1], w.z1], [b[0], b[1], w.z2], [b[0], b[1], w.z2 - TRACK_DROP_M], [a[0], a[1], w.z1 - TRACK_DROP_M]);
+      // The platform's edge: a yellow strip on the floor and the drop to the track bed. The platform is
+      // drawn in cells that stick out past the straightened edge in steps, so the strip reaches a little
+      // over the track, like a platform's nosing, and the drop falls from its outer side, hiding them.
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const [nx, ny] = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len];
+      const look = (k: number) => floorsAt(m, (a[0] + b[0]) / 2 + nx * k, (a[1] + b[1]) / 2 + ny * k).some((f) => Math.abs(f - w.z1) < 0.3);
+      const out = look(EDGE.inside) && !look(-EDGE.inside) ? -1 : 1;
+      ribbon(edge, [[a[0], a[1]], [b[0], b[1]]], EDGE.inside + EDGE.over, w.z1 + 0.01, (out * (EDGE.over - EDGE.inside)) / 2);
+      const [ox, oy] = [nx * out * EDGE.over, ny * out * EDGE.over];
+      drop.add([a[0] + ox, a[1] + oy, w.z1], [b[0] + ox, b[1] + oy, w.z2], [b[0] + ox, b[1] + oy, w.z2 - TRACK_DROP_M], [a[0] + ox, a[1] + oy, w.z1 - TRACK_DROP_M]);
       continue;
     }
     // Below the street the rooms' outlines (further down) are the walls; only stair sides come from here.
@@ -291,16 +293,9 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   }
 
   // Below the street each floor is a room: the trainway beside its platforms, a ceiling over both, walls round it.
-  const floors = m.pieces.filter((g) => !g.stair);
-  rooms(m).forEach((room, n) => {
-    for (const r of floorRuns(room)) {
-      const [x0, x1, y0, y1, zc] = [r.x, r.x + r.w, r.y, r.y + CELL_M, r.z + CEILING_M];
-      ceiling.add([x0, y0, zc], [x1, y0, zc], [x1, y1, zc], [x0, y1, zc]);
-    }
-    for (const r of trainway(room, floors[n])) {
-      const [x0, x1, y0, y1, zb] = [r.x, r.x + r.w, r.y, r.y + CELL_M, r.z - TRACK_DROP_M];
-      bed.add([x0, y0, zb], [x1, y0, zb], [x1, y1, zb], [x0, y1, zb]);
-    }
+  for (const r of surfaces.ceilings) flat(ceiling, r, r.z + CEILING_M);
+  for (const r of surfaces.beds) flat(bed, r, r.z - TRACK_DROP_M);
+  rooms(m).forEach((room) => {
     for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75))) {
       tiled([w.x1, w.y1, w.z1], [w.x2, w.y2, w.z2], [w.z1 - TRACK_DROP_M, w.z2 - TRACK_DROP_M], CEILING_M);
     }

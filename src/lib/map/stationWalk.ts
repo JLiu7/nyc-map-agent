@@ -772,10 +772,70 @@ export function rooms(m: StationModel): Piece[] {
     });
 }
 
-/** The trainway's cells of a room (room, not floor): where the track bed goes. */
-export function trainway(room: Piece, floor: Piece): Run[] {
-  const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(floor.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(floor.h[c]) ? FLOOR : 0)) };
-  return floorRuns(bed);
+/** Floor to ceiling below the street, and a platform's edge above the track bed. */
+export const CEILING_M = 3.2;
+export const TRACK_DROP_M = 1.2;
+/** A floor, ceiling or track bed does not spread where another floor is this close to its height: it would cut through it. */
+const CLEAR_M = 1;
+
+/**
+ * A grid carried one cell past its edge wherever `into` allows, on a grid one
+ * cell bigger all round. Floors are cells but walls are straightened lines, so
+ * a floor drawn cell by cell stops in steps short of its wall, and the dark
+ * behind showed through in sawtooth gaps along every edge. Carried under the
+ * wall, the floor reaches it everywhere and the part past it is hidden.
+ */
+function spread(g: Piece, into: (from: number, at: P) => boolean): Piece {
+  const [nx, ny] = [g.nx + 2, g.ny + 2];
+  const out: Piece = { ...g, x0: g.x0 - CELL_M, y0: g.y0 - CELL_M, nx, ny, h: new Float32Array(nx * ny).fill(NaN), kind: new Uint8Array(nx * ny) };
+  const src = (i: number, j: number) => (i < 0 || j < 0 || i >= g.nx || j >= g.ny ? -1 : j * g.nx + i);
+  for (let j = 0; j < ny; j++)
+    for (let i = 0; i < nx; i++) {
+      const c = j * nx + i, own = src(i - 1, j - 1);
+      if (own >= 0 && !Number.isNaN(g.h[own])) {
+        out.h[c] = g.h[own];
+        out.kind[c] = g.kind[own];
+        continue;
+      }
+      let from = -1;
+      for (let dj = -1; dj <= 1 && from < 0; dj++)
+        for (let di = -1; di <= 1 && from < 0; di++) {
+          const n = src(i - 1 + di, j - 1 + dj);
+          if (n >= 0 && !Number.isNaN(g.h[n])) from = n;
+        }
+      if (from < 0 || !into(from, centre(out, c))) continue;
+      out.h[c] = g.h[from];
+      out.kind[c] = g.kind[from];
+    }
+  return out;
+}
+
+/**
+ * What the scene draws flat: floors, the ceilings over rooms below the street,
+ * and the track beds, each carried under its walls (see `spread`). Each spreads
+ * only where no other floor is near its own height, so it never cuts through a
+ * stair or the room beside it; below the street only past its
+ * room's walls, never over the tracks; above it only off a plain floor, never
+ * past a platform's edge.
+ */
+export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: Run[] } {
+  const free = (at: P, z: number) => !floorsAt(m, ...at).some((f) => Math.abs(f - z) < CLEAR_M);
+  const floorsOnly = m.pieces.filter((g) => !g.stair);
+  const out = { floors: [] as Run[], ceilings: [] as Run[], beds: [] as Run[] };
+  if (m.elevated) {
+    for (const g of floorsOnly) out.floors.push(...floorRuns(spread(g, (from, at) => g.kind[from] === FLOOR && free(at, g.h[from]))));
+    return out;
+  }
+  rooms(m).forEach((room, n) => {
+    const g = floorsOnly[n];
+    const outside = (at: P) => { const c = cellAt(room, ...at); return c < 0 || Number.isNaN(room.h[c]); };
+    const past = (lift: number) => (from: number, at: P) => outside(at) && free(at, room.h[from] + lift);
+    out.floors.push(...floorRuns(spread(g, past(0))));
+    out.ceilings.push(...floorRuns(spread(room, past(CEILING_M))));
+    const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(g.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(g.h[c]) ? FLOOR : 0)) };
+    out.beds.push(...floorRuns(spread(bed, past(-TRACK_DROP_M))));
+  });
+  return out;
 }
 
 /** Where to stand at a street entrance: its stair top. Null when the station has none. */
