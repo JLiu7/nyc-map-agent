@@ -223,6 +223,33 @@ function roomAround(m: StationModel, x: number, y: number, h: number): boolean {
   return true;
 }
 
+/** Within this angle of a flight's line, a step on the stair is turned to run along it. */
+const STAIR_STEER_COS = Math.cos((70 * Math.PI) / 180);
+
+/**
+ * The way down the stair the walker stands on (a unit vector, local metres), or
+ * null off a stair. From its centreline, nearest segment, upper end to lower.
+ */
+function stairDown(m: StationModel, x: number, y: number, feet: number): P | null {
+  for (const g of m.pieces) {
+    if (!g.stair || !g.flight) continue;
+    const c = cellAt(g, x, y);
+    if (c < 0 || Number.isNaN(g.h[c]) || Math.abs(g.h[c] - feet) > RISER_M) continue;
+    const { line, za, zb } = g.flight;
+    let best: P | null = null, bestD = Infinity;
+    for (let i = 1; i < line.length; i++) {
+      const [a, b] = [line[i - 1], line[i]];
+      const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+      if (!l2) continue;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2));
+      const d = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+      if (d < bestD) { bestD = d; best = [dx / Math.sqrt(l2), dy / Math.sqrt(l2)]; }
+    }
+    if (best) return zb <= za ? best : [-best[0], -best[1]];
+  }
+  return null;
+}
+
 /** Where the walker is: local metres, feet height, and whether they are on the station's floors or the street. */
 export type StationPos = { x: number; y: number; z: number; inside: boolean };
 
@@ -235,7 +262,14 @@ export function walkIn(m: StationModel, pos: StationPos, dx: number, dy: number)
   const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / SUBSTEP_M));
   let { x, y, z: feet, inside } = pos;
   for (let s = 0; s < n; s++) {
-    const sx = dx / n, sy = dy / n;
+    let sx = dx / n, sy = dy / n;
+    // On a stair, a step roughly along it runs down (or up) the flight, so you need not line up
+    // exactly with a stairwell to go in (owner, 2026-11-09: "I literally can't walk inside it").
+    const down = inside ? stairDown(m, x, y, feet) : null;
+    if (down) {
+      const len = Math.hypot(sx, sy), along = (sx * down[0] + sy * down[1]) / (len || 1);
+      if (Math.abs(along) >= STAIR_STEER_COS) [sx, sy] = [Math.sign(along) * len * down[0], Math.sign(along) * len * down[1]];
+    }
     const tries: P[] = [[sx, sy], [sx, 0], [0, sy]];
     let moved = false;
     for (const [tx, ty] of tries) {

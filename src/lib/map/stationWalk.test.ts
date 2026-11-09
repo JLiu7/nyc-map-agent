@@ -74,6 +74,16 @@ describe("buildStation", () => {
     expect(floorUnder(m, ...toLocal(m, ...ll(8, 10)), 0)).toEqual({ z: 0, inside: false });
   });
 
+  it("takes you down a stair you walk onto at an angle, not only straight along it", () => {
+    const m = buildStation(small)!;
+    // 45 degrees off the flight's line: the step turns to run down it.
+    const down = walkTo(m, at(m, -2, 2), ...toLocal(m, ...ll(6, -6)), 60);
+    expect(down.z).toBeLessThan(-2);
+    // Across the top at right angles you stay on the pavement.
+    const across = walkTo(m, at(m, -4, -0.3), ...toLocal(m, ...ll(4, -0.3)));
+    expect(across.z).toBe(0);
+  });
+
   it("walks past the side of a stairwell without falling in", () => {
     const m = buildStation(small)!;
     const past = walkTo(m, at(m, -5, -4), ...toLocal(m, ...ll(5, -4)));
