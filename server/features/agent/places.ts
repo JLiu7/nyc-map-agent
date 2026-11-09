@@ -52,11 +52,21 @@ export const LANDMARKS: readonly Landmark[] = [
   { label: "Coney Island (Stillwell Ave)", at: [-73.9811, 40.5773], aliases: ["coney island"] },
 ];
 
-/** Lowercase, "&"→"and", drop punctuation, collapse spaces, drop a trailing ", NY…". */
+/** Trailing place words, any number of them: "Fulton Street, Manhattan, NY" ends in two. */
+const PLACE_TAIL = /(?:,?\s*\b(?:new york city|new york|nyc|ny|usa|lower manhattan|manhattan|brooklyn|queens|the bronx|bronx|staten island)\b)+[\s,.]*$/;
+const BOROUGHS: Array<[RegExp, string]> = [[/manhattan/, "M"], [/brooklyn/, "Bk"], [/queens/, "Q"], [/bronx/, "Bx"], [/staten island/, "SI"]];
+
+/** The borough a place's trailing words name ("Fulton St, Brooklyn" → "Bk"), as the MTA's station list writes it. */
+export function boroughOf(text: string): string | null {
+  const tail = PLACE_TAIL.exec(text.toLowerCase())?.[0] ?? "";
+  return BOROUGHS.find(([re]) => re.test(tail))?.[1] ?? null;
+}
+
+/** Lowercase, "&"→"and", drop punctuation, collapse spaces, drop trailing ", Manhattan, NY…". */
 export function norm(s: string): string {
   return s
     .toLowerCase()
-    .replace(/,?\s*(new york|nyc|ny|manhattan|brooklyn|queens|bronx)\s*$/g, "")
+    .replace(PLACE_TAIL, "")
     .replace(/&/g, " and ")
     .replace(/\bstreet\b/g, "st")
     .replace(/\bsquare\b/g, "sq")
@@ -75,13 +85,16 @@ const TRAINS = /\s*\(([1-7A-Z ]+?) trains?\)/;
 
 /**
  * Exact (normalized) station name match, ignoring a trailing " station". "34 St-Herald Sq" also matches "34 st herald sq".
- * Trains in brackets ("86 St (4 5 6 trains)", from a read-back) pick the one of several same-name stations that serves them.
+ * Trains in brackets ("86 St (4 5 6 trains)", from a read-back) pick the one of several same-name stations that serves them,
+ * and a borough named at the end ("Fulton St, Brooklyn") picks the one in that borough.
  */
 export function matchStation(text: string, stations: Station[]): Station | null {
   const trains = TRAINS.exec(text)?.[1].split(" ").filter(Boolean) ?? [];
-  const q = norm(text.replace(TRAINS, "")).replace(/ (station|stop|subway station)$/, "");
+  const bare = text.replace(TRAINS, "");
+  const q = norm(bare).replace(/ (station|stop|subway station)$/, "");
   if (q.length < 3) return null;
-  return stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r))) ?? null;
+  const borough = boroughOf(bare);
+  return stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r)) && (!borough || !s.borough || s.borough === borough)) ?? null;
 }
 
 export interface GeoCandidate { label: string; at: LngLatTuple; confidence: number }

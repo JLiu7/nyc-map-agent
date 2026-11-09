@@ -26,6 +26,15 @@ describe("geocode landmarks and stations", () => {
     expect(matchStation("86 St (Q train)", six)).toBeNull();
   });
 
+  // Asked "fulton street manhattan", the model looked up "Fulton Street, Manhattan, NY" and landed on 14 Fulton St (#77).
+  it("a station still matches with several place words after it, and the borough picks which one", () => {
+    const fulton = [{ ...st("Fulton St", [-74.0076, 40.7104]), id: "m", borough: "M" }, { ...st("Fulton St", [-73.9754, 40.6872]), id: "bk", borough: "Bk" }];
+    for (const q of ["Fulton Street, Manhattan, NY", "Fulton St, Manhattan, New York", "Fulton Street, New York, NY", "Fulton Street station, Lower Manhattan", "fulton street manhattan"]) expect(matchStation(q, fulton)?.id, q).toBe("m");
+    expect(matchStation("Fulton St, Brooklyn, NY", fulton)?.id).toBe("bk");
+    expect(matchStation("fulton st brooklyn", fulton)?.id).toBe("bk");
+    expect(matchStation("Fulton St, Queens", fulton)).toBeNull();
+  });
+
   it("Grand Central beats GeoSearch's Esplanade Gardens", async () => {
     const geosearch = vi.fn().mockResolvedValue([esplanade]);
     const p = await geocode("Grand Central", { stations: () => Promise.resolve(stations), geosearch });

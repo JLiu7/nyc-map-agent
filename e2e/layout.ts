@@ -44,6 +44,10 @@ export interface LayoutProblem {
 
 /** Every layout problem on the page now; empty when it meets the bar. */
 export async function layoutProblems(page: Page, opts: LayoutOpts = {}): Promise<LayoutProblem[]> {
+  // The static chat bar from index.html covers the bottom of the screen until the real one
+  // mounts, which on a slow machine comes after the map. Measure the app, not the boot screen;
+  // one that never goes away is still measured, and flagged, after 10 s.
+  await page.locator("#shell-bar").waitFor({ state: "detached", timeout: 10_000 }).catch(() => undefined);
   // Let a sheet or camera that is still animating settle first.
   await page.waitForTimeout(500);
   return page.evaluate(({ focus, ignore }) => {

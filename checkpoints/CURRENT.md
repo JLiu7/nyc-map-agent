@@ -14,6 +14,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Ask "fulton street manhattan" on the live site once #77's pull request deploys.** Asking for Fulton Street sent the map and the trip to 14 Fulton St by the Seaport, because a station name followed by more than one place word ("Fulton Street, Manhattan, NY") missed the station match (task NMA-0034). The map should now fly to Fulton St station, and "Fulton St, Brooklyn" should find the G stop.
 - **Read a Fulton Street trace once #75's pull request deploys.** A wrong place on the map could not be traced to the step that chose it, because traces named each step but not what it looked up. Tool spans now carry each step's input and result, and the turn lists every map command sent (task NMA-0033). Ask "fulton street manhattan", then read the trace through Octo's read route to see which place the lookup picked.
 - **Walk a station on a phone once #71's and #73's pull requests deploy.** Stations below the street now have white tile walls with a trim band and MTA-style signs (name, Exit, line bullets; task NMA-0031), and floors, ceilings and track beds reach every wall, so the jagged gaps along wall tops and feet are gone (NMA-0032). Still open: uptown and downtown labels (they need the MTA station list), and stair treads that show small steps against the sloping stair walls.
 - **Walk under the FDR at South St and along a side street on a phone once #67's pull request deploys.** The deck should sit overhead on columns and the sidewalks should reach the buildings.
