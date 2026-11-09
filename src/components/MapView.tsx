@@ -98,12 +98,17 @@ import {
 /** Basemap road classes a pedestrian can stand in (no motorways, rail or ferries). */
 const STREET_CLASSES = new Set(["minor", "service", "tertiary", "secondary", "primary", "trunk", "pedestrian", "living_street"]);
 
+/** A deck drawn above the street (a trunk overpass, or two levels up): you walk on the road under it, not on it. */
+function raisedDeck(p: Record<string, unknown>): boolean {
+  return p.brunnel === "bridge" && (p.class === "trunk" || (Number(p.layer) || 1) >= 2);
+}
+
 /** Street centrelines from the basemap's loaded vector tiles, as [lon, lat] lines. */
 function streetLines(map: MaplibreMapInstance): Array<Array<[number, number]>> {
   if (!map.getSource("openmaptiles")) return [];
   const lines: Array<Array<[number, number]>> = [];
   for (const f of map.querySourceFeatures("openmaptiles", { sourceLayer: "transportation" })) {
-    if (!STREET_CLASSES.has(String(f.properties?.class)) || f.properties?.brunnel === "tunnel") continue;
+    if (!STREET_CLASSES.has(String(f.properties?.class)) || f.properties?.brunnel === "tunnel" || raisedDeck(f.properties ?? {})) continue;
     const g = f.geometry;
     if (g.type === "LineString") lines.push(g.coordinates as Array<[number, number]>);
     else if (g.type === "MultiLineString") lines.push(...(g.coordinates as Array<Array<[number, number]>>));

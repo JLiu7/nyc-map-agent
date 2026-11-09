@@ -12,3 +12,4 @@ export * from "./three/streetSigns";
 export * from "./three/furniture";
 export * from "./three/storefronts";
 export * from "./three/landmarks";
+export * from "./three/overpasses";

@@ -10,6 +10,8 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Completed recently
 
+- **Street view drew roads too narrow and painted the FDR and the BQE flat on the streets under them (#67, task NMA-0029, branch `fix/street-view-road-widths`).** Roads now use NYC's widths by class at eye level (a side street 11 m with 3.75 m sidewalks, an avenue 20 m with 5 m sidewalks, a divided highway half per carriageway), set in `src/lib/map/basemap.ts`. The basemap tiles mark bridges with `brunnel` and an OSM `layer` but no height, and street bridges at layer 1 often cross a highway cut at street grade, so only motorway and trunk decks one level up are lifted: `src/lib/map/three/overpasses.ts` draws them 6 m up on column pairs, ramping down at loose ends, and walking stays on the street below. Not done: real deck heights (the tiles have none), and nobody has walked under one on a phone.
+
 - **Voice on the live site reached Whisper through a socat bridge on port 18799 that is being removed.** Speech-to-text, spoken answers and the voice keeper now go to the shared speech gateway on the VPS (`STT_BASE_URL=http://host.docker.internal:18800` in `~/apps/nyc-map-agent.env`), and every request says `X-Speech-Project: nyc-map` (`STT_PROJECT`). The gateway sends multilingual turns to the Windows PC first, then the Pro. Routing and fallbacks live in `voice-agent-research`'s gateway `routes.toml`, not here (AGENTS.md).
 
 - **A phone showed no way to choose the language (#54).** The rail's language chip sat in the wider-screens column and showed nowhere, and the Settings chip is past the right edge of the task row. The chip now sits under Layers on a phone and opens the phone's own picker; the same stored language drives the app's text, the agent's reply language and the voice. Not done: asking once on first launch when the phone's language is not one of the eight, which waits for the owner's call under `docs/DESIGN_RULES.md`.
@@ -32,6 +34,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Walk under the FDR at South St and along a side street on a phone once #67's pull request deploys.** The deck should sit overhead on columns and the sidewalks should reach the buildings.
 - **Watch a subway trip preview on a phone once #65's pull request deploys.** The walk in should show the walls and the cyan line, the train should pull in beside the platform, and the step text should read in full above the controls.
 - **After #62 merges, walk into Fulton St and an elevated station on a phone.** Check that the stairs feel right with the on-screen pad, and that the view below the street keeps up on a mid-range phone.
 - **After #53 merges, try station, line chip, Back and Close on a phone.** Check the drag between peek, half and full on the station sheet too, since it no longer uses vaul.

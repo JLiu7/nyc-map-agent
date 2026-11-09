@@ -1,4 +1,4 @@
-import type { Map as MapLibreMap } from "maplibre-gl";
+import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl";
 import { DATA_LAYERS, DATA_SOURCES, LAYER_IDS } from "./style";
 
 /**
@@ -119,22 +119,35 @@ export function applyAtmosphere(map: MapLibreMap, street = false): void {
  * (z21-22) a street became a hairline on a white page. While walking, roads
  * are re-sized in ground metres and painted asphalt, casings become kerbs
  * and sidewalks, and the bare ground becomes concrete.
+ *
+ * [layer pattern, kerb-to-kerb carriageway, sidewalk on each side]. Widths
+ * follow NYC's standard rights-of-way (DOT Street Design Manual): a 60 ft
+ * side street is ~34 ft (11 m) of roadway with ~13 ft (4 m) sidewalks, a
+ * 100 ft avenue ~70 ft (20 m) with 15 ft (5 m) sidewalks, so the paving reaches the building line instead
+ * of leaving bare ground between a narrow road and the facades. Street trees
+ * (tree census points) stand ~0.6 m inside the kerb and stay on the sidewalk.
+ * Highways, ramps, alleys and park paths have no sidewalk, only a kerb strip.
  */
-const ROAD_WIDTH_M: Array<[RegExp, number]> = [
-  [/motorway(?!_link)/, 22],
-  // Kerb-to-kerb, matched to where the tree census puts street trees (the
-  // kerb line): a typical side street measures ~8 m, avenues ~15 m. Wider
-  // carriageways painted asphalt under the trees and kerbside buildings.
-  [/trunk_primary/, 15],
-  [/secondary_tertiary/, 12],
-  [/link/, 8],
-  [/minor/, 8],
-  [/^bridge_street/, 8],
-  [/service_track/, 6],
-  [/path_pedestrian/, 3],
+const ROAD_WIDTH_M: Array<[RegExp, number, number]> = [
+  [/motorway(?!_link)/, 24, 1],
+  [/trunk_primary/, 20, 5],
+  [/secondary_tertiary/, 16, 4.5],
+  [/link/, 8, 0.5],
+  [/minor/, 11, 3.75],
+  [/^bridge_street/, 11, 3.75],
+  [/service_track/, 6, 0.5],
+  [/path_pedestrian/, 3, 0.3],
 ];
-/** Each kerb + sidewalk adds this much either side of the carriageway. */
-const SIDEWALK_M = 3.5;
+/**
+ * At eye level, decks a three.js layer lifts off the ground (overpasses.ts,
+ * motorway and trunk) or the city tiles draw high (OSM layer 2 and up) are
+ * not painted again flat on the street below them.
+ */
+const RAISED_BRIDGE: ExpressionSpecification = [
+  "any",
+  ["in", ["get", "class"], ["literal", ["motorway", "trunk"]]],
+  [">=", ["to-number", ["get", "layer"], 1], 2],
+];
 /** Metres per pixel at zoom 0 at NYC's latitude (40.7°). */
 const M_PER_PX_Z0 = 118_700;
 const STREET_COLORS = {
@@ -145,9 +158,15 @@ const STREET_COLORS = {
   park: "#6f9a5b",
 } as const;
 
-function metresWidth(m: number): unknown {
+function metresWidth(m: number | ExpressionSpecification): unknown {
   // Exponential base 2 in zoom = constant ground width.
-  return ["interpolate", ["exponential", 2], ["zoom"], 15, (m * 2 ** 15) / M_PER_PX_Z0, 24, (m * 2 ** 24) / M_PER_PX_Z0];
+  const at = (z: number) => (typeof m === "number" ? (m * 2 ** z) / M_PER_PX_Z0 : ["*", m, 2 ** z / M_PER_PX_Z0]);
+  return ["interpolate", ["exponential", 2], ["zoom"], 15, at(15), 24, at(24)];
+}
+
+/** OSM draws a divided highway as two one-way ways, one per carriageway: each gets half the road. */
+function carriageway(width: number): ExpressionSpecification {
+  return ["case", ["==", ["abs", ["to-number", ["get", "oneway"], 0]], 1], width / 2, width];
 }
 
 const saved = new WeakMap<MapLibreMap, Map<string, unknown>>();
@@ -201,13 +220,17 @@ export function applyStreetPalette(map: MapLibreMap, street: boolean): void {
     // Tunnels run under the street; drawn on the ground they are a pale stripe.
     if (layer.type === "line" && /^tunnel_/.test(id)) setPaint(map, id, "line-opacity", 0, street);
     if (layer.type !== "line" || !/^(road|bridge)_/.test(id) || /rail/.test(id)) continue;
-    const width = ROAD_WIDTH_M.find(([re]) => re.test(id))?.[1];
-    if (!width) continue;
+    const match = ROAD_WIDTH_M.find(([re]) => re.test(id));
+    if (!match) continue;
+    const [, width, sidewalk] = match;
     const casing = id.endsWith("_casing");
     const pedestrian = /path_pedestrian/.test(id);
     if (casing) setPaint(map, id, "line-pattern", map.hasImage(CONCRETE) ? CONCRETE : undefined, street);
     setPaint(map, id, "line-color", casing ? STREET_COLORS.sidewalk : pedestrian ? STREET_COLORS.path : STREET_COLORS.asphalt, street);
-    setPaint(map, id, "line-width", metresWidth(casing ? width + 2 * SIDEWALK_M : width), street);
+    const road = /motorway(?!_link)/.test(id) ? carriageway(width) : width;
+    const paved = typeof road === "number" ? (casing ? road + 2 * sidewalk : road) : (casing ? ["+", road, 2 * sidewalk] as ExpressionSpecification : road);
+    setPaint(map, id, "line-width", metresWidth(paved), street);
     if (!pedestrian) setPaint(map, id, "line-dasharray", undefined, street);
+    if (/^bridge_/.test(id)) setPaint(map, id, "line-opacity", ["case", RAISED_BRIDGE, 0, 1], street);
   }
 }

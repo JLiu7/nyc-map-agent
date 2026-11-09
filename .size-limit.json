@@ -32,7 +32,7 @@
   {
     "name": "feature: city3d (lazy)",
     "path": ".size-build/assets/city3d-*.js",
-    "limit": "2.8 kB"
+    "limit": "2.9 kB"
   },
   {
     "name": "feature: daylight (lazy)",
@@ -85,13 +85,13 @@
     "limit": "10 kB"
   },
   {
-    "name": "shared 3D layer: threeLayer + three (vehicles, hydrants, street signs, storefronts, street furniture; lazy)",
+    "name": "shared 3D layer: threeLayer + three (vehicles, hydrants, street signs, storefronts, street furniture, overpasses; lazy)",
     "path": ".size-build/assets/threeLayer-*.js",
     "limit": "150 kB"
   },
   {
     "name": "all JS",
     "path": ".size-build/assets/*.js",
-    "limit": "1123 kB"
+    "limit": "1126 kB"
   }
 ]
