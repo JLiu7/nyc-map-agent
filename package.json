@@ -95,6 +95,7 @@
     "tailwind-merge": "2.5.4",
     "tailwindcss": "3.4.14",
     "tailwindcss-animate": "1.0.7",
+    "tesseract.js": "7.0.0",
     "three": "0.186.1",
     "typescript": "5.6.3",
     "xstate": "5.33.2",

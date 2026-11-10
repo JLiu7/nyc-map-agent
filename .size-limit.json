@@ -90,8 +90,18 @@
     "limit": "150 kB"
   },
   {
+    "name": "feature: sign camera (lazy, prototype behind a flag)",
+    "path": ".size-build/assets/SignCamera-*.js",
+    "limit": "6.5 kB"
+  },
+  {
+    "name": "sign reader: tesseract.js (lazy, fetched when the sign camera starts)",
+    "path": ".size-build/assets/signReader-*.js",
+    "limit": "6.5 kB"
+  },
+  {
     "name": "all JS",
     "path": ".size-build/assets/*.js",
-    "limit": "1130 kB"
+    "limit": "1143 kB"
   }
 ]

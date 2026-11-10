@@ -54,6 +54,7 @@ export const FLAGS = {
   ferry: { tier: "basic", default: true, label: "Ferries (NYC Ferry and Staten Island Ferry; layer off until chosen)", owner: "@Pukujan", expires: "2027-04-30" },
   events: { tier: "basic", default: true, label: "Events (street fairs, markets, pop-ups; layer off until chosen)", owner: "@Pukujan", expires: "2027-04-30" },
   underground: { tier: "basic", default: true, label: "Underground help: station exits and the walk out, saved for when there is no signal", owner: "@Pukujan", expires: "2027-04-30" },
+  signCamera: { tier: "basic", default: false, label: "Sign camera (prototype)", owner: "@Pukujan", expires: "2027-03-31" },
   contextClean: { tier: "basic", default: false, label: "Clean map by context (show only your line, trip or street; landmarks always)", owner: "@Pukujan", expires: "2027-04-30" },
 } as const satisfies Record<string, FlagMeta>;
 

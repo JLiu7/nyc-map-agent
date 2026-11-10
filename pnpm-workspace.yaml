@@ -338,6 +338,7 @@ allowBuilds:
   swagger-ui: true
   swiftlint: true
   taiko: true
+  tesseract.js: false
   tldjs: true
   tree-sitter: true
   tree-sitter-cli: true
