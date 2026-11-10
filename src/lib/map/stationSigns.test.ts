@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bulletsFor, trimFor } from "./stationSignWords";
-import { placeSigns, SIGN_Z, type SignInfo } from "./stationSigns";
+import { inManhattan, placeSigns, runsToward, SIGN_Z, type SignInfo } from "./stationSigns";
 import { buildStation, toLocal, type WalkStation, type WalkWay } from "./stationWalk";
 
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
@@ -62,6 +62,61 @@ describe("placeSigns", () => {
 
   it("hangs nothing at street level, where the map is drawn instead", () => {
     expect(signs.filter((s) => s.z > -2)).toHaveLength(0);
+  });
+});
+
+describe("which way the trains go", () => {
+  const m = buildStation(small)!;
+  const [px] = toLocal(m, ...ll(8, 0));
+
+  it("says Downtown on a platform whose tracks run along its east side", () => {
+    // Trains keep right: with the platform on their right and the track to its east, they head south.
+    const ways = placeSigns(m, info(m)).filter((s) => s.kind === "way");
+    expect(ways.length).toBeGreaterThan(0);
+    for (const s of ways) {
+      expect(s.words).toBe("Downtown");
+      expect(s.routes.map((b) => b.short)).toEqual(["4"]);
+      expect(s.x).toBeGreaterThan(px);
+      expect(s.z).toBeCloseTo(-10 + SIGN_Z, 1);
+    }
+  });
+
+  it("says Uptown on the east edge and Downtown on the west of a platform between two tracks", () => {
+    const local = (pts: Array<[number, number]>) => pts.map(([x, y]) => toLocal(m, ...ll(x, y)));
+    const island: SignInfo = { ...info(m), lines: [{ route: "4", c: local([[8, -60], [8, 0], [8, 80]]) }] };
+    const ways = placeSigns(m, island).filter((s) => s.kind === "way");
+    expect(new Set(ways.map((s) => s.words))).toEqual(new Set(["Uptown", "Downtown"]));
+    for (const s of ways) expect(s.words).toBe(s.x > px ? "Uptown" : "Downtown");
+  });
+
+  it("hangs none outside Manhattan, where Uptown and Downtown mean nothing", () => {
+    const queens = { ...m, origin: [-73.945, 40.747] as [number, number] };
+    expect(placeSigns(queens, info(m)).filter((s) => s.kind === "way")).toHaveLength(0);
+  });
+
+  it("keeps right", () => {
+    expect(runsToward([1, 0], false)).toEqual([0, -1]);
+    expect(runsToward([1, 0], true)).toEqual([-0, 1]);
+  });
+
+  it("knows Manhattan from across the rivers", () => {
+    expect(inManhattan([-74.0095, 40.7104])).toBe(true); // Fulton St
+    expect(inManhattan([-73.9768, 40.7518])).toBe(true); // Grand Central
+    expect(inManhattan([-73.945, 40.747])).toBe(false); // Court Sq, Queens
+    expect(inManhattan([-73.9903, 40.6925])).toBe(false); // Borough Hall, Brooklyn
+  });
+});
+
+describe("exit signs", () => {
+  const m = buildStation(small)!;
+  it("name the corner the street stair comes up at, and nothing on a stair between floors", () => {
+    const exits = placeSigns(m, info(m), () => "Broadway & Fulton St · NW corner").filter((s) => s.kind === "exit");
+    expect(exits).toHaveLength(2);
+    expect(exits.filter((s) => s.words === "Broadway & Fulton St · NW corner")).toHaveLength(1);
+    expect(exits.find((s) => !s.words)!.z).toBeLessThan(exits.find((s) => s.words)!.z);
+  });
+  it("say Exit alone while the map has no streets yet", () => {
+    expect(placeSigns(m, info(m), () => null).filter((s) => s.kind === "exit").every((s) => !s.words)).toBe(true);
   });
 });
 

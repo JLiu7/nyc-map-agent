@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { NearStation } from "@/lib/map/stationNear";
+import { getMapInstance } from "@/lib/map/mapInstance";
 import { mountStationView } from "@/lib/map/three/stationScene";
 
 type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: number };
@@ -14,7 +15,7 @@ export function StationInside({ station, getEye, fov }: { station: NearStation; 
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!ref.current) return;
-    return mountStationView(ref.current, station.model, station.tracks, getEye, fov, undefined, station.signs);
+    return mountStationView(ref.current, station.model, station.tracks, getEye, fov, undefined, station.signs, getMapInstance());
   }, [station, getEye, fov]);
   return <canvas ref={ref} aria-hidden data-testid="station-inside" className="pointer-events-none absolute inset-0 z-[1] h-full w-full" />;
 }

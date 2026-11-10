@@ -176,7 +176,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       canvas.className = "pointer-events-none absolute inset-0 z-[1] h-full w-full";
       canvas.style.display = "none";
       map.getContainer().appendChild(canvas);
-      const unmount = mountStationView(canvas, model, tracks, () => view.eye, map.getVerticalFieldOfView(), trip, signs);
+      const unmount = mountStationView(canvas, model, tracks, () => view.eye, map.getVerticalFieldOfView(), trip, signs, map);
       view.canvas = canvas;
       view.stop = () => { unmount(); canvas.remove(); };
     });

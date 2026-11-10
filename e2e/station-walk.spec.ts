@@ -33,5 +33,10 @@ for (const size of SIZES) {
     expect((await eye(page))?.inside).toBe(true);
     expect(errors).toEqual([]);
     await expectLayout(page);
+    // The Exit signs are hung again with their street corners once the map settles; that must not throw or move anything.
+    await page.waitForTimeout(1500);
+    await expect(page.getByTestId("station-inside")).toBeVisible();
+    expect(errors).toEqual([]);
+    await expectLayout(page);
   });
 }

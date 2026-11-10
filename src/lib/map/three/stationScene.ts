@@ -7,9 +7,11 @@
 import * as THREE from "three";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
-import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_W, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
+import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
-import { placeSigns, type Bullet, type Sign, type SignInfo } from "../stationSigns";
+import { placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
+import { cornerLine } from "../cornerLine";
+import { readMap } from "../mapRead";
 
 /** Railing height on an elevated platform or stair. */
 const RAIL_M = 1.1;
@@ -51,6 +53,12 @@ class Quads {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
     if (this.uv.length) g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
+    else if (opts.map) {
+      // A floor or ceiling: its texture laid in metres across the ground, so slabs line up from room to room.
+      const uv = new Float32Array((this.pos.length / 3) * 2);
+      for (let i = 0, k = 0; i < this.pos.length; i += 3) { uv[k++] = this.pos[i]; uv[k++] = this.pos[i + 1]; }
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    }
     g.computeVertexNormals();
     return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide, ...opts }));
   }
@@ -186,31 +194,111 @@ function tileTexture(): THREE.Texture | null {
   return t;
 }
 
+/**
+ * A small repeating texture drawn once in code: no download, one 128 px canvas per surface.
+ * `metres` is how much floor one repeat covers.
+ */
+function surfaceTexture(metres: number, draw: (ctx: CanvasRenderingContext2D, size: number, rand: () => number) => void): THREE.Texture | null {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  let seed = 11;
+  draw(ctx, c.width, () => ((seed = (seed * 16807) % 2147483647) / 2147483647));
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / metres, 1 / metres);
+  t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** Speckled concrete in `base` grey, with a dark joint every `joints`-th of the repeat. */
+const concrete = (base: number, joints: number) => (ctx: CanvasRenderingContext2D, size: number, rand: () => number) => {
+  ctx.fillStyle = `rgb(${base},${base - 3},${base - 8})`;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 420; i++) {
+    const v = base + Math.round((rand() - 0.5) * 46);
+    ctx.fillStyle = `rgb(${v},${v - 3},${v - 8})`;
+    ctx.fillRect(Math.floor(rand() * size), Math.floor(rand() * size), 2, 2);
+  }
+  ctx.fillStyle = `rgb(${base - 52},${base - 54},${base - 58})`;
+  for (let k = 0; k < joints; k++) {
+    ctx.fillRect((k * size) / joints, 0, 2, size);
+    ctx.fillRect(0, (k * size) / joints, size, 2);
+  }
+};
+
+/** A dark ceiling with a beam across it and a strip light between beams, as under a street. */
+function ceilingPattern(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.fillStyle = "#57534e";
+  ctx.fillRect(0, 0, size, size);
+  // Beams: one each way, darker.
+  ctx.fillStyle = "#3a3733";
+  ctx.fillRect(0, 0, size, 14);
+  ctx.fillRect(0, 0, 14, size);
+  ctx.fillStyle = "#6b6660";
+  ctx.fillRect(0, 14, size, 2);
+  ctx.fillRect(14, 0, 2, size);
+  // The strip light.
+  ctx.fillStyle = "#f6f1e2";
+  ctx.fillRect(40, 66, 62, 8);
+}
+
 /** A sign's face drawn once per wording: black, a white rule across the top, white lettering and the lines' bullets. */
 const SIGN = { px: 128, height: 0.5, font: '600 60px "Helvetica Neue", Helvetica, Arial, sans-serif' };
 function signTexture(s: Sign): { tex: THREE.Texture; width: number } | null {
   const c = document.createElement("canvas");
   const ctx = c.getContext("2d");
   if (!ctx) return null;
-  const words = s.kind === "exit" ? "Exit" : s.kind === "name" ? s.name : "";
+  const exit = s.kind === "exit";
+  // An exit: "Exit" and an up arrow on the red field, then the corner it comes up at. A way sign: bullets first, then the way.
+  const words = exit ? s.words ?? "" : s.kind === "name" ? s.name : s.words ?? "";
   const r = 38, gap = 12, pad = 34;
   ctx.font = SIGN.font;
+  const red = exit ? pad + ctx.measureText("Exit").width + 24 + 44 + pad : 0;
   const textW = words ? ctx.measureText(words).width : 0;
-  const bulletsW = s.routes.length * (2 * r + gap);
-  c.width = Math.ceil(pad * 2 + textW + (words && s.routes.length ? 40 : 0) + bulletsW - (s.routes.length ? gap : 0));
+  const bulletsW = s.routes.length ? s.routes.length * (2 * r + gap) - gap : 0;
+  const between = words && s.routes.length ? 40 : 0;
+  const rest = words || s.routes.length ? pad * 2 + textW + between + bulletsW : 0;
+  c.width = Math.ceil(red + rest);
   c.height = SIGN.px;
   ctx.fillStyle = "#111214";
   ctx.fillRect(0, 0, c.width, c.height);
+  if (exit) {
+    ctx.fillStyle = "#d9261c";
+    ctx.fillRect(0, 0, red, c.height);
+  }
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 12, c.width, 4);
   ctx.font = SIGN.font;
   ctx.textBaseline = "middle";
-  ctx.fillText(words, pad, c.height / 2 + 8);
-  let x = pad + textW + (words && s.routes.length ? 40 : 0) + r;
-  for (const b of s.routes) {
-    bullet(ctx, b, x, c.height / 2 + 8, r);
-    x += 2 * r + gap;
+  const mid = c.height / 2 + 8;
+  if (exit) {
+    ctx.fillText("Exit", pad, mid);
+    // The arrow: up the stairs.
+    const ax = red - pad - 22;
+    ctx.lineWidth = 9;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(ax, mid + 26); ctx.lineTo(ax, mid - 26);
+    ctx.moveTo(ax - 20, mid - 6); ctx.lineTo(ax, mid - 26); ctx.lineTo(ax + 20, mid - 6);
+    ctx.stroke();
   }
+  let x = red + pad;
+  const drawBullets = () => {
+    x += r;
+    for (const b of s.routes) { bullet(ctx, b, x, mid, r); x += 2 * r + gap; }
+    x += -r - gap + between;
+  };
+  if (s.kind === "way" && s.routes.length) drawBullets();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = SIGN.font;
+  ctx.fillText(words, x, mid);
+  x += textW + between;
+  if (s.kind !== "way" && s.routes.length) drawBullets();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -230,11 +318,11 @@ function bullet(ctx: CanvasRenderingContext2D, b: Bullet, x: number, y: number, 
 }
 
 /** The station's signs, one face (or two, back to back) per sign; faces with the same wording share a texture. */
-function signMeshes(m: StationModel, info: SignInfo): THREE.Object3D[] {
+function signMeshes(m: StationModel, info: SignInfo, exitName?: ExitName): THREE.Object3D[] {
   const faces = new Map<string, { mat: THREE.Material; geo: THREE.PlaneGeometry } | null>();
   const out: THREE.Object3D[] = [];
-  for (const s of placeSigns(m, info)) {
-    const key = `${s.kind}|${s.name}|${s.routes.map((b) => b.short).join(",")}`;
+  for (const s of placeSigns(m, info, exitName)) {
+    const key = `${s.kind}|${s.name}|${s.words ?? ""}|${s.routes.map((b) => b.short).join(",")}`;
     if (!faces.has(key)) {
       const t = signTexture(s);
       // Upright and facing -y before it is turned.
@@ -253,7 +341,13 @@ function signMeshes(m: StationModel, info: SignInfo): THREE.Object3D[] {
   return out;
 }
 
-function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip, signs?: SignInfo): { group: THREE.Group; update: () => void } {
+/** Names a street stair's corner from the streets the map has loaded around the station. */
+function exitNamer(map: MapLibreMap, m: StationModel): ExitName {
+  const read = readMap(map);
+  return (x, y) => cornerLine(read.placeAt(toLngLat(m, x, y)));
+}
+
+function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]>>, trip?: StationTrip, signs?: SignInfo): { group: THREE.Group; update: () => void; nameExits: (map: MapLibreMap) => void } {
   const group = new THREE.Group();
   const under = !m.elevated;
   const [floor, platform, ceiling, wall, edge, drop, bed, rail, railing, canopy, trim] = Array.from({ length: 11 }, () => new Quads());
@@ -316,9 +410,10 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   }
 
   group.add(
-    floor.mesh(COLORS.floor),
-    platform.mesh(COLORS.platform),
-    ceiling.mesh(COLORS.ceiling),
+    // Below the street each surface has its own look, so floor, platform and ceiling read apart (owner, 2026-11-10).
+    under ? floor.mesh(0xffffff, { map: surfaceTexture(1.2, concrete(143, 2)) }) : floor.mesh(COLORS.floor),
+    under ? platform.mesh(0xffffff, { map: surfaceTexture(2.4, concrete(184, 2)) }) : platform.mesh(COLORS.platform),
+    under ? ceiling.mesh(0xffffff, { map: surfaceTexture(3, ceilingPattern) }) : ceiling.mesh(COLORS.ceiling),
     wall.mesh(COLORS.wall, { map: under ? tileTexture() : null }),
     trim.mesh(new THREE.Color(signs?.trim ?? "#2f6b45").getHex(), { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     edge.mesh(COLORS.edge),
@@ -338,14 +433,32 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     group.add(mesh);
   }
 
-  if (signs) group.add(...signMeshes(m, signs));
+  let hung = signs ? signMeshes(m, signs) : [];
+  group.add(...hung);
+  /**
+   * Hang the signs again with each street stair's corner on its Exit sign. The streets come from
+   * the map's loaded tiles, which may arrive after the station is drawn: once now, once when the map settles.
+   */
+  const nameExits = (map: MapLibreMap) => {
+    if (!signs) return;
+    const hang = () => {
+      if (!group.parent) return;
+      const next = signMeshes(m, signs, exitNamer(map, m));
+      group.remove(...hung);
+      for (const o of hung) ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).map?.dispose();
+      hung = next;
+      group.add(...hung);
+    };
+    hang();
+    void map.once("idle").then(hang);
+  };
 
   group.add(new THREE.AmbientLight(0xffffff, (under ? 0.6 : 0.5) * LEGACY_LIGHT));
   const sun = new THREE.DirectionalLight(0xffffff, 0.45 * LEGACY_LIGHT);
   sun.position.set(0.3, -0.5, 1);
   group.add(sun);
 
-  if (!trip) return { group, update: () => {} };
+  if (!trip) return { group, update: () => {}, nameExits };
   const boardZ = trip.guide.length ? trip.guide.reduce((z, p) => (Math.hypot(p[0] - trip.board[0], p[1] - trip.board[1]) < 1 ? p[2] : z), trip.guide[trip.guide.length - 1][2]) : 0;
   group.add(...guideMeshes(trip, boardZ));
   const train = trainMesh(trip.color);
@@ -358,7 +471,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     train.visible = off !== null;
     if (off !== null) train.position.set(trip.track.at[0] + dx * off, trip.track.at[1] + dy * off, boardZ);
   };
-  return { group, update };
+  return { group, update, nameExits };
 }
 
 function disposeGroup(g: THREE.Object3D) {
@@ -382,7 +495,7 @@ export function createStationLayer(m: StationModel, tracks: Array<Array<[number,
   let renderer: THREE.WebGLRenderer;
   const scene = new THREE.Scene();
   const camera = new THREE.Camera();
-  const { group, update } = buildStationScene(m, tracks, trip, signs);
+  const { group, update, nameExits } = buildStationScene(m, tracks, trip, signs);
   scene.add(group);
   const origin = MercatorCoordinate.fromLngLat(m.origin, 0);
   const s = origin.meterInMercatorCoordinateUnits();
@@ -393,8 +506,10 @@ export function createStationLayer(m: StationModel, tracks: Array<Array<[number,
     renderingMode: "3d",
     onAdd(map: MapLibreMap, gl) {
       renderer = sharedRenderer(map, gl);
+      nameExits(map);
     },
     onRemove() {
+      scene.remove(group);
       disposeGroup(group);
     },
     render(_gl, args) {
@@ -414,14 +529,15 @@ type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: numbe
  * walker's feet and looks where the map's street view looks. Returns the
  * function that stops it.
  */
-export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number, trip?: StationTrip, signs?: SignInfo): () => void {
+export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tracks: Array<Array<[number, number]>>, getEye: () => Eye | null, fov: number, trip?: StationTrip, signs?: SignInfo, map?: MapLibreMap | null): () => void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1b1a19);
   scene.fog = new THREE.Fog(0x1b1a19, 20, 120);
-  const { group, update } = buildStationScene(m, tracks, trip, signs);
+  const { group, update, nameExits } = buildStationScene(m, tracks, trip, signs);
   scene.add(group);
+  if (map) nameExits(map);
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 400);
   camera.up.set(0, 0, 1);
   const resize = () => {
@@ -453,6 +569,7 @@ export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tra
   return () => {
     cancelAnimationFrame(frame);
     ro.disconnect();
+    scene.remove(group);
     disposeGroup(group);
     renderer.dispose();
   };

@@ -18,7 +18,14 @@ type Piece = StationModel["pieces"][number];
  * One sign: its middle, the way its face looks (radians from east), and what it
  * says. `back`: it hangs free and has a face on both sides; otherwise it is on a wall.
  */
-export type Sign = { kind: "name" | "exit" | "trains"; x: number; y: number; z: number; angle: number; back: boolean; name: string; routes: Bullet[] };
+export type Sign = {
+  kind: "name" | "exit" | "trains" | "way"; x: number; y: number; z: number; angle: number; back: boolean; name: string; routes: Bullet[];
+  /** An exit: the street corner its stair comes up at. A way sign: "Uptown" or "Downtown". */
+  words?: string;
+};
+
+/** The street corner at a stair's top (local metres), when the map knows the streets there. */
+export type ExitName = (x: number, y: number) => string | null;
 
 /** Height of a sign's middle above the floor it hangs over. */
 export const SIGN_Z = 2.45;
@@ -27,6 +34,10 @@ const PLATFORM_EVERY_M = 20;
 const WALL_EVERY_M = 15;
 /** A line stops at a platform when its track passes this close. */
 const SERVES_M = 9;
+/** A line's middle this far off a platform's own means the tracks run along one side of it. */
+const SIDE_M = 2.5;
+/** Way signs hang this far in from the platform's edge. */
+const WAY_INSET_M = 0.75;
 /** More signs than this are left out (a big complex would draw hundreds): wall signs go first, then those along platforms. */
 const MAX_SIGNS = 240;
 
@@ -73,9 +84,26 @@ function served(info: SignInfo, pts: P[]): { name: string; routes: Bullet[] } {
   return { name: best.name, routes: routes.length ? routes : best.routes };
 }
 
-/** Every sign in the station. */
-export function placeSigns(m: StationModel, info: SignInfo): Sign[] {
-  const [out, onWalls, atStairs]: Sign[][] = [[], [], []];
+/**
+ * Manhattan, roughly: west of the East River's line and between the Battery and Inwood.
+ * Only there do platform signs say Uptown and Downtown.
+ */
+export function inManhattan([lon, lat]: [number, number]): boolean {
+  return lat > 40.7 && lat < 40.88 && lon > -74.02 && lon < -73.975 + (lat - 40.71) * 0.5;
+}
+
+/**
+ * Which way trains run past a platform's edge, as a unit vector. New York trains keep right:
+ * with the tracks along one side (`island` false) the platform is on the train's right;
+ * between two tracks it is on each train's left. `n` points from the platform to the track.
+ */
+export function runsToward(n: P, island: boolean): P {
+  return island ? [-n[1], n[0]] : [n[1], -n[0]];
+}
+
+/** Every sign in the station. `exitName` names the corner a street stair comes up at. */
+export function placeSigns(m: StationModel, info: SignInfo, exitName?: ExitName): Sign[] {
+  const [out, onWalls, atStairs, ways]: Sign[][] = [[], [], [], []];
   const home = info.stations[0] ?? { name: "", routes: [] };
   if (!home.name) return out;
 
@@ -101,6 +129,42 @@ export function placeSigns(m: StationModel, info: SignInfo): Sign[] {
       p.pts.forEach(([x, y], i) => { const d = (x - tx) ** 2 + (y - ty) ** 2; if (d < bd) { bd = d; best = i; } });
       const c = p.cells[best];
       out.push({ kind: "name", x: p.pts[best][0], y: p.pts[best][1], z: p.g.h[c] + SIGN_Z, angle: p.axis + Math.PI / 2, back: true, name: p.name, routes: p.routes });
+    }
+  }
+
+  // Over each platform edge: which way its trains go, where that is plain (Manhattan, tracks running up and down it).
+  if (inManhattan(m.origin)) for (const p of plats) {
+    const near = new Set(p.routes.map((r) => r.route));
+    // How far to the side the lines' middle runs, along the platform's normal.
+    const [nx, ny] = [-p.uy, p.ux];
+    const offs: number[] = [];
+    for (const l of info.lines) {
+      if (!near.has(l.route)) continue;
+      let bd = Infinity, off = 0;
+      for (const q of l.c) { const d = Math.hypot(q[0] - p.mx, q[1] - p.my); if (d < bd) { bd = d; off = (q[0] - p.mx) * nx + (q[1] - p.my) * ny; } }
+      if (bd < Infinity) offs.push(off);
+    }
+    if (!offs.length) continue;
+    const side = offs.reduce((a, b) => a + b, 0) / offs.length;
+    const island = Math.abs(side) < SIDE_M;
+    const cells = new Set(p.pts.map(([x, y]) => `${Math.round(x / CELL_M)},${Math.round(y / CELL_M)}`));
+    const on = (x: number, y: number) => cells.has(`${Math.round(x / CELL_M)},${Math.round(y / CELL_M)}`);
+    const len = p.t1 - p.t0, count = Math.max(1, Math.floor(len / PLATFORM_EVERY_M));
+    for (const sgn of island ? [1, -1] : [Math.sign(side)]) {
+      const n: P = [nx * sgn, ny * sgn];
+      const d = runsToward(n, island);
+      const words = d[1] > 0.5 ? "Uptown" : d[1] < -0.5 ? "Downtown" : null;
+      if (!words) continue;
+      for (let k = 0; k < count; k++) {
+        // Between the name signs, out at the edge the trains stop on, facing up and down the platform so you read it walking along.
+        const t = p.t0 + (len * (k + (count > 1 ? 1 : 0.25))) / count;
+        if (t > p.t1 - 2) continue;
+        let [x, y] = [p.mx + p.ux * t, p.my + p.uy * t];
+        if (!on(x, y)) continue;
+        while (on(x + n[0] * CELL_M, y + n[1] * CELL_M)) { x += n[0] * CELL_M; y += n[1] * CELL_M; }
+        const c = p.cells[p.pts.findIndex(([px, py]) => Math.abs(px - x) < CELL_M && Math.abs(py - y) < CELL_M)] ?? p.cells[0];
+        ways.push({ kind: "way", x: x - n[0] * WAY_INSET_M, y: y - n[1] * WAY_INSET_M, z: p.g.h[c] + SIGN_Z, angle: p.axis, back: true, name: "", routes: p.routes, words });
+      }
     }
   }
 
@@ -145,9 +209,11 @@ export function placeSigns(m: StationModel, info: SignInfo): Sign[] {
     const [fx, fy] = out1(far), [nx, ny] = out1(near);
     // A street stair's top is on the map, which this scene does not draw.
     const street = Math.abs(near.z) <= 0.5;
-    if (Math.abs(far.z) > 0.5) atStairs.push({ kind: "exit", x: far.at[0], y: far.at[1], z: far.z + SIGN_Z, angle: Math.atan2(fy, fx), back: false, name: "", routes: [] });
+    // The stair to the street says which corner it comes up at.
+    const words = (street && exitName?.(near.at[0], near.at[1])) || undefined;
+    if (Math.abs(far.z) > 0.5) atStairs.push({ kind: "exit", x: far.at[0], y: far.at[1], z: far.z + SIGN_Z, angle: Math.atan2(fy, fx), back: false, name: "", routes: [], words });
     const below = platformAt(far.at[0] + fx, far.at[1] + fy, far.z);
     if (below && !street) atStairs.push({ kind: "trains", x: near.at[0], y: near.at[1], z: near.z + SIGN_Z, angle: Math.atan2(ny, nx), back: false, name: below.name, routes: below.routes });
   }
-  return [...atStairs, ...out, ...onWalls].slice(0, MAX_SIGNS);
+  return [...atStairs, ...ways, ...out, ...onWalls].slice(0, MAX_SIGNS);
 }
