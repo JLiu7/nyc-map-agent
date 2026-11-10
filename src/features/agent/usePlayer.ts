@@ -6,6 +6,7 @@ import { framePadding } from "@/lib/map/mapCover";
 import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewEye, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { readMap } from "@/lib/map/mapRead";
+import { getAppLang } from "@/lib/i18n/appLang";
 import { approachBearing } from "@/lib/map/walk";
 import { getStreetXray, setStreetXray } from "@/lib/transit/streetXray";
 import { setXray as setStationXray } from "@/lib/transit/stationXray";
@@ -130,6 +131,28 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const styledSeg = useRef(-1);
   const say = useRef(onCallout);
   say.current = onCallout;
+  /**
+   * The steps in the rider's language, by their English text (owner, 2026-11-10: the demo is spoken
+   * in several languages). They arrive a moment after the trip loads; until then a step shows as written.
+   */
+  const words = useRef(new Map<string, string>());
+  const inLang = useCallback((text: string) => words.current.get(text.trim()) ?? text, []);
+  const translate = useCallback((tripId: string, t: Segment[]) => {
+    const lang = getAppLang();
+    words.current = new Map();
+    if (lang === "en") return;
+    // What is said or shown as a step: each scene's label and its spoken callouts. Stop names stay as the signs read.
+    const lines = t.flatMap((seg) => [seg.label, ...seg.callouts.filter((c) => !c.quiet).map((c) => c.text)]);
+    // Loaded only for another language, so English previews carry none of it.
+    void import("@/lib/i18n/translateLines").then(({ translateLines }) => translateLines(lines, lang)).then((got) => {
+      if (pbRef.current.tripId !== tripId || !got.size) return;
+      words.current = got;
+      // The step on screen now, said again in its language.
+      setCallout((c) => got.get(lastCallout.current.trim()) ?? got.get(c.trim()) ?? c);
+    });
+  }, []);
+  /** The camera as it was before Play, to go back to when the preview closes. */
+  const home = useRef<Cam | null>(null);
   const rafId = useRef(0);
   /** The follow camera last drawn, and the steadied heading and zoom it rides with. */
   const camMode = useRef<FollowMode>("map");
@@ -231,13 +254,15 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setCallout(t[0]?.label ?? "");
     setWhere(null);
     setProgress(0);
+    home.current = null;
     // A new preview starts on the calm map; a view picked during it then stays until it ends.
     setFollowMode("map");
     dispatch({ type: "load", tripId: trip.id, segCount: t.length, speed });
     pbRef.current = { ...pbRef.current, tripId: trip.id };
     segsRef.current = t;
     addStairs(trip.id, t);
-  }, [addStairs]);
+    translate(trip.id, t);
+  }, [addStairs, translate]);
   /** Load and play at once, for the Play button. */
   const start = useCallback((trip: Trip, speed?: Speed) => {
     if (pbRef.current.tripId !== trip.id || !isActive(pbRef.current)) load(trip, speed);
@@ -257,7 +282,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
     pbRef.current = { ...pbRef.current, tripId: trip.id };
     segsRef.current = t;
     addStairs(trip.id, t);
-  }, [clearLayers, addStairs]);
+    translate(trip.id, t);
+  }, [clearLayers, addStairs, translate]);
   /** Drop the preview camera without easing the map home. Follow and Ask use this. */
   const release = useCallback(() => {
     cancelAnimationFrame(rafId.current);
@@ -270,7 +296,12 @@ export function usePlayer(onCallout?: (text: string) => void) {
     // threw street view overhead under the street bar, entrance labels piled up (owner report, 2026-10-28).
     const playing = isActive(pbRef.current);
     release();
-    if (playing) getMapInstance()?.easeTo({ pitch: 0, zoom: 14, bearing: 0, duration: 600 });
+    if (!playing) return;
+    // Back to the map as it was before Play (the route, as the trip card showed it), not a far-off overview:
+    // snapping from eye level to zoom 14 in half a second lost people (owner, 2026-11-10).
+    const h = home.current;
+    home.current = null;
+    getMapInstance()?.easeTo(h ? { center: h.center, zoom: h.zoom, pitch: h.pitch, bearing: h.bearing, duration: 1100 } : { pitch: 0, zoom: 14, bearing: 0, duration: 600 });
   }, [release]);
   const toggle = useCallback(() => dispatch({ type: "toggle" }), []);
   const setSpeed = useCallback((speed: Speed) => dispatch({ type: "speed", speed }), []);
@@ -302,6 +333,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       }
       counted.current = { restart: s0.restart, seg: s0.seg };
     }
+    if (!home.current) { const m0 = getMapInstance(); if (m0) home.current = camNow(m0); }
     let prev = performance.now();
     const tick = (now: number) => {
       if (!alive) return;
@@ -354,8 +386,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
           setPreviewEye(true);
         }
         const e = eye.current;
-        // On the platform, turn to face the track the train comes in on.
-        e.bearing = approachBearing(e.bearing, seg.inside && wait !== null ? faceTrain(seg.inside, seg.kind === "ascend") : pose.bearing, dt, 4);
+        // Waiting to board, turn to face the track the train comes in on. Getting off, keep facing the way out:
+        // watching the train leave meant seconds of dark tunnel (owner, 2026-11-10).
+        e.bearing = approachBearing(e.bearing, seg.inside && wait !== null && seg.kind !== "ascend" ? faceTrain(seg.inside, false) : pose.bearing, dt, 4);
         const rig = eyeRig(mark, e.bearing, depth, !seg.inside);
         const cam = map.calculateCameraOptionsFromTo(new LngLat(...rig.eye), rig.eyeAlt, new LngLat(...rig.look), rig.lookAlt);
         const to: Cam = { center: rig.look, zoom: cam.zoom ?? map.getZoom(), pitch: cam.pitch ?? 0, bearing: cam.bearing ?? e.bearing, elevation: rig.lookAlt };
@@ -397,8 +430,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
       const { text, quiet } = calloutInfoAt(seg, f);
       if (text !== lastCallout.current) {
         lastCallout.current = text;
-        if (!quiet) say.current?.(text);
-        setCallout(text);
+        if (!quiet) say.current?.(inLang(text));
+        setCallout(inLang(text));
       }
       if (now - progressAt.current >= PROGRESS_MS) {
         progressAt.current = now;
@@ -418,7 +451,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
       alive = false;
       cancelAnimationFrame(rafId.current);
     };
-  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs, showInside, hideInside]);
+  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs, showInside, hideInside, inLang]);
 
   // Where the trip ended: the street and what to look for at the destination.
   useEffect(() => {

@@ -155,7 +155,9 @@ function FollowViewMenu({ onPick, preview }: { onPick: () => void; preview?: boo
   const mode = useFollowMode();
   return (
     <div role="menu" aria-label="Change view" data-testid="follow-view-menu" data-map-cover className={`flex w-[220px] flex-col gap-0.5 ${FLOAT}`}>
-      {FOLLOW_VIEWS.map((v) => {
+      {FOLLOW_VIEWS.map((view) => {
+        // In a trip preview the first view walks the trip through your eyes; "Map, flat, from above" was wrong for it (owner, 2026-11-10).
+        const v = preview && view.id === "map" ? { ...view, label: "Walkthrough", note: "On foot, through your eyes" } : view;
         const on = mode === v.id;
         return (
           <button key={v.id} type="button" role="menuitemradio" aria-checked={on} onClick={() => { setFollowMode(v.id); onPick(); }}

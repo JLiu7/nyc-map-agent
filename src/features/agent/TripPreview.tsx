@@ -74,7 +74,7 @@ export function TripPreview(p: {
   const player = <div className="flex flex-col gap-2" data-testid="trip-heading">
     <div className="flex items-start gap-2">
       <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-semibold leading-snug" aria-live="polite" data-testid="trip-caption">{state.status === "ended" ? `At ${place}` : state.callout}</p>
+        <p className="text-[14px] font-semibold leading-snug" aria-live="polite" data-testid="trip-caption">{state.status === "ended" ? t("atPlace").replace("{p}", place) : state.callout}</p>
         {state.where ? <p className="mt-0.5 flex items-center gap-1 text-[12px] text-slate-300" data-testid="trip-where"><MapPin size={12} className="shrink-0" aria-hidden /><span className="truncate">{state.where}</span></p> : null}
       </div>
       {close}
@@ -87,7 +87,7 @@ export function TripPreview(p: {
         <span className="text-[12px] text-slate-300" data-testid="trip-step">{Math.min(state.seg + 1, state.segs.length)} / {state.segs.length}</span>
         {bar}
       </div>
-      {state.status === "ended" ? <button type="button" className="task-action task-secondary shrink-0 px-3" data-testid="trip-done" onClick={p.onClose}>Done</button> : null}
+      {state.status === "ended" ? <button type="button" className="task-action task-secondary shrink-0 px-3" data-testid="trip-done" onClick={p.onClose}>{t("done")}</button> : null}
     </div>
   </div>;
   const rest = (phone: boolean) => <>
@@ -116,7 +116,7 @@ export function TripPreview(p: {
       <button type="button" className="task-action task-secondary" onClick={p.onOther}>{t("otherOptions")}</button>
     </div>
   </>;
-  const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} place={place} where={state.where} /> : null;
+  const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} text={t("arrivedAt").replace("{p}", place)} where={state.where} /> : null;
   // A phone: the trip rests as one line on the chat (Play, where to, how long) and pulls up, so the route stays on the map (owner, 2026-10-25).
   if (!wide) return <>
     <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel} onClose={p.onClose}
@@ -188,9 +188,9 @@ export function TripPreview(p: {
 }
 
 /** You've arrived, said like a reply: a speech bubble just above the chat bar. Nothing to dismiss; Done or close puts it away with the trip. */
-function ArrivedBubble({ place, where }: { place: string; where: string | null }) {
+function ArrivedBubble({ text, where }: { text: string; where: string | null }) {
   return <div className="arrive-bubble" role="status" data-testid="trip-arrived">
-    <p className="flex items-center gap-2 text-[15px] font-semibold"><PartyPopper size={18} className="shrink-0 text-amber-500" aria-hidden />You've arrived at {place}</p>
+    <p className="flex items-center gap-2 text-[15px] font-semibold"><PartyPopper size={18} className="shrink-0 text-amber-500" aria-hidden />{text}</p>
     {where ? <p className="mt-0.5 text-[13px] text-slate-600">{where}</p> : null}
   </div>;
 }

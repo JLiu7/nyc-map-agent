@@ -140,6 +140,10 @@ for (const size of SIZES) {
       }
       await page.waitForTimeout(900);
       await expectLayout(page);
+      // Change view names the preview's own view for what it is: a walk through your eyes, not a flat map.
+      await page.getByRole("button", { name: "Change view", exact: true }).first().click();
+      await expect(page.getByRole("menuitemradio", { name: /Walkthrough/ })).toHaveAttribute("aria-checked", "true");
+      await expectLayout(page);
     });
 
     test("a second quick question is held, then answered (no refusal)", async ({ page }) => {

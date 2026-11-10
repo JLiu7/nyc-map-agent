@@ -272,7 +272,8 @@ export default function AgentOverlay() {
     }
     wasListening.current = speech.listening;
   }, [speech.listening]);
-  const player = usePlayer((text) => speech.speak(text));
+  // The preview's steps are said in the app's language, with that language's voice.
+  const player = usePlayer((text) => speech.speak(text, { lang: speechTag(getAppLang(), lang) }));
   /** Speed the next Play uses: the agent's pick or the person's last tap. */
   const [prefSpeed, setPrefSpeed] = useState<PlaybackSpeed>(10);
   // Ask, the route fit, and the preview all move the camera. Follow and street

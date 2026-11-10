@@ -39,11 +39,14 @@ for (const width of [390, 1280]) {
       await expect(page.getByTestId("trip-caption")).not.toBeEmpty();
       await expect(page.getByTestId("trip-step")).toContainText("/");
       await expect(preview.getByRole("button", { name: "Use this route", exact: true })).toHaveCount(0);
-      await preview.getByLabel("Next step").click();
-      await expect(page.getByTestId("trip-step")).toContainText("2 /");
-      await preview.getByLabel("Previous step").click();
-      await expect(page.getByTestId("trip-step")).toContainText("1 /");
+      // Paused, so the preview does not move on by itself between the taps (a slow machine was at step 4 by then).
       await preview.getByLabel("Pause preview").click();
+      const step = async () => Number((await page.getByTestId("trip-step").textContent())?.split("/")[0]);
+      const at = await step();
+      await preview.getByLabel("Next step").click();
+      await expect.poll(step).toBe(at + 1);
+      await preview.getByLabel("Previous step").click();
+      await expect.poll(step).toBe(at);
       await page.getByTestId("sheet-grip").click();
       await speed.click();
       await expect(speed).toHaveAttribute("aria-pressed", "true");
