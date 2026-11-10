@@ -999,6 +999,7 @@ export default function AgentOverlay() {
         {trip && player.state.active && !answerOpen && !stationHelpVisible && !(panelUp && !panelContent.id.startsWith("agent:trip:")) ? <Suspense fallback={null}><TripPreview
           trip={trip} state={player.state} speed={player.state.speed}
           onToggle={player.toggle} onSpeed={(s) => { setPrefSpeed(s); player.setSpeed(s); }}
+          onBack={player.back} onNext={player.skip}
           onAlert={(route) => setSelectedLine(route)}
           onClose={() => { player.stop(); setTrip(null); clearTripBuses(); }}
           onUse={() => {

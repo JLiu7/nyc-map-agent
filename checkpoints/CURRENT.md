@@ -14,6 +14,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Watch a subway trip preview on a phone once #84's pull request deploys.** The preview hid the walk through the station under its panel and showed an empty street (task NMA-0037). Pressing Play should now leave one bar (the step in words, back, pause, next, progress), the street should have standing buildings going in and coming out, and the station walk should last longer than the ride. Still to do for the hackathon demo on 2026-11-14: which car to board, landmark callouts at Fulton St, and station signs like the real ones.
 - **Walk a station on a phone once #71's and #73's pull requests deploy.** Stations below the street now have white tile walls with a trim band and MTA-style signs (name, Exit, line bullets; task NMA-0031), and floors, ceilings and track beds reach every wall, so the jagged gaps along wall tops and feet are gone (NMA-0032). Still open: uptown and downtown labels (they need the MTA station list), and stair treads that show small steps against the sloping stair walls.
 - **Walk under the FDR at South St and along a side street on a phone once #67's pull request deploys.** The deck should sit overhead on columns and the sidewalks should reach the buildings.
 - **Watch a subway trip preview on a phone once #65's pull request deploys.** The walk in should show the walls and the cyan line, the train should pull in beside the platform, and the step text should read in full above the controls.

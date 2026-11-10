@@ -106,6 +106,22 @@ export function usePreviewing(): boolean {
 }
 
 /**
+ * True while a trip preview looks through the rider's eyes on the street. The map
+ * then stands its buildings up as street view does: on the flat overview map the
+ * walk out of a station was an empty grey plane (owner, 2026-11-10).
+ */
+let previewEye = false;
+const eyeSubs = new Set<() => void>();
+export function setPreviewEye(on: boolean) {
+  if (previewEye === on) return;
+  previewEye = on;
+  eyeSubs.forEach((f) => f());
+}
+export function usePreviewEye(): boolean {
+  return useSyncExternalStore((f) => (eyeSubs.add(f), () => eyeSubs.delete(f)), () => previewEye);
+}
+
+/**
  * Keeps the person's own zoom while a camera drives the map every frame: a
  * zoom since the last frame becomes an offset on top of the camera's zoom.
  */

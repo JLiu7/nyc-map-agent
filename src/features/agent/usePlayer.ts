@@ -3,10 +3,9 @@ import { LngLat, type Map as MapLibreMap } from "maplibre-gl";
 import { getMapInstance } from "@/lib/map/mapInstance";
 import { keepInView } from "@/lib/map/keepInView";
 import { framePadding } from "@/lib/map/mapCover";
-import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
+import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewEye, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { readMap } from "@/lib/map/mapRead";
-import { applyAtmosphere, applyStreetPalette, loadStreetTextures } from "@/lib/map/basemap";
 import { approachBearing } from "@/lib/map/walk";
 import { getStreetXray, setStreetXray } from "@/lib/transit/streetXray";
 import { setXray as setStationXray } from "@/lib/transit/stationXray";
@@ -22,10 +21,14 @@ export interface PlayerState extends Playback {
   active: boolean; playing: boolean; segs: Segment[]; callout: string;
   /** "On Queens Blvd · near Aldi" while a walk plays, or where you end up once the trip ends. */
   where: string | null;
+  /** How much of the whole preview has played, 0 to 1, by time and not by scene count. */
+  progress: number;
 }
 
 /** How often a walk re-reads the street and storefronts under the marker. */
 const PLACE_MS = 600;
+/** How often the progress bar moves. */
+const PROGRESS_MS = 200;
 /** How often it re-reads the map's loaded tiles, which change as the camera moves. */
 const TILES_MS = 2500;
 
@@ -108,6 +111,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const [segs, setSegs] = useState<Segment[]>([]);
   const [callout, setCallout] = useState("");
   const [where, setWhere] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const progressAt = useRef(0);
   /** The map read and when it, and the place, were last taken. */
   const place = useRef<{ read: ReturnType<typeof readMap> | null; readAt: number; at: number }>({ read: null, readAt: 0, at: 0 });
   const pbRef = useRef(pb);
@@ -180,8 +185,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const leaveEye = useCallback((map: MapLibreMap) => {
     if (!eye.current) return;
     map.setMaxZoom(eye.current.maxZoom);
-    applyAtmosphere(map, false);
-    applyStreetPalette(map, false);
+    setPreviewEye(false);
     eye.current = null;
   }, []);
   /** Show a station's insides and a see-through ground while the rider is on its stairs; null puts them back. */
@@ -226,6 +230,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setSegs(t);
     setCallout(t[0]?.label ?? "");
     setWhere(null);
+    setProgress(0);
     // A new preview starts on the calm map; a view picked during it then stays until it ends.
     setFollowMode("map");
     dispatch({ type: "load", tripId: trip.id, segCount: t.length, speed });
@@ -270,10 +275,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const toggle = useCallback(() => dispatch({ type: "toggle" }), []);
   const setSpeed = useCallback((speed: Speed) => dispatch({ type: "speed", speed }), []);
   const skip = useCallback(() => dispatch({ type: "skip" }), []);
+  const back = useCallback(() => dispatch({ type: "back" }), []);
 
   const on = isActive(pb);
   useEffect(() => { setPreviewing(on); }, [on]);
-  useEffect(() => () => setPreviewing(false), []);
+  useEffect(() => () => { setPreviewing(false); setPreviewEye(false); }, []);
   useEffect(() => hideInside, [hideInside]);
 
   useEffect(() => {
@@ -344,10 +350,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
         if (!eye.current) {
           eye.current = { bearing: pose.bearing, from: reduced ? null : camNow(map), t: 0, maxZoom: map.getMaxZoom() };
           map.setMaxZoom(EYE_MAX_ZOOM);
-          // Street view's haze and pavement: the overhead ones shimmer and fog over at eye level.
-          applyAtmosphere(map, true);
-          applyStreetPalette(map, true);
-          void loadStreetTextures(map).then(() => { if (eye.current) applyStreetPalette(map, true); }).catch(() => {});
+          // The map takes street view's haze, pavement and buildings while this is on (MapView).
+          setPreviewEye(true);
         }
         const e = eye.current;
         // On the platform, turn to face the track the train comes in on.
@@ -396,6 +400,12 @@ export function usePlayer(onCallout?: (text: string) => void) {
         if (!quiet) say.current?.(text);
         setCallout(text);
       }
+      if (now - progressAt.current >= PROGRESS_MS) {
+        progressAt.current = now;
+        const all = segsRef.current.map((x) => (reduced ? 3 : wallSeconds(x, s.speed)));
+        const sum = all.reduce((a, b) => a + b, 0) || 1;
+        setProgress((all.slice(0, s.seg).reduce((a, b) => a + b, 0) + f * total) / sum);
+      }
       if (elapsed.current >= total) {
         alive = false;
         dispatch({ type: "legDone" });
@@ -426,6 +436,6 @@ export function usePlayer(onCallout?: (text: string) => void) {
     }
   }, [pb.status, leaveEye, reduced]);
 
-  const state: PlayerState = { ...pb, active: isActive(pb), playing: pb.status === "playing", segs, callout, where };
-  return { state, load, start, select, stop, release, toggle, setSpeed, skip };
+  const state: PlayerState = { ...pb, active: isActive(pb), playing: pb.status === "playing", segs, callout, where, progress: pb.status === "ended" ? 1 : progress };
+  return { state, load, start, select, stop, release, toggle, setSpeed, skip, back };
 }

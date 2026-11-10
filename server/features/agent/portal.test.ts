@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { portalFor } from "./trip";
+import { onOrBy, portalFor } from "./trip";
 import type { Entrance, Station } from "./transit";
 import type { LngLatTuple } from "../../../src/features/agent/schema";
 
@@ -37,5 +37,12 @@ describe("portalFor", () => {
   it("falls back to the straight line when the walking router is down", async () => {
     const p = await portalFor(st, [nw, se], dest, "exit", [], () => Promise.reject(new Error("down")));
     expect([p.lon, p.lat]).toEqual(nw.at);
+  });
+});
+
+describe("an exit named after what is beside it", () => {
+  it("is on a street and by a place", () => {
+    for (const street of ["Broadway", "East 42 Street", "Lexington Avenue", "Park Row", "Fulton St"]) expect(onOrBy(street)).toBe("on");
+    for (const place of ["Saint Paul's Chapel", "Grand Central Terminal", "Oculus"]) expect(onOrBy(place)).toBe("by");
   });
 });

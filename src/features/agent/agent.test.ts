@@ -78,29 +78,28 @@ describe("flythrough timeline", () => {
     expect(segs[0].coords.at(-1)).toEqual([-73.9901, 40.7345]);
     expect(buildTimeline(out)[4].coords[0]).toEqual([-73.9762, 40.7522]);
   });
-  it("speeds up and stays watchable", () => {
-    expect(wallSeconds(segs[2], 30)).toBe(14);
-    expect(wallSeconds(segs[2], 10)).toBe(42);
-    expect(wallSeconds(segs[2], 2)).toBe(210);
-    // On foot it runs four times faster than a ride.
-    expect(wallSeconds(segs[0], 10)).toBe(3);
-    expect(wallSeconds(segs[1], 10)).toBe(1.5);
-    expect(wallSeconds(segs[4], 30)).toBe(0.5);
+  it("holds the parts on foot long enough to read and keeps the ride short", () => {
+    // A 7 minute ride: capped at 10 s at 10x, however long it really is.
+    expect(wallSeconds(segs[2], 10)).toBe(10);
+    expect(wallSeconds({ ...segs[2], realS: 1800 }, 10)).toBe(10);
+    expect(wallSeconds({ ...segs[2], realS: 20 }, 10)).toBe(4);
+    // A short walk and a station without its stairs still get 4 s.
+    expect(wallSeconds(segs[0], 10)).toBe(4);
+    expect(wallSeconds(segs[1], 10)).toBe(4);
+    // A long walk stops at 12 s.
+    expect(wallSeconds({ ...segs[0], realS: 1200 }, 10)).toBe(12);
   });
-  it("a long walk stays short", () => {
-    const walk = { ...segs[0], realS: 1200 };
-    expect(wallSeconds(walk, 10)).toBe(12);
-    expect(wallSeconds(walk, 30)).toBe(4);
-    expect(wallSeconds(walk, 10)).toBeLessThan(wallSeconds({ ...segs[2], realS: 1200 }, 10) / 3);
+  it("gives the walk through a station the most time", () => {
+    const stairs = { ...segs[1], depths: [0, -8] };
+    expect(wallSeconds(stairs, 10)).toBe(6);
+    expect(wallSeconds({ ...stairs, inside: {} as never }, 10)).toBe(22);
+    expect(wallSeconds({ ...stairs, inside: {} as never }, 10)).toBeGreaterThan(wallSeconds(segs[2], 10));
   });
-  it("keeps 2x, 10x and 30x apart on a long ride", () => {
-    const ride = { ...segs[2], realS: 1800 };
-    const slow = wallSeconds(ride, 2);
-    const mid = wallSeconds(ride, 10);
-    const fast = wallSeconds(ride, 30);
-    expect(slow).toBe(225);
-    expect(mid).toBe(45);
-    expect(fast).toBe(15);
+  it("scales every scene with the speed", () => {
+    expect(wallSeconds(segs[2], 2)).toBe(50);
+    expect(wallSeconds(segs[2], 5)).toBe(20);
+    expect(wallSeconds(segs[0], 30)).toBeCloseTo(4 / 3);
+    expect(wallSeconds({ ...segs[0], realS: 1200 }, 30)).toBe(4);
   });
   it("walks at eye level and rides lower, x-ray underground", () => {
     expect(poseAt(segs[0], 0.5).pitch).toBe(75);

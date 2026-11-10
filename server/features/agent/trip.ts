@@ -32,6 +32,13 @@ export const straight = (a: LngLatTuple, b: LngLatTuple): WalkResult => ({ coord
 const WALK_CANDIDATES = 3;
 
 /**
+ * The nearest address to an exit is sometimes a named place, not a street: "N exit on Saint
+ * Paul's Chapel" read as nonsense (owner, 2026-11-10). A street takes "on", a place "by".
+ */
+const STREETISH = /\b(street|st|avenue|ave|av|boulevard|blvd|road|rd|place|pl|drive|dr|parkway|pkwy|lane|ln|way|terrace|court|plaza|square|broadway|bowery|row|slip|concourse|turnpike|expressway|highway)\b/i;
+export const onOrBy = (name: string): "on" | "by" => (STREETISH.test(name) ? "on" : "by");
+
+/**
  * The entrance or exit to use (owner, 2026-10-26). An elevator-only one whose elevator is out is
  * skipped while there is another way in or out (the outage list names the station, not the entrance,
  * so any elevator outage counts). Of the nearest few, the shortest walk wins; the straight line
@@ -54,7 +61,7 @@ export async function portalFor(st: Station, ents: Entrance[], toward: LngLatTup
   const elevatorOnly = /elevator/i.test(type);
   const outage = elevatorOnly ? outages.find((o) => /^elevator out/i.test(o)) ?? null : null;
   const word = mode === "entry" ? "entrance" : "exit";
-  return { lon: at[0], lat: at[1], type, elevatorOnly, outage, label: `${dir} ${word}${street ? ` on ${street}` : ""}${elevatorOnly ? " (elevator)" : ""}` };
+  return { lon: at[0], lat: at[1], type, elevatorOnly, outage, label: `${dir} ${word}${street ? ` ${onOrBy(street)} ${street}` : ""}${elevatorOnly ? " (elevator)" : ""}` };
 }
 
 export interface TripDeps { planner?: TransitPlanner; entrances?: StationEntrances; changes?: ServiceChange[] }

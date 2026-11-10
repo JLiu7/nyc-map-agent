@@ -141,7 +141,7 @@ describe("withStairs", () => {
     expect(depthAt(down, 1)).toBe(-10);
     expect(depthAt(down, 0.3)).toBeLessThan(0);
     // Real stairs get time on screen at 10x.
-    expect(wallSeconds(down, 10)).toBeGreaterThanOrEqual(5 * Math.min(1, down.realS / 50));
+    expect(wallSeconds(down, 10)).toBe(6);
     const up = segs[3];
     expect(up.kind).toBe("ascend");
     expect(up.depths).toBeUndefined();

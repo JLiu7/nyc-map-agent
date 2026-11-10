@@ -120,6 +120,28 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    // Playing, the trip is a walkthrough: one slim bar, so the walk has the screen (owner, 2026-11-10).
+    test("a playing trip preview is one bar", async ({ page }) => {
+      await open(page, [
+        { type: "command", command: { type: "showRoute", trip } },
+        { type: "command", command: { type: "openPanel", trip } },
+        { type: "text", text: "Take this route." },
+      ]);
+      await ask(page, "Plan a trip from Union Square to Grand Central");
+      const preview = page.getByRole("region", { name: "Trip preview" });
+      await preview.getByLabel("Play preview", { exact: true }).click();
+      await preview.getByLabel("Pause preview").click();
+      await expect(preview.getByLabel("Play preview", { exact: true })).toBeVisible();
+      if (size.width < 640) {
+        await expect(page.getByTestId("trip-caption")).toBeVisible();
+        const box = (await preview.boundingBox())!;
+        // The bar and the chat under it leave most of the screen to the map.
+        expect(box.height).toBeLessThan(size.height * 0.3);
+      }
+      await page.waitForTimeout(900);
+      await expectLayout(page);
+    });
+
     test("a second quick question is held, then answered (no refusal)", async ({ page }) => {
       await open(page);
       let n = 0;

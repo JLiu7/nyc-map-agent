@@ -30,6 +30,8 @@ export type PlaybackEvent =
   | { type: "toggle" }
   | { type: "speed"; speed: PlaybackSpeed }
   | { type: "skip" }
+  /** Back one scene; from the first, or within a scene's opening moments, to its own start. */
+  | { type: "back" }
   /** The animation reached the end of the current leg. */
   | { type: "legDone" }
   | { type: "stop" };
@@ -66,6 +68,12 @@ export function playback(s: Playback, e: PlaybackEvent): Playback {
       if (s.status === "idle") return s;
       if (s.seg + 1 >= s.segCount) return { ...s, seg: Math.max(0, s.segCount - 1), status: "ended" };
       return { ...s, seg: s.seg + 1 };
+    case "back": {
+      if (s.status === "idle") return s;
+      // `restart` makes the loop count the scene from 0 again, even when it is the same one.
+      const seg = s.status === "ended" ? s.seg : Math.max(0, s.seg - 1);
+      return { ...s, seg, status: s.status === "ended" ? "playing" : s.status, run: s.run + 1, restart: s.restart + 1 };
+    }
     case "stop":
       return s.status === "idle" ? s : { ...s, status: "idle", tripId: null, seg: 0, segCount: 0, run: s.run + 1 };
   }

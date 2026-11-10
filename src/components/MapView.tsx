@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStreetContext, closeAsk, openAsk } from "@/lib/agent/streetContext";
-import { followedTrain } from "@/lib/transit/follow";
+import { followedTrain, usePreviewEye } from "@/lib/transit/follow";
 import { setMapInstance } from "@/lib/map/mapInstance";
 import { watchMapCovers } from "@/lib/map/mapCover";
 import { DirectionsFromHere } from "@/components/DirectionsFromHere";
@@ -555,7 +555,9 @@ export function MapView({
   // Top view is a flat 2D overview (#364). Tilted views are a simple block map;
   // the detailed city above street level is an advanced, off-by-default flag (#363).
   const detailedCity = useFlag("detailedCity");
-  const level = mapLevel(walking, tilted);
+  // A trip preview at eye level is on the street too, for what the city draws.
+  const previewEye = usePreviewEye();
+  const level = mapLevel(walking || previewEye, tilted);
   const { extrude, skyline: skylineOn, textured: texturedOn } = cityDetail({ level, flat: flatBuildings, eco, city3d, detailed: detailedCity });
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -1225,21 +1227,25 @@ export function MapView({
     if (!ready) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
-    applyAtmosphere(map, walking);
+    // A trip preview through the rider's eyes takes the same street look. It is applied here, after the
+    // theme effect above, because applied from the player the theme painted over it (owner, 2026-11-10).
+    const street = walking || previewEye;
+    applyAtmosphere(map, street);
     // Looking up puts the map centre in the air along the look ray; overhead
     // it stays pinned to the ground as usual.
     map.setCenterClampedToGround(!walking);
-    applyStreetPalette(map, walking);
+    applyStreetPalette(map, street);
     // Flat footprints are already the map option. Re-apply here: this effect
     // runs after the city load, and the street texture arrives a moment later.
-    applyBuildings(map, flatBuildings, t.building, buildingEdge(t));
+    const flat = walking ? flatBuildings : previewEye ? !extrude : flatBuildings;
+    applyBuildings(map, flat, t.building, buildingEdge(t));
     // After the street palette, so time-of-day lighting re-tints on top of it.
-    setAmbient({ walking });
+    setAmbient({ walking: street });
     // The sidewalk texture arrives a moment later; repaint once it has.
-    if (walking) {
+    if (street) {
       void loadStreetTextures(map).then(() => {
         applyStreetPalette(map, true);
-        applyBuildings(map, flatBuildings, t.building, buildingEdge(t));
+        applyBuildings(map, flat, t.building, buildingEdge(t));
       }).catch(() => {});
     }
     // At eye level basemap labels stand on the horizon and float in the sky,
@@ -1251,9 +1257,9 @@ export function MapView({
       // Transit layers (station names + route bullets, #186) stand in the 3D scene and stay.
       if (layer.type !== "symbol" || own.has((layer as { source?: string }).source ?? "") || layer.id.startsWith("transit-") || isLandmarkLayer(layer.id)) continue;
       if (layer.id === "restrooms") continue;
-      map.setLayoutProperty(layer.id, "visibility", walking ? "none" : "visible");
+      map.setLayoutProperty(layer.id, "visibility", street ? "none" : "visible");
     }
-  }, [ready, walking, styleEpoch, flatBuildings, t]);
+  }, [ready, walking, previewEye, extrude, styleEpoch, flatBuildings, t]);
 
   // The location card names the nearest corner from the baked sign points.
   useEffect(() => {

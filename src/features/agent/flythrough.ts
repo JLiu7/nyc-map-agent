@@ -185,18 +185,19 @@ const FOOT_RATE = 4;
 const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" || seg.kind === "ascend";
 
 /**
- * Wall-clock seconds for one leg. The ceiling and floor scale with the speed:
- * a flat 45s cap made 2x and 10x the same length on a subway ride. Walking moves little on the map,
- * so it plays FOOT_RATE times faster and stops at 12s (at 10x) however long the walk is.
+ * Wall-clock seconds for one scene of the preview, as a walkthrough someone follows:
+ * the parts on foot are held long enough to read and look around, and the ride, where
+ * nothing changes, is short (owner, 2026-11-10: the ride sat on one caption for 20 s
+ * while the walk through the station went by in 6). At 10x: a street walk 4 to 12 s,
+ * real stairs 6 s, a walk through the station with the wait for the train 22 s, a ride
+ * 4 to 10 s. Other speeds scale all of it.
  */
 export function wallSeconds(seg: Segment, speed: number): number {
   const pace = 10 / speed;
-  const foot = Math.min(12 * pace, Math.max(1.5 * pace, seg.realS / (speed * FOOT_RATE)));
-  // Real stairs get time to be seen: 5 s at 10x, never slower than real time. A walk through the
-  // station at eye level, with the wait for the train, gets 14 s.
-  if (seg.depths) return Math.max(foot, Math.min(seg.realS / speed, (seg.inside ? 14 : 5) * pace));
+  const foot = Math.min(12 * pace, Math.max(4 * pace, seg.realS / (speed * FOOT_RATE)));
+  if (seg.depths) return (seg.inside ? 22 : 6) * pace;
   if (onFoot(seg)) return foot;
-  return Math.min(45 * pace, Math.max(3 * pace, seg.realS / speed));
+  return Math.min(10 * pace, Math.max(4 * pace, seg.realS / speed));
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

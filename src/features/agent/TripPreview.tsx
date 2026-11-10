@@ -1,6 +1,6 @@
 import "@/components/task-screens.css";
-import { BellRing, Clock, MapPin, Pause, PartyPopper, Play, TriangleAlert, X } from "lucide-react";
-import { useState } from "react";
+import { BellRing, Clock, MapPin, Pause, PartyPopper, Play, SkipBack, SkipForward, TriangleAlert, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLeftCard } from "@/lib/store/leftColumn";
 import { toast } from "sonner";
@@ -18,6 +18,8 @@ import { TRIP_CHOICES, type TripChoice } from "./tripChoices";
 export function TripPreview(p: {
   trip: Trip; state: PlayerState; speed: PlaybackSpeed;
   onToggle: () => void; onSpeed: (s: PlaybackSpeed) => void;
+  /** Back one step of the walkthrough, and on to the next. */
+  onBack: () => void; onNext: () => void;
   onClose: () => void; onUse: () => void; onOther: () => void;
   /** Ask again by subway, by bus, on foot or with the least walking (src/features/agent/tripChoices.ts). */
   onChoice?: (c: TripChoice) => void;
@@ -43,12 +45,16 @@ export function TripPreview(p: {
   const named = alert ? [...alert.matchAll(/\[([A-Z0-9]{1,3})\]/g)].map((m) => m[1]) : [];
   const alertRoute = named.find((r) => trip.legs.some((l) => l.kind === "ride" && l.route === r)) ?? named[0];
   const w = trip.weather;
-  const progress = state.status === "ended" ? 100 : state.segs.length ? state.seg / state.segs.length * 100 : 0;
+  const progress = state.progress * 100;
+  /** Play has been pressed: the preview is a walkthrough now, and the trip card steps back. */
+  const started = state.status === "playing" || state.status === "paused" || state.status === "ended";
   const wide = useMediaQuery("(min-width: 640px)");
   // A desktop: the trip is a card in the one left column, with the ask box under it.
   const desktop = useMediaQuery("(min-width: 1024px)");
   const { slot, top } = useLeftCard(`trip:${trip.id}`, desktop);
   const [level, setLevel] = useState<SheetLevel>(1);
+  // Playing, the sheet drops to its one bar so the walk has the screen (owner, 2026-11-10: the panel hid half the station).
+  useEffect(() => { if (state.playing) setLevel(0); }, [state.playing]);
   const close = <button type="button" className="task-action task-close" aria-label="Close trip" onClick={p.onClose}><X size={18} /></button>;
   const playBtn = (size: string) => <button type="button" className={`task-action ${size} shrink-0 rounded-full p-0`} aria-label={state.playing ? "Pause preview" : "Play preview"} onClick={p.onToggle}>
     {state.playing ? <Pause size={22} /> : <Play size={22} />}
@@ -60,10 +66,34 @@ export function TripPreview(p: {
   const notice = alert ? <button type="button" disabled={!alertRoute || !p.onAlert} onClick={() => alertRoute && p.onAlert?.(alertRoute)}
     className="task-panel flex max-w-full items-center gap-1.5 rounded-full border-amber-500/40 px-3 py-2 text-left text-[13px] text-amber-200">
     <TriangleAlert size={14} className="shrink-0" aria-hidden /><span className="truncate">{plainAlertText(alert)}</span></button> : null;
-  const rest = <>
-    <div role="progressbar" aria-label="Preview progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-1.5 shrink-0 overflow-hidden rounded bg-slate-400/25"><div className="h-full bg-amber-500" style={{ width: `${progress}%` }} /></div>
-    {state.status === "ended" ? <div className="flex items-center gap-2.5">
-      <p className="min-w-0 flex-1 truncate text-[14px] text-slate-300">At {trip.destination.label.split(",")[0]}</p>
+  const bar = <div role="progressbar" aria-label="Preview progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-1.5 shrink-0 overflow-hidden rounded bg-slate-400/25"><div className="h-full bg-amber-500" style={{ width: `${progress}%` }} /></div>;
+  const place = trip.destination.label.split(",")[0];
+  const stepBtn = (label: string, onClick: () => void, icon: ReactNode) =>
+    <button type="button" className="task-action task-secondary h-10 w-10 shrink-0 rounded-full p-0" aria-label={label} onClick={onClick}>{icon}</button>;
+  // The walkthrough's bar on a phone: what to do now, in full, then back / play / next and how far along.
+  const player = <div className="flex flex-col gap-2" data-testid="trip-heading">
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold leading-snug" aria-live="polite" data-testid="trip-caption">{state.status === "ended" ? `At ${place}` : state.callout}</p>
+        {state.where ? <p className="mt-0.5 flex items-center gap-1 text-[12px] text-slate-300" data-testid="trip-where"><MapPin size={12} className="shrink-0" aria-hidden /><span className="truncate">{state.where}</span></p> : null}
+      </div>
+      {close}
+    </div>
+    <div className="flex items-center gap-2">
+      {stepBtn("Previous step", p.onBack, <SkipBack size={16} />)}
+      {playBtn("h-11 w-11")}
+      {stepBtn("Next step", p.onNext, <SkipForward size={16} />)}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="text-[12px] text-slate-300" data-testid="trip-step">{Math.min(state.seg + 1, state.segs.length)} / {state.segs.length}</span>
+        {bar}
+      </div>
+      {state.status === "ended" ? <button type="button" className="task-action task-secondary shrink-0 px-3" data-testid="trip-done" onClick={p.onClose}>Done</button> : null}
+    </div>
+  </div>;
+  const rest = (phone: boolean) => <>
+    {phone ? null : bar}
+    {phone && started ? null : state.status === "ended" ? <div className="flex items-center gap-2.5">
+      <p className="min-w-0 flex-1 truncate text-[14px] text-slate-300">At {place}</p>
       {/* The trip is over: one plain way to put it away, beside the small close at the top. */}
       <button type="button" className="task-action task-secondary shrink-0 px-4" data-testid="trip-done" onClick={p.onClose}>Done</button>
     </div> : <>
@@ -86,11 +116,11 @@ export function TripPreview(p: {
       <button type="button" className="task-action task-secondary" onClick={p.onOther}>{t("otherOptions")}</button>
     </div>
   </>;
-  const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} place={trip.destination.label.split(",")[0]} where={state.where} /> : null;
+  const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} place={place} where={state.where} /> : null;
   // A phone: the trip rests as one line on the chat (Play, where to, how long) and pulls up, so the route stays on the map (owner, 2026-10-25).
   if (!wide) return <>
     <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel} onClose={p.onClose}
-      header={<div className="flex items-center gap-2.5" data-testid="trip-heading">
+      header={started ? player : <div className="flex items-center gap-2.5" data-testid="trip-heading">
         {playBtn("h-11 w-11")}
         <button type="button" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>
           <span className="truncate text-[15px] font-bold" title={`${trip.origin.label} → ${trip.destination.label}`}>To {trip.destination.label}</span>
@@ -100,10 +130,10 @@ export function TripPreview(p: {
       </div>}>
       <div className="pull-sheet-body mt-2 flex flex-col gap-2.5">
         {impactBox}
-        {speeds}
-        {rest}
+        {rest(true)}
         {notice}
         {weather ? <p className="text-[13px] text-slate-300">{weather}</p> : null}
+        {started ? speeds : null}
       </div>
     </PullSheet>
     {balloons}
@@ -124,7 +154,7 @@ export function TripPreview(p: {
           {playBtn("h-[52px] w-[52px]")}
           {speeds}
         </div>
-        {rest}
+        {rest(false)}
       </section>,
       slot,
     )}
@@ -151,7 +181,7 @@ export function TripPreview(p: {
         {playBtn("h-[52px] w-[52px]")}
         {speeds}
       </div>
-      {rest}
+      {rest(false)}
     </section>
     {balloons}
   </>;

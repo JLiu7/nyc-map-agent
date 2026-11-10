@@ -25,10 +25,31 @@ for (const width of [390, 1280]) {
     const preview = page.getByRole("region", { name: "Trip preview" });
     await expect(preview).toBeVisible();
     await expect(preview.getByLabel("Play preview", { exact: true })).toBeVisible();
-    await preview.getByRole("button", { name: "5×", exact: true }).click();
-    await expect(preview.getByRole("button", { name: "5×", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const speed = preview.getByRole("button", { name: "5×", exact: true });
+    // A phone keeps the speeds off the trip card; they wait in the pulled-up sheet once the preview plays.
+    if (width >= 640) {
+      await speed.click();
+      await expect(speed).toHaveAttribute("aria-pressed", "true");
+    } else await expect(speed).toHaveCount(0);
     await preview.getByLabel("Play preview", { exact: true }).click();
     await expect(preview.getByLabel("Pause preview")).toBeVisible();
+    if (width < 640) {
+      // Playing, the sheet is one bar: the step in words, back / pause / next, and how far along.
+      await expect(preview).toHaveAttribute("data-level", "0");
+      await expect(page.getByTestId("trip-caption")).not.toBeEmpty();
+      await expect(page.getByTestId("trip-step")).toContainText("/");
+      await expect(preview.getByRole("button", { name: "Use this route", exact: true })).toHaveCount(0);
+      await preview.getByLabel("Next step").click();
+      await expect(page.getByTestId("trip-step")).toContainText("2 /");
+      await preview.getByLabel("Previous step").click();
+      await expect(page.getByTestId("trip-step")).toContainText("1 /");
+      await preview.getByLabel("Pause preview").click();
+      await page.getByTestId("sheet-grip").click();
+      await speed.click();
+      await expect(speed).toHaveAttribute("aria-pressed", "true");
+      await page.getByTestId("sheet-grip").click();
+      await page.getByTestId("sheet-grip").click();
+    }
     const panel = await preview.boundingBox();
     const bar = await page.getByTestId("agent-bar").boundingBox();
     expect(panel).not.toBeNull();

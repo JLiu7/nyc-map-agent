@@ -68,6 +68,19 @@ describe("trip preview playback", () => {
     expect(playback(off, { type: "play" })).toBe(off);
   });
 
+  it("back goes to the scene before, and replays the last one once the trip has ended", () => {
+    const two = run(load("a", 3), { type: "play" }, { type: "legDone" }, { type: "legDone" });
+    const one = playback(two, { type: "back" });
+    expect(one).toMatchObject({ status: "playing", seg: 1, run: two.run + 1, restart: two.restart + 1 });
+    // On the first scene it starts that scene again.
+    const first = run(load("a", 3), { type: "play" });
+    expect(playback(first, { type: "back" })).toMatchObject({ seg: 0, restart: first.restart + 1 });
+    const end = playback(two, { type: "legDone" });
+    expect(end.status).toBe("ended");
+    expect(playback(end, { type: "back" })).toMatchObject({ status: "playing", seg: 2 });
+    expect(playback(initialPlayback, { type: "back" })).toBe(initialPlayback);
+  });
+
   it("a trip with no drawable legs never plays", () => {
     expect(run(load("a", 0), { type: "play" }).status).toBe("idle");
   });
