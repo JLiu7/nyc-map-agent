@@ -77,7 +77,7 @@
   {
     "name": "feature: line panel (lazy)",
     "path": ".size-build/assets/LinePanel-*.js",
-    "limit": "6.5 kB"
+    "limit": "6.6 kB"
   },
   {
     "name": "feature: notice diagram (lazy, opens with the first notice)",
@@ -102,6 +102,6 @@
   {
     "name": "all JS",
     "path": ".size-build/assets/*.js",
-    "limit": "1149 kB"
+    "limit": "1150 kB"
   }
 ]

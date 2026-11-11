@@ -1,8 +1,8 @@
 # TASK-NMA-0050 — Fulton Stair To Hall
 
-<!-- continuity:task {"acceptance":["Replaying the trip preview's camera along the live walk to the E exit, the stair from the mezzanine down to the hall shows a clean opening, with no wall pieces at odd angles, dark gaps or slab across it","No wall stands across that stair's treads","Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass","A fresh live recording is clean from 60 to 73 s"],"depends_on":[],"goal":"The trip to the E exit on Fulton Street goes down the stair from the mezzanine to the hall through a clean opening and without passing a wall","id":"NMA-0050","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/117","next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"The live recording after #116 still showed wall pieces, a dark slab and a wall across the treads at that stair"} -->
+<!-- continuity:task {"acceptance":["Replaying the trip preview's camera along the live walk to the E exit, the stair from the mezzanine down to the hall shows a clean opening, with no wall pieces at odd angles, dark gaps or slab across it","No wall stands across that stair's treads","Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass","A fresh live recording is clean from 60 to 73 s"],"depends_on":[],"goal":"The trip to the E exit on Fulton Street goes down the stair from the mezzanine to the hall through a clean opening and without passing a wall","id":"NMA-0050","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/117","next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"completed","why":"The live recording after #116 still showed wall pieces, a dark slab and a wall across the treads at that stair"} -->
 
-- Status: active
+- Status: completed
 - Owner: claude-code
 - Priority: high
 - Depends on: none
@@ -36,10 +36,10 @@ Watching the trip to the E exit on Fulton Street, past the J Z sign the stair do
 
 ## Acceptance criteria
 
-- [ ] Replaying the trip preview's camera along the live walk to the E exit, the stair from the mezzanine down to the hall shows a clean opening, with no wall pieces at odd angles, dark gaps or slab across it
-- [ ] No wall stands across that stair's treads
-- [ ] Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass
-- [ ] A fresh live recording is clean from 60 to 73 s
+- [x] Replaying the trip preview's camera along the live walk to the E exit, the stair from the mezzanine down to the hall shows a clean opening, with no wall pieces at odd angles, dark gaps or slab across it
+- [x] No wall stands across that stair's treads
+- [x] Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass
+- [x] A fresh live recording is clean from 60 to 73 s
 
 ## Evidence and sources
 

@@ -5,7 +5,7 @@
  * off the walls, then straightened wherever the walker can walk straight. Pure,
  * so it is tested without WebGL.
  */
-import { CELL_M, floorUnder, PLATFORM, walkIn, type StationModel } from "./stationWalk";
+import { CELL_M, floorUnder, PLATFORM, STAIR_W, walkIn, type StationModel } from "./stationWalk";
 
 type P = [number, number];
 /** A point on the way, local metres, z the floor height (0 the street). */
@@ -154,7 +154,47 @@ export function routeThrough(m: StationModel, door: P, train: P): RoutePoint[] |
   if (best < 0) return null;
   const cells: RoutePoint[] = [];
   for (let id = best; id >= 0; id = prev.get(id) ?? -1) cells.unshift([...xy(id), height(id)]);
-  return [[door[0], door[1], 0], ...straighten(m, cells)];
+  return [[door[0], door[1], 0], ...onFlights(m, straighten(m, cells))];
+}
+
+/**
+ * How far a point may move onto a stair's line: the half-metre cells' own error, no more. Points further off are
+ * where a route steps onto a stair from its side; moved there, its turns grew sharper and walls filled the trip
+ * preview's view at two of Fulton St's stairs.
+ */
+const ON_LINE_M = 0.3;
+
+/**
+ * Moves each end of a leg that climbs or drops along a stair onto that stair's line, the middle of its treads as
+ * drawn, when it is within `ON_LINE_M` of it. Cells are half a metre, so on a stair at an angle to them the way ran
+ * up to a quarter of a metre off the middle. With the stair drawn 2 m wide, the trip preview's eye went down Fulton
+ * St's stair to the hall 0.76 m from one wall and 1.22 m from the other, and the near wall filled the view (owner's
+ * trip recording, 2026-11-11).
+ */
+function onFlights(m: StationModel, pts: RoutePoint[]): RoutePoint[] {
+  const flights = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
+  const on = (f: (typeof flights)[number], p: RoutePoint) => {
+    const near = nearestOnLine(f.line, [p[0], p[1]]);
+    const onStair = p[2] >= Math.min(f.za, f.zb) - 0.3 && p[2] <= Math.max(f.za, f.zb) + 0.3;
+    return near && onStair && near.d <= STAIR_W / 2 + 0.3 ? near : null;
+  };
+  const out = pts.map((p) => [...p] as RoutePoint);
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = [pts[i - 1], pts[i]];
+    if (Math.abs(b[2] - a[2]) < 0.05) continue;
+    let best: { f: (typeof flights)[number]; d: number } | null = null;
+    for (const f of flights) {
+      const [na, nb] = [on(f, a), on(f, b)];
+      if (na && nb && (!best || na.d + nb.d < best.d)) best = { f, d: na.d + nb.d };
+    }
+    if (!best) continue;
+    for (const k of [i - 1, i]) {
+      const near = nearestOnLine(best.f.line, [pts[k][0], pts[k][1]])!;
+      if (near.d > ON_LINE_M) continue;
+      out[k] = [near.at[0], near.at[1], pts[k][2]];
+    }
+  }
+  return out;
 }
 
 /** Whether the walker, starting at a, walks straight to b (same floor, not stopped by a wall). */

@@ -94,3 +94,24 @@ describe("the committed stations", () => {
     expect(found / tried).toBeGreaterThan(0.8);
   }, 180_000);
 });
+
+describe("routeThrough on a stair at an angle to the grid", () => {
+  it("runs down the middle of the stair's treads", () => {
+    // A mezzanine, a stair down at about 37 degrees to the half-metre cells, and a platform below.
+    const m = buildStation({
+      ways: [
+        way("steps", [[0, 0], [0, -8]], 0, -1),
+        way("corridor", [[0, -8], [0.3, -20]], -1),
+        way("steps", [[0.3, -20], [7.1, -29.1]], -1, -2),
+        way("platform", [[10, -50], [10, 40]], -2),
+      ],
+    })!;
+    const route = routeThrough(m, toLocal(m, ...ll(0, 0.5)), toLocal(m, ...ll(11, -40)))!;
+    expect(route).not.toBeNull();
+    const flight = m.pieces.find((g) => g.flight && Math.min(g.flight.za, g.flight.zb) < -6)!.flight!;
+    const lo = Math.min(flight.za, flight.zb), hi = Math.max(flight.za, flight.zb);
+    const onStair = route.filter((p) => p[2] < hi - 0.1 && p[2] > lo + 0.1);
+    expect(onStair.length).toBeGreaterThan(0);
+    for (const p of onStair) expect(nearestOnLine(flight.line, [p[0], p[1]])!.d).toBeLessThan(0.05);
+  });
+});
