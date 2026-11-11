@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
-import { besideFlight, CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_HEAD_M, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
+import { besideFlight, CELL_M, CEILING_M, drawn, floorsAt, outline, overStairDown, overStairs, OVER_STAIR_M, rooms, STAIR_HEAD_M, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
 import { guideSigns, placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
 import { cornerLine } from "../cornerLine";
@@ -48,6 +48,12 @@ class Quads {
     this.add(a, b, c, d);
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     this.uv.push(0, a[2], len, b[2], len, c[2], 0, a[2], len, c[2], 0, d[2]);
+  }
+  /** A quad seen only from below: its corners turned so it faces down (drawn with `side: FrontSide`). */
+  under(a: number[], b: number[], c: number[], d: number[]) {
+    const up = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    if (up > 0) this.add(a, d, c, b);
+    else this.add(a, b, c, d);
   }
   mesh(color: number, opts: THREE.MeshLambertMaterialParameters = {}) {
     const g = new THREE.BufferGeometry();
@@ -373,6 +379,10 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   const group = new THREE.Group();
   const under = !m.elevated;
   const [floor, platform, ceiling, wall, edge, drop, bed, rail, railing, canopy, trim] = Array.from({ length: 11 }, () => new Quads());
+  // A stair's own ceiling, seen only from below. Looking down a stair from the floor it leaves, the opening shows
+  // the top of that ceiling where it dips under the floor; drawn both ways, it hung there as a dark sloping slab
+  // (Fulton St, owner's trip recording, 2026-11-11).
+  const soffit = new Quads();
   /** A wall below the street: tile, with the station's coloured band along it. */
   const tiled = (a: number[], b: number[], foot: [number, number], top: number) => {
     wall.wall([a[0], a[1], foot[0]], [b[0], b[1], foot[1]], [b[0], b[1], b[2] + top], [a[0], a[1], a[2] + top]);
@@ -407,7 +417,8 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
         // A parapet only where the upper room's floor runs beside the opening. A stair that leaves its room
         // and climbs through solid ground is a chute: its walls go up to the lid over it.
         const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-        const beside = roomFloorAt(mx + nx, my + ny, top) || roomFloorAt(mx - nx, my - ny, top);
+        const floorAt = (x: number, y: number) => roomFloorAt(x, y, top) || overStairDown(m, x, y, top);
+        const beside = floorAt(mx + nx, my + ny) || floorAt(mx - nx, my - ny);
         if (end === "head" && beside) continue;
         const up = (z: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + (beside ? STAIR.parapet : Math.abs(top) <= 0.5 ? 3.4 : CEILING_M));
         // Over the open foot, only a lintel above head height, so the stair's own ceiling does not show past its side.
@@ -487,13 +498,16 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
           // parapet like the opening's sides. A full wall there stood alone in Fulton St's hall, floor to
           // ceiling, and with the parapets beside it read as a broken box the trip preview walked into.
           const [ux, uy] = [(h[0] - o[0]) / (Math.hypot(h[0] - o[0], h[1] - o[1]) || 1), (h[1] - o[1]) / (Math.hypot(h[0] - o[0], h[1] - o[1]) || 1)];
-          const past = roomFloorAt(h[0] + ux * 0.8, h[1] + uy * 0.8, top);
+          const [px, py] = [h[0] + ux * 0.8, h[1] + uy * 0.8];
+          const past = roomFloorAt(px, py, top) || overStairDown(m, px, py, top);
           const zh = past ? top + STAIR.parapet : zl;
           wall.wall([h[0] - nx, h[1] - ny, top], [h[0] + nx, h[1] + ny, top], [h[0] + nx, h[1] + ny, zh], [h[0] - nx, h[1] - ny, zh]);
         }
         if (Math.min(p[2], q[2]) + STAIR.head >= top) continue;
-        const [zp, zq] = [stairTop(p[2], top), stairTop(q[2], top)];
-        ceiling.add([p[0] - nx, p[1] - ny, zp], [q[0] - nx, q[1] - ny, zq], [q[0] + nx, q[1] + ny, zq], [p[0] + nx, p[1] + ny, zp]);
+        // Never above the floor the stair goes under: the piece at the head rose to parapet height, a steep dark
+        // face seen through the opening from that floor (Fulton St, 2026-11-11).
+        const [zp, zq] = [Math.min(stairTop(p[2], top), top), Math.min(stairTop(q[2], top), top)];
+        soffit.under([p[0] - nx, p[1] - ny, zp], [q[0] - nx, q[1] - ny, zq], [q[0] + nx, q[1] + ny, zq], [p[0] + nx, p[1] + ny, zp]);
       }
       before += len;
     }
@@ -539,16 +553,29 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   }
   // A room's floor ends at a stair going down from it: that edge is the stair's opening, which the stair rings
   // with its own parapets. Read as a wall, it stood full height round the opening once the treads were a step
-  // below the floor, and in Fulton St's hall made a box of skewed tiles the trip preview walked into.
-  const downs = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
+  // below the floor, and in Fulton St's hall made a box of skewed tiles the trip preview walked into. The outline
+  // runs round the room with its floor laid back over the stair's outline in the data (`overStairs`), which is
+  // wider than the stair as drawn: round the room alone it stood walls in the floor beside the stair.
+  //
+  // A stair going up from a room crosses its outline too, where the room's traced floor runs on under the stair's
+  // lower treads. There the outline stood a full-height wall across the treads, which the trip preview walked into
+  // a couple of metres above the foot of the stair down from Fulton St's mezzanine to the hall (2026-11-11). So an
+  // edge is open wherever a stair leaving the room's floor runs through it, until the stair has climbed past the
+  // wall's top.
+  const flights = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
   const intoStair = (look: [number, number], h: number) =>
-    downs.some((f) => {
-      if (Math.abs(Math.max(f.za, f.zb) - h) > 0.75 || Math.min(f.za, f.zb) > h - 0.75) return false;
+    flights.some((f) => {
+      const [lo, hi] = [Math.min(f.za, f.zb), Math.max(f.za, f.zb)];
+      const down = Math.abs(hi - h) <= 0.75 && lo <= h - 0.75;
+      const up = Math.abs(lo - h) <= 0.75 && hi >= h + 0.75;
+      if (!down && !up) return false;
       const b = besideFlight(f, look[0], look[1]);
-      return b.beside && b.d <= STAIR_W / 2 + 0.3;
+      // Down a stair, only as far as the floor is laid back over it: where that floor ends, the stair has gone
+      // under the room, and the edge is the room's wall (left open, the dark behind the model showed above it).
+      return b.beside && b.d <= STAIR_W / 2 + 0.3 && (down ? b.z > h - OVER_STAIR_M : b.z < h + CEILING_M);
     });
   rooms(m).forEach((room) => {
-    for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75) || intoStair(look, h))) {
+    for (const w of outline(overStairs(m, room), (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75) || intoStair(look, h))) {
       tiled([w.x1, w.y1, w.z1], [w.x2, w.y2, w.z2], [w.z1 - TRACK_DROP_M, w.z2 - TRACK_DROP_M], CEILING_M);
     }
   });
@@ -572,6 +599,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     under ? floor.mesh(0xffffff, { map: surfaceTexture(1.2, concrete(143, 2)) }) : floor.mesh(COLORS.floor),
     under ? platform.mesh(0xffffff, { map: surfaceTexture(2.4, concrete(184, 2)) }) : platform.mesh(COLORS.platform),
     under ? ceiling.mesh(0xffffff, { map: surfaceTexture(3, ceilingPattern) }) : ceiling.mesh(COLORS.ceiling),
+    under ? soffit.mesh(0xffffff, { map: surfaceTexture(3, ceilingPattern), side: THREE.FrontSide }) : soffit.mesh(COLORS.ceiling, { side: THREE.FrontSide }),
     wall.mesh(COLORS.wall, { map: under ? tileTexture() : null }),
     trim.mesh(new THREE.Color(signs?.trim ?? "#2f6b45").getHex(), { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     edge.mesh(COLORS.edge),

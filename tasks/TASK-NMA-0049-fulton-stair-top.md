@@ -1,8 +1,8 @@
 # TASK-NMA-0049 — Fulton Stair Top
 
-<!-- continuity:task {"acceptance":["Replaying the trip preview's camera to the E exit on Fulton Street, no frame is filled by a stair's side wall at arm's length","Where the way steps off a stair's side near its top, no parapet stands across it","Steps stay 2 m wide, routes and the camera outside stations are unchanged; unit tests, typecheck and lint pass"],"depends_on":[],"goal":"The trip to the E exit on Fulton Street climbs out of the hall facing up the stair and steps off at the top without passing a wall","id":"NMA-0049","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/115","next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"The live recording after #114 still showed the camera in a wall near the top of the stair out of the hall"} -->
+<!-- continuity:task {"acceptance":["Replaying the trip preview's camera to the E exit on Fulton Street, no frame is filled by a stair's side wall at arm's length","Where the way steps off a stair's side near its top, no parapet stands across it","Steps stay 2 m wide, routes and the camera outside stations are unchanged; unit tests, typecheck and lint pass"],"depends_on":[],"goal":"The trip to the E exit on Fulton Street climbs out of the hall facing up the stair and steps off at the top without passing a wall","id":"NMA-0049","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/115","next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"done","why":"The live recording after #114 still showed the camera in a wall near the top of the stair out of the hall"} -->
 
-- Status: active
+- Status: done
 - Owner: claude-code
 - Priority: high
 - Depends on: none

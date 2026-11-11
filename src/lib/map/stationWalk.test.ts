@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { besideFlight, buildStation, drawn, floorsAt, floorUnder, outline, reachableShare, rooms, streetTops, toLngLat, toLocal, walkIn, floorWellOpen, walls, wellOpen, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
+import { besideFlight, buildStation, drawn, OVER_STAIR_M, overStairs, floorsAt, floorUnder, outline, reachableShare, rooms, streetTops, toLngLat, toLocal, walkIn, floorWellOpen, walls, wellOpen, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
 
 // Metres east/north of a point in Lower Manhattan, as lon/lat.
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
@@ -266,4 +266,25 @@ describe("stairwells", () => {
       expect(rims.filter((r) => r.kind !== "ceiling").length).toBeGreaterThan(20);
     });
   }
+});
+
+describe("overStairs", () => {
+  it("lays a room's floor back over the top of a stair going down from it, and no further", () => {
+    const m = buildStation({ ways: [way("corridor", [[-20, 0], [0, 0]], -1), way("steps", [[0, 0], [16, 0]], -1, -3), way("platform", [[16, -10], [16, 40]], -3)] })!;
+    const stair = m.pieces.find((g) => g.stair && g.flight)!;
+    const top = Math.max(stair.flight!.za, stair.flight!.zb);
+    expect(top - Math.min(stair.flight!.za, stair.flight!.zb)).toBeGreaterThan(OVER_STAIR_M);
+    const room = rooms(m).find((r) => r.h.some((h) => Math.abs(h - top) < 0.5))!;
+    const laid = overStairs(m, room);
+    const at = (c: number): [number, number] => [laid.x0 + ((c % laid.nx) + 0.5) * 0.5, laid.y0 + (Math.floor(c / laid.nx) + 0.5) * 0.5];
+    const added = Array.from(laid.h).flatMap((h, c) => (Number.isNaN(room.h[c]) && !Number.isNaN(h) ? [c] : []));
+    expect(added.length).toBeGreaterThan(0);
+    for (const c of added) {
+      expect(laid.h[c]).toBeCloseTo(top, 5);
+      expect(besideFlight(stair.flight!, ...at(c)).z).toBeGreaterThan(top - OVER_STAIR_M - 0.5);
+    }
+    // Further down, the stair is under the room's floor's height by more than a storey: left open.
+    const deep = Array.from(laid.h).flatMap((h, c) => (Number.isNaN(h) ? [c] : [])).filter((c) => { const b = besideFlight(stair.flight!, ...at(c)); return b.beside && b.d < 0.5 && b.z < top - OVER_STAIR_M - 0.5; });
+    expect(deep.length).toBeGreaterThan(0);
+  });
 });

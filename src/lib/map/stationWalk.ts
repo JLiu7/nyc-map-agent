@@ -838,7 +838,10 @@ function wellsCut(m: StationModel, g: Piece, lift: number, rest: number, open?: 
     const at = centre(g, c), z = h[c] + lift;
     for (const st of stairs) {
       const k = cellAt(st, ...at);
-      if (k >= 0 && !Number.isNaN(st.h[k]) && st.h[k] < z - rest && st.h[k] + HEAD_M > z) { h[c] = NaN; break; }
+      // Cut by cells only where the stair has no line to draw it along. A stair's cells span its whole width in the
+      // data (4.3 m at one of Fulton St's), but it is drawn 2 m wide: cut by cells, the floor beside it was open
+      // and the stair's own ceiling showed through from above.
+      if (!st.flight && k >= 0 && !Number.isNaN(st.h[k]) && st.h[k] < z - rest && st.h[k] + HEAD_M > z) { h[c] = NaN; break; }
       // A slab is also cut by the stair's own outline, not only its cells: cut by cells alone, a stair at an
       // angle to the grid left a stepped rim, with slab sticking into the stairwell and gaps beside it.
       if (!open || !st.flight || at[0] < st.x0 - WELL_PAD_M || at[1] < st.y0 - WELL_PAD_M || at[0] > st.x0 + st.nx * CELL_M + WELL_PAD_M || at[1] > st.y0 + st.ny * CELL_M + WELL_PAD_M) continue;
@@ -847,6 +850,51 @@ function wellsCut(m: StationModel, g: Piece, lift: number, rest: number, open?: 
     }
   }
   return { ...g, h };
+}
+
+/**
+ * Is (x, y) on a stair, as the station data outlines it, that goes down from a floor at about height h, within
+ * `OVER_STAIR_M` of that floor? The data leaves the floor out over the stair's whole outline; the scene draws the
+ * stair narrower than that.
+ */
+export function overStairDown(m: StationModel, x: number, y: number, h: number): boolean {
+  return m.pieces.some((g) => {
+    if (!g.stair || !g.flight) return false;
+    const [lo, hi] = [Math.min(g.flight.za, g.flight.zb), Math.max(g.flight.za, g.flight.zb)];
+    if (Math.abs(hi - h) > 0.75 || lo > h - 0.75) return false;
+    const k = cellAt(g, x, y);
+    return k >= 0 && !Number.isNaN(g.h[k]) && g.h[k] > h - OVER_STAIR_M;
+  });
+}
+/** How far down a stair the floor it leaves is laid back over it: a metre past where its opening ends (`floorWellOpen`). */
+export const OVER_STAIR_M = STAIR_HEAD_M + 1.7;
+
+/**
+ * A room's floor laid over the stairs going down from it, out from its own cells, so `wellsCut` can open
+ * just the stairwell as drawn. Left out, the floor had a hole the width of the stair's outline in the data:
+ * at Fulton St, walking down a stair from the mezzanine showed walls round that hole and the stair's sloping
+ * ceiling inside it (owner's trip recording, 2026-11-11).
+ */
+export function overStairs(m: StationModel, g: Piece): Piece {
+  if (!m.pieces.some((p) => p.stair && p.flight)) return g;
+  const h = g.h.slice(), kind = g.kind.slice();
+  const queue: number[] = [];
+  const reach = (c: number, z: number) => {
+    if (!Number.isNaN(h[c]) || !overStairDown(m, ...centre(g, c), z)) return;
+    h[c] = z;
+    kind[c] = FLOOR;
+    queue.push(c);
+  };
+  const around = (c: number, z: number) => {
+    const [i, j] = [c % g.nx, Math.floor(c / g.nx)];
+    if (i > 0) reach(c - 1, z);
+    if (i + 1 < g.nx) reach(c + 1, z);
+    if (j > 0) reach(c - g.nx, z);
+    if (j + 1 < g.ny) reach(c + g.nx, z);
+  };
+  for (let c = 0; c < h.length; c++) if (!Number.isNaN(g.h[c])) around(c, g.h[c]);
+  while (queue.length) { const c = queue.pop()!; around(c, h[c]); }
+  return { ...g, h, kind };
 }
 
 /**
@@ -988,7 +1036,7 @@ export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: 
     const outside = (at: P) => { const c = cellAt(room, ...at); return c < 0 || Number.isNaN(room.h[c]); };
     const past = (lift: number) => (from: number, at: P) => outside(at) && free(at, room.h[from] + lift);
     // A floor is open over a stair still climbing to it (0.35 m: the last riser lands on it); a ceiling, over any stair that reaches it.
-    out.floors.push(...floorRuns(wellsCut(m, spread(g, past(0)), 0, 0.35, floorWellOpen)));
+    out.floors.push(...floorRuns(wellsCut(m, spread(overStairs(m, g), past(0)), 0, 0.35, floorWellOpen)));
     out.ceilings.push(...floorRuns(wellsCut(m, spread(room, past(CEILING_M)), CEILING_M, -0.2, wellOpen)));
     const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(g.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(g.h[c]) ? FLOOR : 0)) };
     out.beds.push(...floorRuns(spread(bed, past(-TRACK_DROP_M))));
