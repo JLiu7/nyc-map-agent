@@ -54,7 +54,7 @@ describe("placeSigns", () => {
 
   it("says Exit at the foot of each stair, and shows the lines at the top of the one down to the platform", () => {
     expect(signs.filter((s) => s.kind === "exit")).toHaveLength(2);
-    const trains = signs.filter((s) => s.kind === "trains");
+    const trains = signs.filter((s) => s.kind === "trains" && !s.arrow);
     expect(trains).toHaveLength(1);
     expect(trains[0].z).toBeCloseTo(-5 + SIGN_Z, 1);
     expect(trains[0].routes.map((b) => b.short)).toEqual(["4"]);
@@ -62,6 +62,41 @@ describe("placeSigns", () => {
 
   it("hangs nothing at street level, where the map is drawn instead", () => {
     expect(signs.filter((s) => s.z > -2)).toHaveLength(0);
+  });
+});
+
+describe("a directory of lines where a street stair lands", () => {
+  const m = buildStation(small)!;
+  const dir = placeSigns(m, info(m)).filter((s) => s.kind === "trains" && s.arrow);
+
+  it("points ahead to the 4, whose platform stair is straight on, and faces whoever comes down", () => {
+    expect(dir).toHaveLength(1);
+    expect(dir[0].routes.map((b) => b.short)).toEqual(["4"]);
+    expect(dir[0].arrow).toBe("up");
+    // The street stair runs south and lands at y = -8: the sign hangs 4 m on, looking back north.
+    const [, fy] = toLocal(m, ...ll(0, -8));
+    expect(dir[0].y).toBeCloseTo(fy - 4, 0);
+    expect(Math.sin(dir[0].angle)).toBeCloseTo(1, 1);
+    expect(dir[0].z).toBeCloseTo(-5 + SIGN_Z, 1);
+  });
+
+  it("points left or right to a platform stair off to the side", () => {
+    // The same station with its platform stair 30 m east of where the street stair lands.
+    const side: WalkStation = {
+      ways: [
+        way("steps", [[0, 0], [0, -8]], 0, -1),
+        way("corridor", [[0, -8], [0, -12], [30, -12]], -1),
+        way("steps", [[30, -12], [38, -12]], -1, -2),
+        way("platform", [[38, -60], [38, 40]], -2),
+      ],
+    };
+    const ms = buildStation(side)!;
+    const local = (pts: Array<[number, number]>) => pts.map(([x, y]) => toLocal(ms, ...ll(x, y)));
+    const signs = placeSigns(ms, { stations: [{ name: "Test St", routes: bulletsFor("4", table) }], lines: [{ route: "4", c: local([[41.5, -80], [41.5, 60]]) }], trim: "#2f6b45" });
+    const d = signs.filter((s) => s.kind === "trains" && s.arrow);
+    expect(d).toHaveLength(1);
+    // Walking south off the stair, east is on the left.
+    expect(d[0].arrow).toBe("left");
   });
 });
 

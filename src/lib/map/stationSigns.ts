@@ -109,6 +109,8 @@ const TURN_RAD = 0.6;
 const BEFORE_TURN_M = 3;
 const AHEAD_EVERY_M = 28;
 const MAX_WAY_SIGNS = 14;
+/** A directory hangs this far past a street stair's foot; its signs sit this far apart; a line within this turn is "ahead". */
+const DIRECTORY = { ahead_m: 4, apart: 2.6, ahead: 0.6 };
 
 /**
  * Signs over a trip's own way through the station, facing the walker: an arrow before each turn
@@ -243,6 +245,8 @@ export function placeSigns(m: StationModel, info: SignInfo, exitName?: ExitName)
     }
   });
 
+  const tops: Array<{ x: number; y: number; z: number; routes: Bullet[] }> = [];
+  const feet: Array<{ x: number; y: number; z: number; fx: number; fy: number }> = [];
   // At each stair: "Exit" at the end away from the street; at the other end, when it leads down to a platform, that platform's lines.
   const platformAt = (x: number, y: number, z: number) =>
     plats.find((p) => Math.abs(p.g.h[p.cells[0]] - z) <= 0.75 && p.pts.some(([px, py]) => Math.abs(px - x) <= CELL_M && Math.abs(py - y) <= CELL_M));
@@ -259,6 +263,10 @@ export function placeSigns(m: StationModel, info: SignInfo, exitName?: ExitName)
       return [(e.at[0] - e.prev[0]) / d, (e.at[1] - e.prev[1]) / d];
     };
     const [fx, fy] = out1(far), [nx, ny] = out1(near);
+    // For the directories below: where each stair down to a platform starts, and where each street stair lands.
+    const lands = platformAt(far.at[0] + fx, far.at[1] + fy, far.z);
+    if (lands && Math.abs(near.z) > 0.5) tops.push({ x: near.at[0], y: near.at[1], z: near.z, routes: lands.routes });
+    if (Math.abs(near.z) <= 0.5 && Math.abs(far.z) > 0.5 && !lands) feet.push({ x: far.at[0], y: far.at[1], z: far.z, fx, fy });
     // A street stair's top is on the map, which this scene does not draw.
     const street = Math.abs(near.z) <= 0.5;
     // The stair to the street says which corner it comes up at.
@@ -267,5 +275,32 @@ export function placeSigns(m: StationModel, info: SignInfo, exitName?: ExitName)
     const below = platformAt(far.at[0] + fx, far.at[1] + fy, far.z);
     if (below && !street) atStairs.push({ kind: "trains", x: near.at[0], y: near.at[1], z: near.z + SIGN_Z, angle: Math.atan2(ny, nx), back: false, name: below.name, routes: below.routes });
   }
-  return [...atStairs, ...ways, ...out, ...onWalls].slice(0, MAX_SIGNS);
+  // Where a street stair lands: a directory of the station's lines, each with an arrow towards the nearest
+  // stair down to its platform, facing whoever comes down (owner, 2026-11-10: "no other sign boards to other
+  // trains"). The arrow is the straight direction, not the walking route. Lines that share an arrow share a sign.
+  const directory: Sign[] = [];
+  for (const f of feet) {
+    const byArrow = new Map<NonNullable<Sign["arrow"]>, Bullet[]>();
+    const seen = new Set<string>();
+    const near = [...tops].sort((a, b) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b.x - f.x, b.y - f.y));
+    for (const t of near) {
+      const fresh = t.routes.filter((r) => !seen.has(r.short));
+      if (!fresh.length) continue;
+      const [vx, vy] = [t.x - f.x, t.y - f.y];
+      const turn = Math.atan2(f.fx * vy - f.fy * vx, f.fx * vx + f.fy * vy);
+      const arrow = Math.abs(turn) < DIRECTORY.ahead ? "up" : turn > 0 ? "left" : "right";
+      for (const r of fresh) seen.add(r.short);
+      byArrow.set(arrow, [...(byArrow.get(arrow) ?? []), ...fresh]);
+    }
+    const order = (["left", "up", "right"] as const).filter((a) => byArrow.has(a));
+    order.forEach((arrow, k) => {
+      // Side by side across the way, left to right as the reader sees them.
+      const side = (k - (order.length - 1) / 2) * DIRECTORY.apart;
+      directory.push({
+        kind: "trains", x: f.x + f.fx * DIRECTORY.ahead_m - f.fy * side, y: f.y + f.fy * DIRECTORY.ahead_m + f.fx * side, z: f.z + SIGN_Z,
+        angle: Math.atan2(-f.fy, -f.fx), back: false, name: "", routes: byArrow.get(arrow)!, arrow,
+      });
+    });
+  }
+  return [...atStairs, ...directory, ...ways, ...out, ...onWalls].slice(0, MAX_SIGNS);
 }
