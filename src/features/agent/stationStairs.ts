@@ -93,10 +93,12 @@ export function stairPath(st: StationInside, portal: LngLatTuple, train: LngLatT
   for (const w of ways) {
     if (w.c.length < 2) continue;
     const levels = w.k === "steps" ? stepLevels(w, flat, [portal]) : w.c.map(() => w.from);
+    const room = w.k === "corridor" && w.c.length > 3 && metres(w.c[0], w.c[w.c.length - 1]) < 0.01;
     let prev = -1;
     w.c.forEach((at, i) => {
       const id = add({ at, level: levels[i], platform: w.k === "platform" });
-      if (prev >= 0) link(prev, id, Math.hypot(metres(nodes[prev].at, at), depth(nodes[prev].level) - depth(levels[i])));
+      // A corridor traced as a closed outline is a room: its wall is not a path, so its points join only across the floor.
+      if (prev >= 0 && !room) link(prev, id, Math.hypot(metres(nodes[prev].at, at), depth(nodes[prev].level) - depth(levels[i])));
       prev = id;
     });
   }

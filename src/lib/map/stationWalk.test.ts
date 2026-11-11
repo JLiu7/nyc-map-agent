@@ -108,6 +108,23 @@ describe("buildStation", () => {
     expect(on.z).toBeCloseTo(10, 1);
   });
 
+  it("fills a corridor traced as a closed outline: a room you can cross corner to corner", () => {
+    // A 20 m by 16 m mezzanine room in place of the 3 m passage, same stairs and platform.
+    const room = way("corridor", [[-10, -30], [10, -30], [10, -14], [-10, -14], [-10, -30]], -1);
+    const m = buildStation({ ways: [small.ways[0], way("corridor", [[0, -8], [0, -14]], -1), room, small.ways[2], small.ways[3]] })!;
+    for (const [x, y] of [[-8, -28], [8, -16], [0, -22]] as const) expect(floorsAt(m, ...toLocal(m, ...ll(x, y)))).toContain(-5);
+    // Outside the outline there is no floor: the passage's old 3 m strip would have ended at x = 1.5.
+    expect(floorsAt(m, ...toLocal(m, ...ll(-13, -22)))).toEqual([]);
+    const mezz = walkTo(m, at(m, 0, 2), ...toLocal(m, ...ll(0, -20)));
+    const corner = walkTo(m, mezz, ...toLocal(m, ...ll(-8, -28)));
+    expect(corner.z).toBeCloseTo(-5, 1);
+    expect(Math.hypot(...[corner.x, corner.y].map((v, i) => v - toLocal(m, ...ll(-8, -28))[i]))).toBeLessThan(0.5);
+    // Its wall stops you: walking on west leaves you inside the room.
+    const west = walkTo(m, corner, ...toLocal(m, ...ll(-20, -28)));
+    expect(toLngLat(m, west.x, west.y)[0]).toBeGreaterThan(ll(-10.5, 0)[0]);
+    expect(reachableShare(m)).toBeGreaterThan(0.99);
+  });
+
   it("draws walls along the passage and edges along the platform", () => {
     const ws = walls(buildStation(small)!);
     expect(ws.some((w) => !w.edge && Math.abs(w.z1 + 5) < 0.1)).toBe(true);

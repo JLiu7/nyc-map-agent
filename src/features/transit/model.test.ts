@@ -168,6 +168,14 @@ describe("x-ray", () => {
     expect(p[1].pts.map((q) => q[2])).toEqual([-10, -5]);
     expect(p.find((q) => q.kind === "shaft" && q.width > 1)?.color).toBe("#ef4444");
   });
+  it("draws a corridor traced as a closed outline as a floor, and a corridor line as a ribbon", async () => {
+    const { xrayPrims } = await import("./xray");
+    const room = { k: "corridor" as const, c: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]] as Array<[number, number]>, from: -1, to: -1 };
+    const line = { k: "corridor" as const, c: [[0, 0], [1, 0]] as Array<[number, number]>, from: -1, to: -1 };
+    const p = xrayPrims({ ways: [room, line], elevators: [] }, [], false);
+    expect(p.map((q) => q.kind)).toEqual(["area", "ribbon"]);
+    expect(p[0].order).toBeLessThan(p[1].order);
+  });
 });
 
 import { boardingArrivals } from "./model";

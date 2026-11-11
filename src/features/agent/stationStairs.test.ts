@@ -78,6 +78,19 @@ describe("stairPath", () => {
   });
 });
 
+describe("stairPath through a room", () => {
+  it("crosses a corridor traced as a closed outline instead of following its walls", () => {
+    // A 30 m square mezzanine between the street stair (west side) and the platform stair (east side).
+    const room: StationWay = { k: "corridor", c: [P(20, -15), P(50, -15), P(50, 15), P(20, 15), P(20, -15)], from: -1, to: -1 };
+    const st: StationInside = { ways: [steps([P(2, 0), P(20, 0)], 0, -1), room, steps([P(50, 0), P(60, 0)], -1, -2), platform([P(60, -60), P(60, 60), P(64, 60), P(64, -60), P(60, -60)], -2)] };
+    const path = stairPath(st, P(0, 0), P(65, 0))!;
+    expect(path).not.toBeNull();
+    // Straight across at y = 0, never out to a corner 15 m away.
+    for (const p of path.filter((q) => q.z === -5)) expect(near(p.at, P(35, 0), 16)).toBe(true);
+    expect(path.some((p) => near(p.at, P(20, 15), 3) || near(p.at, P(20, -15), 3))).toBe(false);
+  });
+});
+
 describe("stationStairs", () => {
   it("uses the trip's station when it has a path", () => {
     expect(stationStairs({ A: station }, "A", P(0, 0), P(45, 0))?.id).toBe("A");

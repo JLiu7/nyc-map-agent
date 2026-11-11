@@ -36,7 +36,8 @@ function touchPoints(w: XrayWay): Array<[number, Pt]> {
   return out;
 }
 
-const closed = (w: XrayWay) => w.k === "platform" && w.c.length > 3 && w.c[0][0] === w.c.at(-1)![0] && w.c[0][1] === w.c.at(-1)![1];
+/** A platform or a room (a corridor traced as its outline): standing anywhere inside it counts as on it. */
+const closed = (w: XrayWay) => w.k !== "steps" && w.c.length > 3 && w.c[0][0] === w.c.at(-1)![0] && w.c[0][1] === w.c.at(-1)![1];
 function inside([x, y]: Pt, ring: Pt[]): boolean {
   let r = false;
   for (let i = 1; i < ring.length; i++) {

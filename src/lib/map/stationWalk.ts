@@ -402,7 +402,8 @@ export function buildStation(st: WalkStation, input: BuildInput = {}): StationMo
 
   for (const w of ways) {
     if (w.k === "steps" || w.from === 0) continue;
-    if (w.k === "platform" && closedRing(w.c)) fill(floor(w.from), w.c, z(w.from), PLATFORM);
+    // A closed outline is the floor itself (a platform, or a mezzanine or hall traced as a room); a line is its centre.
+    if (closedRing(w.c)) fill(floor(w.from), w.c, z(w.from), w.k === "platform" ? PLATFORM : FLOOR);
     else if (w.k === "platform") paint(floor(w.from), w.c, PLATFORM_R, z(w.from), PLATFORM);
     else paint(floor(w.from), w.c, CORRIDOR_R, z(w.from), FLOOR);
   }

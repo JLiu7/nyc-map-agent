@@ -21,7 +21,11 @@ export function xrayPrims(st: XrayStation, entrances: Array<[number, number]>, e
     } else if (w.k === "steps") {
       const n = w.c.length - 1;
       out.push({ kind: "ribbon", pts: w.c.map(([x, y], i) => [x, y, z(w.from) + ((z(w.to) - z(w.from)) * i) / Math.max(n, 1)]), width: 2, color: "#facc15", order: order + 0.5 });
-    } else out.push({ kind: "ribbon", pts: w.c.map(([x, y]) => [x, y, z(w.from)]), width: 1.6, color: "#e2e8f0", order });
+    } else {
+      // A corridor traced as a closed outline is a room (a mezzanine, a hall): drawn as its floor, under the platforms.
+      const room = w.c.length > 3 && w.c[0][0] === w.c.at(-1)![0] && w.c[0][1] === w.c.at(-1)![1];
+      out.push({ kind: room ? "area" : "ribbon", pts: w.c.map(([x, y]) => [x, y, z(w.from)]), width: 1.6, color: "#e2e8f0", order: room ? order - 0.5 : order });
+    }
   }
   for (const e of st.elevators) out.push({ kind: "shaft", pts: [[e.lon, e.lat, z(e.from)]], width: 2.2, color: elevatorOut ? "#ef4444" : "#22c55e", order: 20 });
   for (const [x, y] of entrances) out.push({ kind: "shaft", pts: [[x, y, -LEVEL_M]], width: 0.8, color: "#16a34a", order: 19 });

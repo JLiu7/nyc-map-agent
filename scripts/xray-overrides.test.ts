@@ -15,6 +15,15 @@ describe("unreachablePlatforms", () => {
   it("flags a platform with no stairs down to its level", () => {
     expect(unreachablePlatforms({ ways: [street, mezz, platform], elevators: [] })).toEqual([2]);
   });
+  it("counts a stair that ends inside a room (a corridor traced as its outline) as joined to it", () => {
+    // A 22 m square mezzanine: both stairs end well inside it, more than JOIN_M from its outline.
+    const room: XrayWay = { k: "corridor", c: [[-74.00013, 40.70006], [-73.99987, 40.70006], [-73.99987, 40.70026], [-74.00013, 40.70026], [-74.00013, 40.70006]], from: -1, to: -1 };
+    const intoRoom: XrayWay = { k: "steps", c: [[-74, 40.7], [-74, 40.70012]], from: -1, to: 0 };
+    const outOfRoom: XrayWay = { k: "steps", c: [[-74, 40.7002], [-74, 40.70033]], from: -2, to: -1 };
+    expect(unreachablePlatforms({ ways: [intoRoom, room, outOfRoom, platform], elevators: [] })).toEqual([]);
+    // The same room on another level joins nothing, and the two stairs are too far apart to meet.
+    expect(unreachablePlatforms({ ways: [intoRoom, { ...room, from: -3, to: -3 }, outOfRoom, platform], elevators: [] })).toEqual([3]);
+  });
   it("doesn't join ways on different levels that only line up on the map", () => {
     const deep = { ...platform, from: -3, to: -3 };
     expect(unreachablePlatforms({ ways: [street, mezz, down, deep], elevators: [] })).toEqual([3]);
