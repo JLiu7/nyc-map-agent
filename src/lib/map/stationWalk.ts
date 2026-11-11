@@ -596,7 +596,7 @@ export function floorRuns(g: Piece): Run[] {
 
 /** A wall or platform edge from (x1, y1) to (x2, y2), standing on the floor at z1..z2; edges face the track. */
 /** A wall's foot from (x1, y1, z1) to (x2, y2, z2). `edge`: a platform's edge, not a wall. `stair`: a stair's side. */
-type Wall = { x1: number; y1: number; z1: number; x2: number; y2: number; z2: number; edge: boolean; stair?: boolean };
+type Wall = { x1: number; y1: number; z1: number; x2: number; y2: number; z2: number; edge: boolean; stair?: boolean; /** A stair's side: the height of the floor its flight climbs to. */ top?: number };
 
 /** How far a traced outline may stray from the cells when it is straightened. */
 const SIMPLIFY_M = 0.4;
@@ -634,7 +634,7 @@ export function walls(m: StationModel): Wall[] {
         const before = f.line.slice(0, s).reduce((t, p, i, l) => (i ? t + dist(l[i - 1], p) : 0), 0);
         const za = f.za + ((f.zb - f.za) * before) / total, zb = f.za + ((f.zb - f.za) * (before + len)) / total;
         for (const side of [-STAIR_R, STAIR_R]) {
-          const w = { x1: a[0] + nx * side, y1: a[1] + ny * side, z1: za, x2: b[0] + nx * side, y2: b[1] + ny * side, z2: zb, edge: false, stair: true };
+          const w = { x1: a[0] + nx * side, y1: a[1] + ny * side, z1: za, x2: b[0] + nx * side, y2: b[1] + ny * side, z2: zb, edge: false, stair: true, top: Math.max(f.za, f.zb) };
           // Beside the stair, a floor at the stair's height (a landing, the mezzanine) is open.
           const mid: P = [(w.x1 + w.x2) / 2 + nx * Math.sign(side) * 0.4, (w.y1 + w.y2) / 2 + ny * Math.sign(side) * 0.4];
           const zm = (za + zb) / 2;

@@ -196,6 +196,11 @@ function tileTexture(): THREE.Texture | null {
   return t;
 }
 
+/** A stair's own head room, its parapet where it comes up through a floor, and the daylight at a street stair's top. */
+const STAIR = { head: 2.6, parapet: 1.05, sky: 0xdcebf7 };
+/** The top of a stair's side wall at tread height z: its soffit under the floor it climbs to (`top`), a parapet once it is through. */
+const stairTop = (z: number, top: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + STAIR.parapet);
+
 /**
  * A small repeating texture drawn once in code: no download, one 128 px canvas per surface.
  * `metres` is how much floor one repeat covers.
@@ -370,6 +375,34 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     for (const [lo, hi] of [[TRIM.from, TRIM.to], [TRIM.line, TRIM.lineTo]]) trim.add([a[0], a[1], a[2] + lo], [b[0], b[1], b[2] + lo], [b[0], b[1], b[2] + hi], [a[0], a[1], a[2] + hi]);
   };
 
+  /**
+   * A stair's side below the street, in short pieces. Under the floor it climbs to, the wall stands to that
+   * floor's underside (never past it); where the stair comes up through the floor, it is a waist-high parapet
+   * round the opening. One tall sloping wall each side made a jagged chute through every room, with pieces
+   * sticking out above the ceilings (owner, 2026-11-10: "stairs ... so tightly closed", "holes in the ground").
+   */
+  const stairSide = (w: ReturnType<typeof walls>[number]) => {
+    const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1), n = Math.max(1, Math.round(len / 0.7)), top = w.top ?? Math.max(w.z1, w.z2);
+    const at = (t: number) => [w.x1 + (w.x2 - w.x1) * t, w.y1 + (w.y2 - w.y1) * t, w.z1 + (w.z2 - w.z1) * t];
+    const [nx, ny] = [(-(w.y2 - w.y1) / (len || 1)) * 0.9, ((w.x2 - w.x1) / (len || 1)) * 0.9];
+    for (let k = 0; k < n; k++) {
+      const [p, q] = [at(k / n), at((k + 1) / n)];
+      // A parapet only where the upper room's floor runs beside the opening. A stair that leaves its room
+      // and climbs through solid ground is a chute: its walls go up to the lid over it.
+      const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      const beside = roomFloorAt(mx + nx, my + ny, top) || roomFloorAt(mx - nx, my - ny, top);
+      const up = (z: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + (beside ? STAIR.parapet : Math.abs(top) <= 0.5 ? 3.4 : CEILING_M));
+      wall.wall(p, q, [q[0], q[1], up(q[2])], [p[0], p[1], up(p[2])]);
+    }
+  };
+  /** Is there a room's floor (not a stair) at (x, y) at about height z? */
+  const roomFloorAt = (x: number, y: number, z: number) =>
+    m.pieces.some((g) => {
+      if (g.stair) return false;
+      const [i, j] = [Math.floor((x - g.x0) / CELL_M), Math.floor((y - g.y0) / CELL_M)];
+      return i >= 0 && j >= 0 && i < g.nx && j < g.ny && Math.abs(g.h[j * g.nx + i] - z) < 0.75;
+    });
+
   const surfaces = drawn(m);
   const flat = (q: Quads, r: { x: number; y: number; w: number }, z: number) => q.add([r.x, r.y, z], [r.x + r.w, r.y, z], [r.x + r.w, r.y + CELL_M, z], [r.x, r.y + CELL_M, z]);
   const platformRuns: Array<{ x: number; y: number; z: number }> = [];
@@ -395,13 +428,61 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     }
     // Below the street the rooms' outlines (further down) are the walls; only stair sides come from here.
     if (under && !w.stair) continue;
-    if (under) tiled([a[0], a[1], w.z1], [b[0], b[1], w.z2], [w.z1, w.z2], CEILING_M);
+    if (under) stairSide(w);
     else railing.add([a[0], a[1], w.z1], [b[0], b[1], w.z2], [b[0], b[1], w.z2 + RAIL_M], [a[0], a[1], w.z1 + RAIL_M]);
   }
 
   // Below the street each floor is a room: the trainway beside its platforms, a ceiling over both, walls round it.
   for (const r of surfaces.ceilings) flat(ceiling, r, r.z + CEILING_M);
   for (const r of surfaces.beds) flat(bed, r, r.z - TRACK_DROP_M);
+  // Each stair below the street has a ceiling of its own, sloping with it, until it comes up through the floor
+  // above; a street stair ends in daylight, where the map takes over (it was a black rectangle).
+  const sky = new Quads();
+  if (under) for (const g of m.pieces) {
+    const f = g.flight;
+    if (!f || f.line.length < 2) continue;
+    const top = Math.max(f.za, f.zb), half = STAIR_W / 2;
+    const total = f.line.reduce((t, p, i) => (i ? t + Math.hypot(p[0] - f.line[i - 1][0], p[1] - f.line[i - 1][1]) : 0), 0) || 1;
+    let before = 0;
+    for (let sI = 1; sI < f.line.length; sI++) {
+      const [a, b] = [f.line[sI - 1], f.line[sI]];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, n = Math.max(1, Math.round(len / 0.7));
+      const [nx, ny] = [(-(b[1] - a[1]) / len) * half, ((b[0] - a[0]) / len) * half];
+      const done = before;
+      const at = (t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, f.za + ((f.zb - f.za) * (done + len * t)) / total];
+      for (let k = 0; k < n; k++) {
+        const [p, q] = [at(k / n), at((k + 1) / n)];
+        // Over the whole stairwell, at the upper room's ceiling height (daylight over a street stair): the upper
+        // room has no floor here, so it has no ceiling either, and the dark behind the model showed through.
+        const lid = Math.abs(top) <= 0.5 ? sky : ceiling, zl = top + (Math.abs(top) <= 0.5 ? 3.4 : CEILING_M);
+        lid.add([p[0] - nx, p[1] - ny, zl], [q[0] - nx, q[1] - ny, zl], [q[0] + nx, q[1] + ny, zl], [p[0] + nx, p[1] + ny, zl]);
+        // Where the stair goes under the floor it climbs to, the opening's head: a wall across it from that
+        // floor up to the lid, or the view down the stair from its top ended in the dark behind the model.
+        const under2 = (z: number) => z + STAIR.head < top;
+        if (under2(p[2]) !== under2(q[2])) {
+          const h = under2(p[2]) ? p : q;
+          wall.wall([h[0] - nx, h[1] - ny, top], [h[0] + nx, h[1] + ny, top], [h[0] + nx, h[1] + ny, zl], [h[0] - nx, h[1] - ny, zl]);
+        }
+        if (Math.min(p[2], q[2]) + STAIR.head >= top) continue;
+        const [zp, zq] = [stairTop(p[2], top), stairTop(q[2], top)];
+        ceiling.add([p[0] - nx, p[1] - ny, zp], [q[0] - nx, q[1] - ny, zq], [q[0] + nx, q[1] + ny, zq], [p[0] + nx, p[1] + ny, zp]);
+      }
+      before += len;
+    }
+    if (Math.abs(top) <= 0.5) {
+      // The street end, and the way the stair runs as it reaches it.
+      const up = f.za >= f.zb ? [f.line[0], f.line[1]] : [f.line.at(-1)!, f.line.at(-2)!];
+      const d = Math.hypot(up[0][0] - up[1][0], up[0][1] - up[1][1]) || 1;
+      const [ux, uy] = [(up[0][0] - up[1][0]) / d, (up[0][1] - up[1][1]) / d];
+      const [cx, cy] = [up[0][0] + ux * 0.6, up[0][1] + uy * 0.6];
+      sky.add([cx + uy * half, cy - ux * half, top - 0.4], [cx - uy * half, cy + ux * half, top - 0.4], [cx - uy * half, cy + ux * half, top + 3.4], [cx + uy * half, cy - ux * half, top + 3.4]);
+    }
+  }
+  if (sky.pos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(sky.pos, 3));
+    group.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: STAIR.sky, side: THREE.DoubleSide, fog: false })));
+  }
   rooms(m).forEach((room) => {
     for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75))) {
       tiled([w.x1, w.y1, w.z1], [w.x2, w.y2, w.z2], [w.z1 - TRACK_DROP_M, w.z2 - TRACK_DROP_M], CEILING_M);
