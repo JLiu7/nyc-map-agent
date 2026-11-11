@@ -166,6 +166,98 @@ Blocked/uncertain:
 Next:
 - Merge the pull request, then watch a preview in Chinese on the live site
 
+### 2026-11-10 23:58:13 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge the follow-up pull request, then play a preview in Chinese on the live site once more","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0039","timestamp":"2026-11-10T23:58:13Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"fd8d59bdddf0f927ca8039d1a83a9d60332d8f9522156ce443ba832f42277606","request_id":"197771ce6e1e4fb5923a2cddcdddb2c4","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0039"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge the follow-up pull request, then play a preview in Chinese on the live site once more
+
+### 2026-11-11 00:15:12 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge the follow-up pull request, then play a preview in Chinese on the live site once more","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0039","timestamp":"2026-11-11T00:15:12Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"fd8d59bdddf0f927ca8039d1a83a9d60332d8f9522156ce443ba832f42277606","request_id":"ac99dc61b6594ae88358e4e3b021fe6d","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0039"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge the follow-up pull request, then play a preview in Chinese on the live site once more
+
+### 2026-11-11 00:29:55 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge the pull request, then check it on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0039","timestamp":"2026-11-11T00:29:55Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b1a033874a8efe0152eb7e5bebf69aea191c374f79d775bf96890dbd261651a0","request_id":"e9b22e57a5aa43f9b5da3042d3b42cf7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0039"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge the pull request, then check it on the live site
+
+### 2026-11-11 00:47:43 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge the pull request, then check it on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0039","timestamp":"2026-11-11T00:47:43Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b1a033874a8efe0152eb7e5bebf69aea191c374f79d775bf96890dbd261651a0","request_id":"5e126482185f43069065c4a86287bd9a","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0039"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge the pull request, then check it on the live site
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

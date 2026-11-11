@@ -137,16 +137,17 @@ export function usePlayer(onCallout?: (text: string) => void) {
    */
   const words = useRef(new Map<string, string>());
   const inLang = useCallback((text: string) => words.current.get(text.trim()) ?? text, []);
-  const translate = useCallback((tripId: string, t: Segment[]) => {
+  const translate = useCallback((tripId: string, t: Segment[], more = false) => {
     const lang = getAppLang();
-    words.current = new Map();
+    // `more`: the same trip with steps added (the walk through the station), so what is translated already stays.
+    if (!more) words.current = new Map();
     if (lang === "en") return;
     // What is said or shown as a step: each scene's label and its spoken callouts. Stop names stay as the signs read.
     const lines = t.flatMap((seg) => [seg.label, ...seg.callouts.filter((c) => !c.quiet).map((c) => c.text)]);
     // Loaded only for another language, so English previews carry none of it.
     void import("@/lib/i18n/translateLines").then(({ translateLines }) => translateLines(lines, lang)).then((got) => {
       if (pbRef.current.tripId !== tripId || !got.size) return;
-      words.current = got;
+      words.current = more ? new Map([...words.current, ...got]) : got;
       // The step on screen now, said again in its language.
       setCallout((c) => got.get(lastCallout.current.trim()) ?? got.get(c.trim()) ?? c);
     });
@@ -232,8 +233,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
       if (pbRef.current.tripId !== tripId || segsRef.current !== t) return;
       segsRef.current = next;
       setSegs(next);
+      // The station walk adds steps of its own ("Step off the 4 train"), which stayed in English (live check, 2026-11-10).
+      translate(tripId, next, true);
     });
-  }, []);
+  }, [translate]);
 
   const clearLayers = useCallback(() => {
     const map = getMapInstance();
