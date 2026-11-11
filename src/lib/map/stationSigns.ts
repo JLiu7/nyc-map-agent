@@ -114,10 +114,10 @@ const MAX_WAY_SIGNS = 14;
  * Signs over a trip's own way through the station, facing the walker: an arrow before each turn
  * and one pointing ahead on a long straight, so the way shows at eye level and not only as a line
  * on the floor (owner, 2026-11-10: "hard to see where you're going ... more signage"). Leaving,
- * they are Exit signs; going to the train, they carry its line. `guide` is the way in walking
+ * they are Exit signs with the exit's street when the trip names it; going to the train, they carry its line. `guide` is the way in walking
  * order, local metres. Nothing hangs on stairs.
  */
-export function guideSigns(guide: Array<[number, number, number]>, exit: boolean, routes: Bullet[]): Sign[] {
+export function guideSigns(guide: Array<[number, number, number]>, exit: boolean, routes: Bullet[], words?: string): Sign[] {
   // The way at one-metre steps, so a zigzag of half-metre cells reads as one heading.
   const pts: Array<[number, number, number]> = [];
   let carry = 0;
@@ -135,7 +135,7 @@ export function guideSigns(guide: Array<[number, number, number]>, exit: boolean
   const flat = (i: number, j: number) => Math.abs(pts[j][2] - pts[i][2]) < 0.6;
   const out: Sign[] = [];
   const hang = (i: number, heading: number, arrow: Sign["arrow"]) =>
-    out.push({ kind: exit ? "exit" : "way", x: pts[i][0], y: pts[i][1], z: pts[i][2] + SIGN_Z, angle: heading + Math.PI, back: false, name: "", routes: exit ? [] : routes, arrow });
+    out.push({ kind: exit ? "exit" : "way", x: pts[i][0], y: pts[i][1], z: pts[i][2] + SIGN_Z, angle: heading + Math.PI, back: false, name: "", routes: exit ? [] : routes, arrow, ...(exit && words ? { words } : {}) });
   let last = -AHEAD_EVERY_M;
   for (let i = W; i < n - W && out.length < MAX_WAY_SIGNS; i++) {
     if (!flat(i - W, i + W)) continue;

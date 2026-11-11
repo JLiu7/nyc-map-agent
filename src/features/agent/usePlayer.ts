@@ -111,6 +111,12 @@ function lookPitch(seg: Segment, f: number): number {
   return Math.max(62, Math.min(96, 80 + (Math.atan2(dz, 0.01 * len) * 180) / Math.PI));
 }
 
+/** The street a trip's exit comes up on, from its step ("Use the E exit on Fulton Street at Fulton St"), for the Exit signs on the way. */
+function exitStreet(seg: Segment): string | undefined {
+  if (seg.kind !== "ascend") return undefined;
+  return /\bexit (?:on|by) (.+?) at /.exec(seg.label)?.[1];
+}
+
 type StationEye = { lon: number; lat: number; bearing: number; pitch: number; z: number; fov?: number };
 
 export function usePlayer(onCallout?: (text: string) => void) {
@@ -196,7 +202,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
     const ride = segsRef.current[seg.kind === "ascend" ? at - 1 : at + 1];
     const line = ride?.kind === "ride" && ride.route ? ride.route.replace(/^([0-9A-Z])X$/, "$1") : null;
     const bullets = walk.station.signs.stations.flatMap((s) => s.routes).filter((b) => b.route === line).slice(0, 1);
-    const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train, signs: { exit: seg.kind === "ascend", routes: bullets } };
+    const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train, signs: { exit: seg.kind === "ascend", routes: bullets, words: exitStreet(seg) } };
     void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
       if (inside.current !== view) return;
       const { model, tracks, signs } = walk.station;

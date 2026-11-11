@@ -101,6 +101,29 @@ Blocked/uncertain:
 Next:
 - Merge the pull request, then watch the Fulton St walk on the live site
 
+### 2026-11-11 02:07:22 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge the pull request, then record a trip to Fulton St and read the steps around the ride","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0042","timestamp":"2026-11-11T02:07:22Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"f004373beccae51a5fba420ea3cc6e95d9f63e6ce9e447aacb0317d63ce4db7a","request_id":"06b874ad1033482997cf21a2d969c73f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0042"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge the pull request, then record a trip to Fulton St and read the steps around the ride
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

@@ -39,6 +39,8 @@ export interface InsideWalk {
   track: { at: [number, number]; angle: number };
   /** The line's colour, for the train's stripe and the boarding spot. */
   color: string;
+  /** Getting off: which part of the train stops by the stairs to the exit ("at the front"). */
+  trainPart?: string;
 }
 export interface Pose { center: LngLatTuple; bearing: number; pitch: number; zoom: number }
 

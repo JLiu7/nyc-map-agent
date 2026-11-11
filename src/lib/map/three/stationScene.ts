@@ -88,7 +88,7 @@ interface StationTrip {
   color: string;
   train: () => number | null;
   /** Signs over the way itself: Exit signs when leaving, else the train's line. */
-  signs?: { exit: boolean; routes: Bullet[] };
+  signs?: { exit: boolean; routes: Bullet[]; /** The street the trip's exit comes up on, for its Exit signs. */ words?: string };
 }
 
 /** The guide line: bright, unlit, a little above the floor so stair treads do not cover it. */
@@ -447,7 +447,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
   }
 
   // Over the trip's own way: arrows before its turns, Exit signs leaving and the train's line going to it.
-  const onWay = trip?.signs ? guideSigns(trip.guide, trip.signs.exit, trip.signs.routes) : [];
+  const onWay = trip?.signs ? guideSigns(trip.guide, trip.signs.exit, trip.signs.routes, trip.signs.words) : [];
   let hung = signs ? signMeshes(m, signs, undefined, onWay) : [];
   group.add(...hung);
   /**

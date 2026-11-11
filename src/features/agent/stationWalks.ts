@@ -78,8 +78,14 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
   const station = (await stationAt(...train)) ?? (await stationAt(...street));
   if (!station) return null;
   const m = station.model;
-  const route = routeThrough(m, toLocal(m, ...street), toLocal(m, ...train));
-  if (!route) return null;
+  const whole = routeThrough(m, toLocal(m, ...street), toLocal(m, ...train));
+  if (!whole) return null;
+  // Where the way first reaches the platform: the foot of the stairs to the exit. The rider still steps
+  // off at the station's stop point, the middle of the train, since the app cannot know their car; the
+  // stairs are then described from there (owner, 2026-11-10).
+  let foot = whole.length - 1;
+  while (foot > 0 && Math.abs(whole[foot - 1][2] - whole[whole.length - 1][2]) < 0.3) foot--;
+  const route = whole;
   // The train runs the way the ride goes, and stops beside the platform's edge.
   const travel = ride ? travelAngle(ride.coords, !down) : 0;
   const end = route[route.length - 1];
@@ -94,12 +100,13 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
   const guide = down ? route : [...route].reverse();
   const walkS = Math.max(30, Math.min(240, metres(route) / STATION_PACE));
   const waitS = down ? WAIT_DOWN_S : WAIT_UP_S;
-  const inside: InsideWalk = { station, guide, board, track, color: lineColor(ride?.route ?? "") };
+  const part = down ? null : trainPartAt(m, route[Math.min(route.length - 1, foot)], track.angle);
+  const inside: InsideWalk = { station, guide, board, track, color: lineColor(ride?.route ?? ""), ...(part ? { trainPart: part } : {}) };
   const w = waitShare({ ...seg, realS: walkS + waitS, waitS });
   const name = ride?.route ? `the ${ride.route} train` : "the train";
   const callouts = down
     ? [...seg.callouts, { f: 1 - w, text: `Wait here for ${name}` }, { f: 1 - w * 0.2, text: `Board ${name}` }]
-    : [{ f: 0, text: `Step off ${name}` }, ...seg.callouts.map((c) => ({ ...c, f: Math.max(c.f, w) }))];
+    : [{ f: 0, text: part ? `Step off ${name}. You are in the middle of the train. The stairs to your exit are ${fromMiddle(part)}` : `Step off ${name}` }, ...seg.callouts.map((c) => ({ ...c, f: Math.max(c.f, w) }))];
   return {
     ...seg,
     coords: guide.map((p) => toLngLat(m, p[0], p[1])),
@@ -109,6 +116,50 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
     inside,
     callouts,
   };
+}
+
+/** A platform edge further than this to the side of the stairs belongs to another platform. */
+const SAME_PLATFORM_M = 16;
+
+/**
+ * Which part of the train stops by a point on the platform, in words, or null when the platform's
+ * length cannot be read. A train fills nearly the whole platform, so how far along it the stairs to
+ * the exit are is how far along the train to ride (owner, 2026-11-10: "wish we knew which car we came
+ * out of ... where the stairs are relative to the train itself"). `travel` is the way the train runs.
+ */
+export function trainPartAt(m: StationModel, at: RoutePoint, travel: number): string | null {
+  const [ux, uy] = [Math.cos(travel), Math.sin(travel)];
+  let [lo, hi] = [Infinity, -Infinity];
+  for (const w of walls(m)) {
+    if (!w.edge || Math.abs(w.z1 - at[2]) > 0.5) continue;
+    if (Math.abs(Math.cos(Math.atan2(w.y2 - w.y1, w.x2 - w.x1) - travel)) < 0.7) continue;
+    const near = nearestOnLine([[w.x1, w.y1], [w.x2, w.y2]], [at[0], at[1]]);
+    // Only this platform's edges: the ones the stairs' own spot lies alongside, give or take the stairs' landing.
+    const [ta, tb] = [w.x1 * ux + w.y1 * uy, w.x2 * ux + w.y2 * uy];
+    const side = Math.abs((at[0] - w.x1) * -uy + (at[1] - w.y1) * ux);
+    if (!near || side > SAME_PLATFORM_M) continue;
+    lo = Math.min(lo, ta, tb);
+    hi = Math.max(hi, ta, tb);
+  }
+  if (hi - lo < 60) return null;
+  return trainPart((at[0] * ux + at[1] * uy - lo) / (hi - lo));
+}
+
+/** Where a part of the train is for someone standing at its middle. */
+export function fromMiddle(part: string): string {
+  // Said by the train's ends, not "ahead" or "behind": stepping off, the rider may face either way.
+  if (part === "in the middle") return "right by you";
+  if (part === "at the front" || part === "at the back") return `${part} of the train`;
+  return /front/.test(part) ? "a little toward the front of the train" : "a little toward the back of the train";
+}
+
+/** A share of the way along the train, 0 its back and 1 its front, in five plain parts. */
+export function trainPart(f: number): string {
+  if (f >= 0.8) return "at the front";
+  if (f >= 0.6) return "between the middle and the front";
+  if (f > 0.4) return "in the middle";
+  if (f > 0.2) return "between the middle and the back";
+  return "at the back";
 }
 
 /** Route the trip's station legs through the walkable stations, falling back to the x-ray stairs. */
@@ -121,5 +172,15 @@ export async function withStationWalks(segs: Segment[]): Promise<Segment[]> {
     }),
   );
   const rest = walked.some((w, i) => !w && segs[i].station) ? withStairs(segs, await loadStationInsides()) : segs;
-  return rest.map((seg, i) => walked[i] ?? seg);
+  const out = rest.map((seg, i) => walked[i] ?? seg);
+  // The part of the train that stops by the exit's stairs is said before it matters: boarding, and at the start of the ride.
+  out.forEach((seg, i) => {
+    const part = seg.kind === "ascend" ? seg.inside?.trainPart : undefined;
+    const ride = out[i - 1];
+    if (!part || ride?.kind !== "ride") return;
+    out[i - 1] = { ...ride, callouts: [ride.callouts[0], { f: 0.04, text: `The stairs to your exit are ${part} of the train. Ride there to step off beside them` }, ...ride.callouts.slice(1)].filter(Boolean) };
+    const board = out[i - 2];
+    if (board?.kind === "descend") out[i - 2] = { ...board, callouts: board.callouts.map((c) => (/^Board /.test(c.text) ? { ...c, text: `${c.text}. For your exit, ride ${part}` } : c)) };
+  });
+  return out;
 }
