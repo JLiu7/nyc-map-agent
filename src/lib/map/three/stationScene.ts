@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
-import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_HEAD_M, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
+import { besideFlight, CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_HEAD_M, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
 import { guideSigns, placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
 import { cornerLine } from "../cornerLine";
@@ -198,6 +198,10 @@ function tileTexture(): THREE.Texture | null {
 
 /** A stair's own head room, its parapet where it comes up through a floor, and the daylight at a street stair's top. */
 const STAIR = { head: STAIR_HEAD_M, parapet: 1.05, sky: 0xdcebf7 };
+/** How far a stair's treads climb from its foot before its side walls start. */
+const FOOT_OPEN_M = 0.5;
+/** Over that open foot, the side wall starts this far above the foot, clear of a walker's head. */
+const FOOT_LINTEL_M = 2.3;
 /** The top of a stair's side wall at tread height z: its soffit under the floor it climbs to (`top`), a parapet once it is through. */
 const stairTop = (z: number, top: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + STAIR.parapet);
 
@@ -382,17 +386,31 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
    * sticking out above the ceilings (owner, 2026-11-10: "stairs ... so tightly closed", "holes in the ground").
    */
   const stairSide = (w: ReturnType<typeof walls>[number]) => {
-    const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1), n = Math.max(1, Math.round(len / 0.7)), top = w.top ?? Math.max(w.z1, w.z2);
+    const top = w.top ?? Math.max(w.z1, w.z2), foot = Math.min(w.z1, w.z2);
+    const full = Math.hypot(w.x2 - w.x1, w.y2 - w.y1) || 1;
+    const [nx, ny] = [(-(w.y2 - w.y1) / full) * 0.9, ((w.x2 - w.x1) / full) * 0.9];
     const at = (t: number) => [w.x1 + (w.x2 - w.x1) * t, w.y1 + (w.y2 - w.y1) * t, w.z1 + (w.z2 - w.z1) * t];
-    const [nx, ny] = [(-(w.y2 - w.y1) / (len || 1)) * 0.9, ((w.x2 - w.x1) / (len || 1)) * 0.9];
-    for (let k = 0; k < n; k++) {
-      const [p, q] = [at(k / n), at((k + 1) / n)];
-      // A parapet only where the upper room's floor runs beside the opening. A stair that leaves its room
-      // and climbs through solid ground is a chute: its walls go up to the lid over it.
-      const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-      const beside = roomFloorAt(mx + nx, my + ny, top) || roomFloorAt(mx - nx, my - ny, top);
-      const up = (z: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + (beside ? STAIR.parapet : Math.abs(top) <= 0.5 ? 3.4 : CEILING_M));
-      wall.wall(p, q, [q[0], q[1], up(q[2])], [p[0], p[1], up(p[2])]);
+    // The sides are open below head height until the treads are a step up from the floor at the foot.
+    // Walkers (and the trip preview's way) can step onto the lowest treads from the side, and at Fulton St
+    // the way to the E exit came in across the foot of a stair from the hall, through a full-height side wall.
+    const open = Math.min(1, FOOT_OPEN_M / (Math.abs(w.z2 - w.z1) || 1));
+    const cut = w.z1 < w.z2 ? open : 1 - open;
+    const runs: Array<[number, number, boolean]> = w.z1 < w.z2 ? [[0, cut, true], [cut, 1, false]] : [[0, cut, false], [cut, 1, true]];
+    for (const [ta, tb, low] of runs) {
+      if (tb - ta < 1e-6) continue;
+      const n = Math.max(1, Math.round((full * (tb - ta)) / 0.7));
+      for (let k = 0; k < n; k++) {
+        const [p, q] = [at(ta + ((tb - ta) * k) / n), at(ta + ((tb - ta) * (k + 1)) / n)];
+        // A parapet only where the upper room's floor runs beside the opening. A stair that leaves its room
+        // and climbs through solid ground is a chute: its walls go up to the lid over it.
+        const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+        const beside = roomFloorAt(mx + nx, my + ny, top) || roomFloorAt(mx - nx, my - ny, top);
+        const up = (z: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + (beside ? STAIR.parapet : Math.abs(top) <= 0.5 ? 3.4 : CEILING_M));
+        // Over the open foot, only a lintel above head height, so the stair's own ceiling does not show past its side.
+        const [bp, bq] = low ? [foot + FOOT_LINTEL_M, foot + FOOT_LINTEL_M] : [p[2], q[2]];
+        if (low && up(p[2]) <= bp && up(q[2]) <= bq) continue;
+        wall.wall([p[0], p[1], bp], [q[0], q[1], bq], [q[0], q[1], Math.max(bq, up(q[2]))], [p[0], p[1], Math.max(bp, up(p[2]))]);
+      }
     }
   };
   /** Is there a room's floor (not a stair) at (x, y) at about height z? */
@@ -460,8 +478,14 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
         // floor up to the lid, or the view down the stair from its top ended in the dark behind the model.
         const under2 = (z: number) => z + STAIR.head < top;
         if (under2(p[2]) !== under2(q[2])) {
-          const h = under2(p[2]) ? p : q;
-          wall.wall([h[0] - nx, h[1] - ny, top], [h[0] + nx, h[1] + ny, top], [h[0] + nx, h[1] + ny, zl], [h[0] - nx, h[1] - ny, zl]);
+          const [h, o] = under2(p[2]) ? [p, q] : [q, p];
+          // In an open room the upper floor goes on past the head (the stair dives under it), so the head is a
+          // parapet like the opening's sides. A full wall there stood alone in Fulton St's hall, floor to
+          // ceiling, and with the parapets beside it read as a broken box the trip preview walked into.
+          const [ux, uy] = [(h[0] - o[0]) / (Math.hypot(h[0] - o[0], h[1] - o[1]) || 1), (h[1] - o[1]) / (Math.hypot(h[0] - o[0], h[1] - o[1]) || 1)];
+          const past = roomFloorAt(h[0] + ux * 0.8, h[1] + uy * 0.8, top);
+          const zh = past ? top + STAIR.parapet : zl;
+          wall.wall([h[0] - nx, h[1] - ny, top], [h[0] + nx, h[1] + ny, top], [h[0] + nx, h[1] + ny, zh], [h[0] - nx, h[1] - ny, zh]);
         }
         if (Math.min(p[2], q[2]) + STAIR.head >= top) continue;
         const [zp, zq] = [stairTop(p[2], top), stairTop(q[2], top)];
@@ -509,8 +533,18 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     g.setAttribute("position", new THREE.Float32BufferAttribute(sky.pos, 3));
     group.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: STAIR.sky, side: THREE.DoubleSide, fog: false })));
   }
+  // A room's floor ends at a stair going down from it: that edge is the stair's opening, which the stair rings
+  // with its own parapets. Read as a wall, it stood full height round the opening once the treads were a step
+  // below the floor, and in Fulton St's hall made a box of skewed tiles the trip preview walked into.
+  const downs = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
+  const intoStair = (look: [number, number], h: number) =>
+    downs.some((f) => {
+      if (Math.abs(Math.max(f.za, f.zb) - h) > 0.75 || Math.min(f.za, f.zb) > h - 0.75) return false;
+      const b = besideFlight(f, look[0], look[1]);
+      return b.beside && b.d <= STAIR_W / 2 + 0.3;
+    });
   rooms(m).forEach((room) => {
-    for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75))) {
+    for (const w of outline(room, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= 0.75) || intoStair(look, h))) {
       tiled([w.x1, w.y1, w.z1], [w.x2, w.y2, w.z2], [w.z1 - TRACK_DROP_M, w.z2 - TRACK_DROP_M], CEILING_M);
     }
   });
