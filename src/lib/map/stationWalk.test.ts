@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStation, drawn, floorsAt, floorUnder, outline, reachableShare, rooms, streetTops, toLngLat, toLocal, walkIn, walls, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
+import { besideFlight, buildStation, drawn, floorsAt, floorUnder, outline, reachableShare, rooms, streetTops, toLngLat, toLocal, walkIn, floorWellOpen, walls, wellOpen, type StationModel, type StationPos, type WalkStation, type WalkWay } from "./stationWalk";
 
 // Metres east/north of a point in Lower Manhattan, as lon/lat.
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
@@ -169,10 +169,21 @@ describe("drawn", () => {
   };
   type Run = ReturnType<typeof drawn>["floors"][number];
   const covers = (runs: Run[], x: number, y: number, z: number) => runs.some((r) => Math.abs(r.z - z) < 0.1 && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + 0.5);
+  type Rim = ReturnType<typeof drawn>["rims"][number];
+  /** Is (x, y) under a stairwell's rim, the strip of slab along a stair's side, at height z? */
+  const rimmed = (rims: Rim[], x: number, y: number, z: number) =>
+    rims.some(({ strip }) => {
+      if (Math.abs(strip[0][2] - z) > 0.1) return false;
+      const turns = strip.map((a, i) => { const b = strip[(i + 1) % 4]; return Math.sign((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])); });
+      return turns.every((t) => t >= 0) || turns.every((t) => t <= 0);
+    });
+  /** Is (x, y) inside a stairwell that opens a slab at height z there (a wall can run into a stair's footprint)? */
+  const inWell = (m: StationModel, x: number, y: number, z: number, open: (t: number, z: number) => boolean) =>
+    m.pieces.some((g) => { if (!g.flight) return false; const b = besideFlight(g.flight, x, y); return b.d <= 1.02 && open(b.z, z); });
 
   it("reaches every wall with floor and ceiling, leaving no gap along its foot or top", () => {
     const m = buildStation(slanted)!;
-    const { floors, ceilings, beds } = drawn(m);
+    const { floors, ceilings, beds, rims } = drawn(m);
     let points = 0;
     const missed: string[] = [];
     for (const room of rooms(m)) {
@@ -181,8 +192,8 @@ describe("drawn", () => {
         for (let t = 0.1; t <= 0.9; t += 0.25 / Math.max(len, 1)) {
           const [x, y] = [w.x1 + (w.x2 - w.x1) * t, w.y1 + (w.y2 - w.y1) * t];
           points++;
-          if (!covers([...floors, ...beds], x, y, w.z1)) missed.push(`floor ${x.toFixed(1)},${y.toFixed(1)}`);
-          if (!covers(ceilings, x, y, w.z1)) missed.push(`ceiling ${x.toFixed(1)},${y.toFixed(1)}`);
+          if (!covers([...floors, ...beds], x, y, w.z1) && !rimmed(rims, x, y, w.z1) && !inWell(m, x, y, w.z1, floorWellOpen)) missed.push(`floor ${x.toFixed(1)},${y.toFixed(1)}`);
+          if (!covers(ceilings, x, y, w.z1) && !rimmed(rims, x, y, w.z1 + 3.2) && !inWell(m, x, y, w.z1 + 3.2, wellOpen)) missed.push(`ceiling ${x.toFixed(1)},${y.toFixed(1)}`);
         }
       }
     }
@@ -227,6 +238,32 @@ describe("stairwells", () => {
       check(floors, 0, 0.35);
       expect(cells).toBeGreaterThan(10_000);
       expect(over).toBe(0);
+    });
+
+    it(`cuts each stairwell along the stair's sides and closes its rim at station ${id}`, () => {
+      const m = buildStation(xray[id])!;
+      const flights = m.pieces.filter((g) => g.flight);
+      const { floors, ceilings, rims } = drawn(m);
+      // No slab cell reaches inside a stair's side walls where the stair opens it: cut by cells alone, a stair at an
+      // angle to the grid left teeth of slab inside its walls and holes beside them (owner's trip recording, 2026-11-11).
+      let inside = 0;
+      const check = (runs: typeof floors, lift: number, open: (t: number, z: number) => boolean) => {
+        for (const r of runs) for (let k = 0; k < Math.round(r.w / 0.5); k++) {
+          const [x, y, z] = [r.x + k * 0.5, r.y, r.z + lift];
+          for (const g of flights) {
+            if (x + 0.5 < g.x0 - 0.5 || y + 0.5 < g.y0 - 0.5 || x > g.x0 + g.nx * 0.5 + 0.5 || y > g.y0 + g.ny * 0.5 + 0.5) continue;
+            if ([[0.05, 0.05], [0.45, 0.05], [0.05, 0.45], [0.45, 0.45]].some(([dx, dy]) => { const b = besideFlight(g.flight!, x + dx, y + dy); return b.beside && b.d < 0.97 && open(b.z, z); })) inside++;
+          }
+        }
+      };
+      // Inside the walls a slab shows wherever it is over the treads and under the stair's own ceiling (2.6 m up).
+      check(ceilings, 3.2, (t, z) => t + 2.6 > z && t < z - 0.05);
+      // A floor: short of its last step, which lands on it (a cell there may overhang the top tread by its half-width).
+      check(floors, 0, (t, z) => t + 2.6 > z && t < z - 0.6);
+      expect(inside).toBe(0);
+      // And the rim closes the cut past the walls, in ceilings and floors alike.
+      expect(rims.filter((r) => r.kind === "ceiling").length).toBeGreaterThan(20);
+      expect(rims.filter((r) => r.kind !== "ceiling").length).toBeGreaterThan(20);
     });
   }
 });

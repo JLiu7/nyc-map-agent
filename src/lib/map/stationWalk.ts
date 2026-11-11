@@ -780,6 +780,45 @@ export const TRACK_DROP_M = 1.2;
 const CLEAR_M = 1;
 /** Room a walker needs over a stair tread: a slab lower than this above one is opened. */
 const HEAD_M = 2.2;
+/** A stair's own ceiling over its treads, below the street (the scene draws it there). */
+export const STAIR_HEAD_M = 2.6;
+/**
+ * How far past a stair's side a ceiling cell's centre may sit and still be cut: half a cell's diagonal, so
+ * no cell left standing reaches inside the stair's side wall. The scene closes the cut past the wall with
+ * a strip of ceiling along it (`wellRim`).
+ */
+export const WELL_PAD_M = 0.36;
+
+/**
+ * Where (x, y) lies against a flight: its distance from the flight's line, the tread height there, and
+ * whether it is beside the flight rather than past either end.
+ */
+export function besideFlight(f: NonNullable<Piece["flight"]>, x: number, y: number): { d: number; z: number; beside: boolean } {
+  const { line, za, zb } = f;
+  const total = line.reduce((t, p, i) => (i ? t + dist(line[i - 1], p) : 0), 0) || 1;
+  let best = Infinity, along = 0, beside = false, run = 0;
+  for (let s = 1; s < line.length; s++) {
+    const len = dist(line[s - 1], line[s]);
+    const [d, t] = toSegment([x, y], line[s - 1], line[s]);
+    if (d < best) { best = d; along = run + t * len; beside = !((s === 1 && t <= 0) || (s === line.length - 1 && t >= 1)); }
+    run += len;
+  }
+  return { d: best, z: za + ((zb - za) * along) / total, beside };
+}
+
+/**
+ * Is a ceiling at height `zc` open over a tread at height `t`? From where the stair's own ceiling comes
+ * within 0.3 m below it (so the slab left standing is always above the stair's) until the tread has
+ * climbed past it.
+ */
+export const wellOpen = (t: number, zc: number) => t + STAIR_HEAD_M + 0.3 > zc && t < zc + 0.2;
+/**
+ * Is a floor at height `zf` open over a tread at height `t`? From a little before the stair's own ceiling meets
+ * it (the head of the opening, where the scene stands a wall across the stair, up to one 0.7 m piece later)
+ * until the last riser, which lands on it. Cut from the head itself, cells behind it overhung the opening; the
+ * scene lays floor back over the stair behind the head (`wellRims`).
+ */
+export const floorWellOpen = (t: number, zf: number) => t + STAIR_HEAD_M + 0.7 > zf && t < zf - 0.35;
 
 /**
  * A slab with a stairwell cut in it: its cells are dropped wherever a stair's tread comes within a
@@ -789,17 +828,22 @@ const HEAD_M = 2.2;
  * `lift` is how far above the piece's own heights the slab sits; `rest` is how close under the slab a
  * tread may come and still be the landing that meets it.
  */
-function wellsCut(m: StationModel, g: Piece, lift: number, rest: number): Piece {
+function wellsCut(m: StationModel, g: Piece, lift: number, rest: number, open?: (t: number, z: number) => boolean): Piece {
   const stairs = m.pieces.filter((p) => p.stair);
   if (!stairs.length) return g;
   const h = g.h.slice();
+  const reach = STAIR_R + WELL_PAD_M;
   for (let c = 0; c < h.length; c++) {
     if (Number.isNaN(h[c])) continue;
     const at = centre(g, c), z = h[c] + lift;
     for (const st of stairs) {
       const k = cellAt(st, ...at);
-      if (k < 0 || Number.isNaN(st.h[k])) continue;
-      if (st.h[k] < z - rest && st.h[k] + HEAD_M > z) { h[c] = NaN; break; }
+      if (k >= 0 && !Number.isNaN(st.h[k]) && st.h[k] < z - rest && st.h[k] + HEAD_M > z) { h[c] = NaN; break; }
+      // A slab is also cut by the stair's own outline, not only its cells: cut by cells alone, a stair at an
+      // angle to the grid left a stepped rim, with slab sticking into the stairwell and gaps beside it.
+      if (!open || !st.flight || at[0] < st.x0 - WELL_PAD_M || at[1] < st.y0 - WELL_PAD_M || at[0] > st.x0 + st.nx * CELL_M + WELL_PAD_M || at[1] > st.y0 + st.ny * CELL_M + WELL_PAD_M) continue;
+      const b = besideFlight(st.flight, ...at);
+      if (b.beside && b.d < reach && open(b.z, z)) { h[c] = NaN; break; }
     }
   }
   return { ...g, h };
@@ -837,6 +881,92 @@ function spread(g: Piece, into: (from: number, at: P) => boolean): Piece {
   return out;
 }
 
+/** How far a well's rim reaches out from a stair's side: past the farthest ceiling cell its cut drops. */
+const RIM_M = 0.8;
+type V3 = [number, number, number];
+/** A strip of ceiling along one side of a stairwell, and the wall under it where the stair's side wall stops short. */
+export type Rim = { strip: [V3, V3, V3, V3]; skirt?: [V3, V3, V3, V3]; kind: "ceiling" | "floor" | "platform" };
+
+/**
+ * The rim of each stairwell cut through a ceiling: a strip of ceiling along both sides of the stair, out from
+ * its side wall, just under the slab, and a short wall from the top of the side wall up to the slab where the
+ * stair's own ceiling is still below it. The ceiling is cut in 0.5 m cells, so a stair at an angle to the grid
+ * left a stepped hole whose teeth showed the floor above (owner's trip recording, 2026-11-11).
+ */
+function wellRims(m: StationModel, runs: Run[], ceiling: boolean): Rim[] {
+  const [lift, open] = ceiling ? [CEILING_M, wellOpen] : [0, floorWellOpen];
+  // Which slabs (their height and kind) stand over each cell, as cut.
+  const over = new Map<string, Array<[number, CellKind]>>();
+  const key = (x: number, y: number) => `${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`;
+  for (const r of runs)
+    for (let k = 0; k < Math.round(r.w / CELL_M); k++) {
+      const id = key(r.x + (k + 0.5) * CELL_M, r.y + CELL_M / 2);
+      (over.get(id) ?? over.set(id, []).get(id)!).push([r.z + lift, r.kind]);
+    }
+  const flights = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
+  // A strip's end lands in no stairwell cut through the same ceiling (two stairs side by side, or a bend).
+  const clear = (x: number, y: number, zc: number) => flights.every((f) => { const b = besideFlight(f, x, y); return b.d >= STAIR_R - 0.02 || !open(b.z, zc); });
+  const out: Rim[] = [];
+  for (const f of flights) {
+    const headed = new Set<string>();
+    const total = f.line.reduce((t, p, i) => (i ? t + dist(f.line[i - 1], p) : 0), 0) || 1;
+    const slope = Math.abs(f.zb - f.za) / total;
+    let before = 0;
+    for (let s = 1; s < f.line.length; s++) {
+      const [a, b] = [f.line[s - 1], f.line[s]];
+      const len = dist(a, b) || 1, n = Math.max(1, Math.round(len / 0.7));
+      const [ux, uy] = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len];
+      const done = before;
+      const at = (t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, f.za + ((f.zb - f.za) * (done + len * t)) / total];
+      for (let k = 0; k < n; k++) {
+        const [p, q] = [at(k / n), at((k + 1) / n)];
+        // The cut reaches half a cell past where it opens, so the rim starts half a metre early.
+        const [lo, hi] = [Math.min(p[2], q[2]) - slope * 0.5, Math.max(p[2], q[2]) + slope * 0.5];
+        for (const sd of [-1, 1]) {
+          const side = (c: number[], w: number): P => [c[0] + ux * sd * (STAIR_R + w), c[1] + uy * sd * (STAIR_R + w)];
+          // The ceilings standing just past where the cut reaches, along this piece.
+          const near = new Map<number, CellKind>();
+          for (const c of [p, q, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]]) for (const w of [0.6, 0.9, 1.3]) for (const [zc, kind] of over.get(key(...side(c, w))) ?? []) near.set(zc, kind);
+          for (const [zc, kind] of near) {
+            if (![lo, (lo + hi) / 2, hi].some((t) => open(t, zc))) continue;
+            const w = [RIM_M, 0.6, 0.4, 0.2].find((w) => [side(p, w), side(q, w)].every((c) => clear(c[0], c[1], zc)));
+            if (!w) continue;
+            // Just under a ceiling, just over a floor, so it shows over the slab's stepped edge.
+            const z = ceiling ? zc - 0.01 : zc + 0.01;
+            const [p0, q0, p1, q1] = [side(p, 0), side(q, 0), side(p, w), side(q, w)];
+            const rim: Rim = { strip: [[p0[0], p0[1], z], [q0[0], q0[1], z], [q1[0], q1[1], z], [p1[0], p1[1], z]], kind: ceiling ? "ceiling" : kind === PLATFORM ? "platform" : "floor" };
+            out.push(rim);
+            if (!ceiling) {
+              // Behind the head of the opening the stair is still under this floor: lay it back over the stair (once).
+              const id = `${s}:${k}:${zc}`;
+              if (!headed.has(id) && Math.max(p[2], q[2]) + STAIR_HEAD_M < zc) {
+                headed.add(id);
+                const [pa, qa] = [[p[0] - ux * STAIR_R, p[1] - uy * STAIR_R], [q[0] - ux * STAIR_R, q[1] - uy * STAIR_R]];
+                const [pb, qb] = [[p[0] + ux * STAIR_R, p[1] + uy * STAIR_R], [q[0] + ux * STAIR_R, q[1] + uy * STAIR_R]];
+                out.push({ strip: [[pa[0], pa[1], z], [qa[0], qa[1], z], [qb[0], qb[1], z], [pb[0], pb[1], z]], kind: rim.kind });
+              }
+              continue;
+            }
+            // Where the slab is cut but the stair's own ceiling is still under it, its side wall stops short of
+            // the strip. Only that far: before the cut, the slab over the stair hides the gap, and a wall there
+            // stood up over the stair's mouth in two horns.
+            const from = zc - STAIR_HEAD_M - 0.3, [lo2, hi2] = p[2] < q[2] ? [p, q] : [q, p];
+            if (hi2[2] > from && lo2[2] + STAIR_HEAD_M < z) {
+              const t = lo2[2] >= from ? 0 : (from - lo2[2]) / (hi2[2] - lo2[2]);
+              const [l0, h0] = [side(lo2, 0), side(hi2, 0)];
+              const l: V3 = [l0[0] + (h0[0] - l0[0]) * t, l0[1] + (h0[1] - l0[1]) * t, Math.min(Math.max(lo2[2], from) + STAIR_HEAD_M, z)];
+              const h: V3 = [h0[0], h0[1], Math.min(hi2[2] + STAIR_HEAD_M, z)];
+              rim.skirt = [l, h, [h[0], h[1], z], [l[0], l[1], z]];
+            }
+          }
+        }
+      }
+      before += len;
+    }
+  }
+  return out;
+}
+
 /**
  * What the scene draws flat: floors, the ceilings over rooms below the street,
  * and the track beds, each carried under its walls (see `spread`). Each spreads
@@ -845,10 +975,10 @@ function spread(g: Piece, into: (from: number, at: P) => boolean): Piece {
  * room's walls, never over the tracks; above it only off a plain floor, never
  * past a platform's edge.
  */
-export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: Run[] } {
+export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: Run[]; rims: Rim[] } {
   const free = (at: P, z: number) => !floorsAt(m, ...at).some((f) => Math.abs(f - z) < CLEAR_M);
   const floorsOnly = m.pieces.filter((g) => !g.stair);
-  const out = { floors: [] as Run[], ceilings: [] as Run[], beds: [] as Run[] };
+  const out = { floors: [] as Run[], ceilings: [] as Run[], beds: [] as Run[], rims: [] as Rim[] };
   if (m.elevated) {
     for (const g of floorsOnly) out.floors.push(...floorRuns(spread(g, (from, at) => g.kind[from] === FLOOR && free(at, g.h[from]))));
     return out;
@@ -858,11 +988,12 @@ export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: 
     const outside = (at: P) => { const c = cellAt(room, ...at); return c < 0 || Number.isNaN(room.h[c]); };
     const past = (lift: number) => (from: number, at: P) => outside(at) && free(at, room.h[from] + lift);
     // A floor is open over a stair still climbing to it (0.35 m: the last riser lands on it); a ceiling, over any stair that reaches it.
-    out.floors.push(...floorRuns(wellsCut(m, spread(g, past(0)), 0, 0.35)));
-    out.ceilings.push(...floorRuns(wellsCut(m, spread(room, past(CEILING_M)), CEILING_M, -0.2)));
+    out.floors.push(...floorRuns(wellsCut(m, spread(g, past(0)), 0, 0.35, floorWellOpen)));
+    out.ceilings.push(...floorRuns(wellsCut(m, spread(room, past(CEILING_M)), CEILING_M, -0.2, wellOpen)));
     const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(g.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(g.h[c]) ? FLOOR : 0)) };
     out.beds.push(...floorRuns(spread(bed, past(-TRACK_DROP_M))));
   });
+  out.rims = [...wellRims(m, out.ceilings, true), ...wellRims(m, out.floors, false)];
   return out;
 }
 

@@ -7,7 +7,7 @@
   {
     "name": "app (boot chunk, loaded after the first paint)",
     "path": ".size-build/assets/boot-*.js",
-    "limit": "279.5 kB"
+    "limit": "280.5 kB"
   },
   {
     "name": "map library (maplibre-gl, its own chunk so it stays cached across deploys)",

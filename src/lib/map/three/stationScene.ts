@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
-import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
+import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_HEAD_M, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
 import { guideSigns, placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
 import { cornerLine } from "../cornerLine";
@@ -197,7 +197,7 @@ function tileTexture(): THREE.Texture | null {
 }
 
 /** A stair's own head room, its parapet where it comes up through a floor, and the daylight at a street stair's top. */
-const STAIR = { head: 2.6, parapet: 1.05, sky: 0xdcebf7 };
+const STAIR = { head: STAIR_HEAD_M, parapet: 1.05, sky: 0xdcebf7 };
 /** The top of a stair's side wall at tread height z: its soffit under the floor it climbs to (`top`), a parapet once it is through. */
 const stairTop = (z: number, top: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + STAIR.parapet);
 
@@ -469,6 +469,26 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
       }
       before += len;
     }
+    // Where the stair bends, each run's ceiling, lid and side ends square to it, leaving a wedge open on the
+    // outside of the bend, through which the floor above showed. Close it.
+    let run = 0;
+    for (let i = 1; i < f.line.length - 1; i++) {
+      const [a, j, b] = [f.line[i - 1], f.line[i], f.line[i + 1]];
+      const [l1, l2] = [Math.hypot(j[0] - a[0], j[1] - a[1]) || 1, Math.hypot(b[0] - j[0], b[1] - j[1]) || 1];
+      run += l1;
+      const [d1, d2] = [[(j[0] - a[0]) / l1, (j[1] - a[1]) / l1], [(b[0] - j[0]) / l2, (b[1] - j[1]) / l2]];
+      const turn = d1[0] * d2[1] - d1[1] * d2[0];
+      if (Math.abs(turn) < 1e-3) continue;
+      const out = turn > 0 ? -half : half;
+      const [c1, c2] = [[j[0] - d1[1] * out, j[1] + d1[0] * out], [j[0] - d2[1] * out, j[1] + d2[0] * out]];
+      const t = f.za + ((f.zb - f.za) * run) / total;
+      const wedge = (q: Quads, z: number) => q.add([j[0], j[1], z], [c1[0], c1[1], z], [c2[0], c2[1], z], [c2[0], c2[1], z]);
+      const street = Math.abs(top) <= 0.5;
+      wedge(street ? sky : ceiling, top + (street ? 3.4 : CEILING_M));
+      if (t + STAIR.head < top) wedge(ceiling, stairTop(t, top));
+      const zt = t + STAIR.head < top ? t + STAIR.head : top + STAIR.parapet;
+      wall.wall([c1[0], c1[1], t], [c2[0], c2[1], t], [c2[0], c2[1], zt], [c1[0], c1[1], zt]);
+    }
     if (Math.abs(top) <= 0.5) {
       // The street end, and the way the stair runs as it reaches it.
       const up = f.za >= f.zb ? [f.line[0], f.line[1]] : [f.line.at(-1)!, f.line.at(-2)!];
@@ -477,6 +497,12 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
       const [cx, cy] = [up[0][0] + ux * 0.6, up[0][1] + uy * 0.6];
       sky.add([cx + uy * half, cy - ux * half, top - 0.4], [cx - uy * half, cy + ux * half, top - 0.4], [cx - uy * half, cy + ux * half, top + 3.4], [cx + uy * half, cy - ux * half, top + 3.4]);
     }
+  }
+  // The rim of each stairwell cut through a ceiling or a floor (see `drawn`): a strip of slab along the stair's side,
+  // and under a ceiling a short wall from the stair's side wall up to it where the stair's own ceiling is still lower.
+  for (const r of surfaces.rims) {
+    (r.kind === "ceiling" ? ceiling : r.kind === "platform" ? platform : floor).add(...r.strip);
+    if (r.skirt) wall.wall(...r.skirt);
   }
   if (sky.pos.length) {
     const g = new THREE.BufferGeometry();

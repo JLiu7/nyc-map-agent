@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-11, 01:40 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-11, 07:00 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## In flight
+
+**Where a stair climbs through a floor, the ceiling's edge broke into jagged pieces and the floor above showed through (#111, branch `fix/stairwell-ceiling-rim`, task NMA-0047).** A recording of a 4 train trip to Fulton St on 2026-11-11 showed it about 61 seconds in. Slabs are drawn in 0.5 m cells, and a cell was cut only when its centre sat over a stair step, so the opening's edge followed the cells. The cut now follows the stair's own outline, measured from its centre line, and a strip along each side closes the gap between the last whole cell and the stair's wall. The floor above is laid back behind the head of each stair, so a rider climbing no longer sees floor shards overhead, and the wedge left where a stair bends is filled. Steps stay 2 m wide. Still rough: the stepped tops of stair side walls where a parapet meets a full wall.
 
 **Stepping off at Fulton St said nothing about where the exit's stairs are along the train (#109, branch `fix/train-part-fulton`, task NMA-0046).** A live recording on 2026-11-11 showed only "Step off the 4 train". Fulton St's hall and its other 4/5 platform sit level with the platform the train stops at, so the walk back to the foot of the stairs ran through them and ended by the other platform. The walk back now stops where the way moves more than 12 m from the train's track. In the same recording the stairs (#102), the Exit signs with Fulton Street on them and daylight at the top of the street stair all showed; #107's last-step wording merged.
 
@@ -22,6 +24,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Watch the 4 train trip to Fulton St on the live site once #111's pull request deploys.** Stairwell edges in ceilings were jagged and showed the floor above (task NMA-0047). Under each stair the ceiling's edge should now be straight along the stair's walls, and climbing a stair should show its ceiling and the wall at its head, never pieces of the floor above.
 - **Look at Fulton St's entrances on the live site once #105's pull request deploys.** Nothing pointed to each line from where riders come in (task NMA-0044). Where a street stair lands there should now be signs with each line's bullets and an arrow towards its platform stair. The arrow is the straight direction, so check a few against the way you would in fact walk; in a narrow passage a sign can sit against a wall.
 - **Record the walk out of Fulton St once #102's pull request deploys and look at every stair.** Stairs were open chutes with the dark behind the model above them and no rail round their openings (task NMA-0043). Each stair should now have its own sloping ceiling, a wall at the head of its opening, a parapet where open floor runs beside it, and daylight at the top of a street stair. Steps stay 2 m wide: widening them broke the preview's way through 14 St-Union Sq, so that waits for a drawing-only change. Edges where a stairwell is cut in a ceiling are still jagged, and there are no handrails.
 - **Record a trip to Fulton St once #99's pull request deploys and read the steps around the ride.** Stepping off said nothing about where the exit's stairs are along the train, and the Exit signs over the way named no street (task NMA-0042). The ride should now open with which part of the train stops by those stairs, stepping off should say the rider is at the middle of the train and where the stairs are from there, and the Exit signs should carry the exit's street. Check the part named against the real platform: it comes from the app's own station model and assumes the train fills the platform.
