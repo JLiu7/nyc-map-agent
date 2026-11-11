@@ -4,6 +4,7 @@
  * ferry, SIR, with GTFS-rt); this file is thin glue that ranks its itineraries
  * and maps them onto the app's Trip/Leg contract. See docs/OTP.md.
  */
+import { lastWalkLabel } from "./arrivalWalk";
 import { z } from "zod";
 import type { Leg, LngLatTuple, TripCore } from "../../../src/features/agent/schema";
 import { elevatorStatus, serviceAlerts } from "./services";
@@ -159,7 +160,7 @@ export async function itineraryToTrip(
     if (!l.route) {
       const prev = it.legs[i - 1]; const next = it.legs[i + 1];
       const toName = next ? stopName(next.from.stop?.name ?? next.from.name ?? "the stop") : destination.label;
-      const label = !prev ? `Walk to ${toName}` : !next ? `Walk from ${stopName(prev.to.stop?.name ?? prev.to.name ?? "the stop")} to ${destination.label}` : `Transfer: walk to ${toName}`;
+      const label = !prev ? `Walk to ${toName}` : !next ? lastWalkLabel(stopName(prev.to.stop?.name ?? prev.to.name ?? "the stop"), destination.label) : `Transfer: walk to ${toName}`;
       legs.push({ kind: prev && next ? "transfer" : "walk", label, coords: geom, durationS: l.duration, distanceM: l.distance,
         turns: (l.steps ?? []).filter((s) => s.relativeDirection && !/DEPART|CONTINUE/.test(s.relativeDirection)).map((s) => ({ at: [s.lon, s.lat] as LngLatTuple, text: `Turn ${s.relativeDirection!.toLowerCase().replace(/_/g, " ")} onto ${s.streetName || "the path"}` })) });
       continue;

@@ -1,4 +1,5 @@
 /** Compose one door-to-door trip from the thin services + the transit planner. */
+import { lastWalkLabel } from "./arrivalWalk";
 import { formatStreetText } from "../../../src/lib/streetName";
 import type { Leg, LngLatTuple, Trip, TripCore } from "../../../src/features/agent/schema";
 import { elevatorStatus, hazardsAt, reverseGeocode, routeWalk, serviceAlerts, stationServiceChanges, weatherAt, type WalkResult } from "./services";
@@ -210,7 +211,7 @@ export async function buildTrip(
       legs.push({ kind: "ride", mode: "subway", fromStop: r.from.name, toStop: r.to.name, numStops: r.stops.length || undefined, route: r.route, label: `${r.route} train ${r.from.name} → ${r.to.name}`, coords: r.coords, durationS: r.durationS, stops: r.stops, underground: !/elevated|viaduct|embankment/i.test(r.from.structure), geometrySource: r.geometrySource });
     });
     legs.push({ kind: "exit", station: ref(last.to), portal: exit, label: `Use the ${exit.label} at ${last.to.name}` });
-    legs.push(walkLeg("walk", `Walk from ${last.to.name} to ${formatStreetText(destination.label)}`, w2));
+    legs.push(walkLeg("walk", lastWalkLabel(last.to.name, formatStreetText(destination.label)), w2));
     exitAdvice = `Use the ${exit.label} at ${last.to.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}${exit.outage ? ` Heads up: ${exit.outage}.` : ""}`;
     alerts = await safe(serviceAlerts(routes, Math.floor(depart.getTime() / 1000)), []);
   }
