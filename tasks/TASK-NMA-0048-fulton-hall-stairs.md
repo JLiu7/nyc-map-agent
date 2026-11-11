@@ -1,8 +1,8 @@
 # TASK-NMA-0048 — Fulton Hall Stairs
 
-<!-- continuity:task {"acceptance":["A stair going down from Fulton St's hall shows as an opening with a waist-high parapet, not a box of full-height walls","Walking the route from the 4/5 platform to the E exit on Fulton Street, no view passes through a wall","Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass"],"depends_on":[],"goal":"Fulton St's hall shows an opening, not a box of walls, at the stair down, and the trip never walks through a stair's side wall","id":"NMA-0048","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/113","next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"The demo trip's walk out of Fulton St looked broken a little over a minute in, after #112 deployed"} -->
+<!-- continuity:task {"acceptance":["A stair going down from Fulton St's hall shows as an opening with a waist-high parapet, not a box of full-height walls","Walking the route from the 4/5 platform to the E exit on Fulton Street, no view passes through a wall","Steps stay 2 m wide and routes are unchanged; unit tests, typecheck and lint pass"],"depends_on":[],"goal":"Fulton St's hall shows an opening, not a box of walls, at the stair down, and the trip never walks through a stair's side wall","id":"NMA-0048","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/113","next_action":"None: merged in #114; the live recording after it led to #115","owner":"claude-code","priority":"high","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"done","why":"The demo trip's walk out of Fulton St looked broken a little over a minute in, after #112 deployed"} -->
 
-- Status: active
+- Status: done
 - Owner: claude-code
 - Priority: high
 - Depends on: none
@@ -61,7 +61,7 @@ No checkpoints yet.
 
 ### 2026-11-11 07:31:56 UTC — claude-code
 
-<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["src/lib/map/three/stationScene.ts"],"completed":["Fulton St's hall shows a stairwell with a parapet where it showed a box, and the walk onto the next stair stays clear of its side walls"],"decisions":["no new decisions"],"evidence":["Views every 3 m along the route to the E exit rendered before and after; 1,819 unit tests passed; typecheck and lint clean"],"next_action":"Merge the pull request, then record the 4 train trip to Fulton St on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0048","timestamp":"2026-11-11T07:31:56Z"} -->
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["src/lib/map/three/stationScene.ts"],"completed":["Fulton St's hall shows a stairwell with a parapet where it showed a box, and the walk onto the next stair stays clear of its side walls"],"decisions":["no new decisions"],"evidence":["Views every 3 m along the route to the E exit rendered before and after; 1,819 unit tests passed; typecheck and lint clean"],"next_action":"None: merged in #114; the live recording after it led to #115","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0048","timestamp":"2026-11-11T07:31:56Z"} -->
 <!-- continuity:checkpoint-operation {"payload_sha256":"9df0776bb1585462d32e6ec507c86b2d9b4101cb15385b8d2256cc0a29787ba2","request_id":"ab841934cb6c4c9194ef9f46f158fe1b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0048"} -->
 
 Completed:

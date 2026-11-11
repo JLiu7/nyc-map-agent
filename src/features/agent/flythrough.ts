@@ -184,6 +184,8 @@ export function depthAt(seg: Segment, f: number): number {
 
 /** On foot (walks, stairs in and out) the preview runs this many times faster than a ride (owner, 2026-10-27: walking was "super duper slow"). */
 const FOOT_RATE = 4;
+/** How far ahead along the walk through a station the eye turns to face, metres. */
+const INSIDE_LOOK_M = 1.5;
 /** How fast the walk through a station moves on screen at 10x, metres a second. */
 const INSIDE_MPS = 2.5;
 const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" || seg.kind === "ascend";
@@ -210,7 +212,10 @@ export function wallSeconds(seg: Segment, speed: number): number {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export function poseAt(seg: Segment, f: number): Pose {
   const center = along(seg.coords, f);
-  const ahead = along(seg.coords, Math.min(1, f + 0.02));
+  // Inside a station the eye looks a short way ahead, not a fiftieth of the whole walk: on a 200 m walk that
+  // was 4 m, so on a stair the view swung to its side wall well before the top (Fulton St, 2026-11-11).
+  const len = seg.inside ? cumulative(seg.coords).at(-1) ?? 0 : 0;
+  const ahead = along(seg.coords, Math.min(1, f + (len > 0 ? Math.min(0.02, INSIDE_LOOK_M / len) : 0.02)));
   const b = dist(center, ahead) > 0.5 ? bearing(center, ahead) : bearing(seg.coords[0], seg.coords[seg.coords.length - 1]);
   switch (seg.kind) {
     case "walk": return { center, bearing: b, pitch: 75, zoom: 18.5 };

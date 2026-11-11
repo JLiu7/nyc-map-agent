@@ -198,7 +198,7 @@ function tileTexture(): THREE.Texture | null {
 
 /** A stair's own head room, its parapet where it comes up through a floor, and the daylight at a street stair's top. */
 const STAIR = { head: STAIR_HEAD_M, parapet: 1.05, sky: 0xdcebf7 };
-/** How far a stair's treads climb from its foot before its side walls start. */
+/** How far a stair's treads climb from its foot before its side walls start, and how far below its top they stop where a floor runs beside them. */
 const FOOT_OPEN_M = 0.5;
 /** Over that open foot, the side wall starts this far above the foot, clear of a walker's head. */
 const FOOT_LINTEL_M = 2.3;
@@ -393,10 +393,13 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     // The sides are open below head height until the treads are a step up from the floor at the foot.
     // Walkers (and the trip preview's way) can step onto the lowest treads from the side, and at Fulton St
     // the way to the E exit came in across the foot of a stair from the hall, through a full-height side wall.
-    const open = Math.min(1, FOOT_OPEN_M / (Math.abs(w.z2 - w.z1) || 1));
-    const cut = w.z1 < w.z2 ? open : 1 - open;
-    const runs: Array<[number, number, boolean]> = w.z1 < w.z2 ? [[0, cut, true], [cut, 1, false]] : [[0, cut, false], [cut, 1, true]];
-    for (const [ta, tb, low] of runs) {
+    // The same goes for the last treads before the top where the upper room's floor runs beside them: the way
+    // to the E exit steps off the stair it climbs there, sideways, and walked through the parapet.
+    const open = Math.min(0.5, FOOT_OPEN_M / (Math.abs(w.z2 - w.z1) || 1));
+    const ends: Array<[number, number, "foot" | "head" | null]> = [[0, open, "foot"], [open, 1 - open, null], [1 - open, 1, "head"]];
+    const runs = w.z1 < w.z2 ? ends : ends.map(([a, b, e]) => [1 - b, 1 - a, e] as [number, number, "foot" | "head" | null]);
+    for (const [ta, tb, end] of runs) {
+      const low = end === "foot";
       if (tb - ta < 1e-6) continue;
       const n = Math.max(1, Math.round((full * (tb - ta)) / 0.7));
       for (let k = 0; k < n; k++) {
@@ -405,6 +408,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
         // and climbs through solid ground is a chute: its walls go up to the lid over it.
         const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
         const beside = roomFloorAt(mx + nx, my + ny, top) || roomFloorAt(mx - nx, my - ny, top);
+        if (end === "head" && beside) continue;
         const up = (z: number) => (z + STAIR.head < top ? Math.min(z + STAIR.head, top) : top + (beside ? STAIR.parapet : Math.abs(top) <= 0.5 ? 3.4 : CEILING_M));
         // Over the open foot, only a lintel above head height, so the stair's own ceiling does not show past its side.
         const [bp, bq] = low ? [foot + FOOT_LINTEL_M, foot + FOOT_LINTEL_M] : [p[2], q[2]];
