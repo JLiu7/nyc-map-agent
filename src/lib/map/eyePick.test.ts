@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { eyePick } from "./eyePick";
+import { cameraRay, eyePick } from "./eyePick";
 
 const LAT = 40.73, LNG = -73.99, ky = 111_320, kx = 111_320 * Math.cos((LAT * Math.PI) / 180);
 /** A building 40–60 m south of the map centre (the camera sits ~85 m south), 9 m tall. */
@@ -31,5 +31,15 @@ describe("eyePick", () => {
   it("misses to the side and above the roof line", () => {
     expect(eyePick(fakeMap(85), 5, 250)?.kind).not.toBe("building");
     expect(eyePick(fakeMap(85), 400, 0)?.kind ?? "sky").not.toBe("building");
+  });
+});
+
+describe("cameraRay", () => {
+  it("aims from the padded centre of the view, not the middle of the canvas", () => {
+    // A phone with a sheet open pads the bottom by 179 px: the view's centre moves up by half of that.
+    const plain = fakeMap(86), padded = { ...fakeMap(86), getPadding: () => ({ top: 0, bottom: 179, left: 0, right: 0 }) } as unknown as MapLibreMap;
+    const a = cameraRay(plain, 400, 250)!, b = cameraRay(padded, 400, 250 - 89.5)!, low = cameraRay(padded, 400, 250)!;
+    b.dir.forEach((v, i) => expect(v).toBeCloseTo(a.dir[i], 9));
+    expect(low.dir[2]).toBeLessThan(a.dir[2]); // the same pixel now looks lower
   });
 });

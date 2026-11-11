@@ -1246,6 +1246,10 @@ export default function TransitLayer() {
   useEffect(() => {
     if (!map || !busStopsShown) return;
     const onClick = (e: MapLayerMouseEvent) => {
+      // Not at street level: the flat icon of a stop streets away, hidden behind the buildings, still sits
+      // under the tap there, so a tap on a shop sign opened that bus stop (owner, 2026-11-10). A stop you
+      // can see has its own sign to tap (pickStreet above).
+      if (walkingRef.current) return;
       const layers = TRANSIT_CLICK_LAYERS.filter((id) => map.getLayer(id));
       if (layers.length && map.queryRenderedFeatures(e.point, { layers }).length) return;
       const stop = busStopAt(map, e.point);

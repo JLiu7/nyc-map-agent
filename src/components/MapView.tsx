@@ -741,7 +741,8 @@ export function MapView({
       if (hitsAny(transitIds)) return;
       // A bus-stop icon (basemap poi_transit, class "bus"): the transit feature
       // opens its routes and next buses, so skip the area pick.
-      if (opts.busStops && analyticsFlags.transit && clicked && busStopAt(clicked, event.point)) return;
+      // From above only: at street level the icon of a stop behind the buildings is under the tap too.
+      if (!walking && opts.busStops && analyticsFlags.transit && clicked && busStopAt(clicked, event.point)) return;
       // 3D restroom kiosks at street level: public ones open here, shop/café
       // ones are opened by the place-toilets feature's own click handler.
       const kiosk = walking ? pickFurniture(event.target, event.point.x, event.point.y) : null;
@@ -782,7 +783,9 @@ export function MapView({
         showPanel({ id: `landmark:${model.id}`, title: model.name, subtitle: `Landmark · ${modelGuide.borough}`, details: <LandmarkDetails landmark={modelGuide} /> });
         return;
       }
-      const dir = city3d ? signsMod.current?.directoryAt(event.target, event.lngLat.lng, event.lngLat.lat) : null;
+      // From above only: at eye level the tap's ground point is far behind the facade, so this opened
+      // the directory of a mall on another street. There the main sign itself is tapped (below).
+      const dir = city3d && !walking ? signsMod.current?.directoryAt(event.target, event.lngLat.lng, event.lngLat.lat) : null;
       if (dir) {
         const shops = (dir.dir ?? "").split("|").filter(Boolean);
         showPanel({
@@ -803,9 +806,17 @@ export function MapView({
       // Other feature layers (events, parking…) open their own panel.
       if (hitsAny(FEATURES.filter((f) => f.id !== "transit").flatMap((f) => f.clickLayers ?? []))) return;
       // Eye level: cast the camera ray through the tap and open whatever it
-      // hits first (landmark model, storefront, building), like overhead.
+      // hits first (storefront, landmark model, school), like overhead.
       if (walking) {
         const hit = eyePick(event.target, event.point.x, event.point.y);
+        // The shop whose sign or window the tap is on, unless a wall or landmark stands in front
+        // of it. Signs hang 0.15 m off their wall and the footprints are a metre or two loose.
+        const shop = signsMod.current?.storefrontOnRay(event.target, event.point.x, event.point.y, hit && hit.kind !== "ground" ? hit.t + 2 : Infinity);
+        if (shop) {
+          // The card's code arrives with the first shop tapped, so the boot chunk stays inside its budget.
+          void import("@/components/StorefrontCard").then((m) => showPanel(m.storefrontPanel(shop)));
+          return;
+        }
         if (hit?.kind === "landmark") {
           const guide = guideLandmarkNamed(hit.landmark.name);
           showPanel({
@@ -816,42 +827,14 @@ export function MapView({
           });
           return;
         }
-        if (hit?.kind === "building") {
-          if (typeof hit.props.school === "string" && hit.props.school) {
-            showPanel({
-              id: `school:${hit.props.school}`,
-              title: hit.props.school,
-              subtitle: "School · NYC DOE (LCGMS)",
-              details: <DirectionsFromHere lon={hit.lng} lat={hit.lat} label={hit.props.school} />,
-            });
-            return;
-          }
-          // Up to 7 m: the ground floor and the sign band above it.
-          const shop = hit.props.store === 1 && hit.z < 7 ? signsMod.current?.storefrontAt(event.target, hit.lng, hit.lat) : null;
-          if (shop) {
-            const shops = (shop.dir ?? "").split("|").filter(Boolean);
-            showPanel({
-              id: `storefront:${shop.lng},${shop.lat}:${shop.name}`,
-              title: shop.name,
-              subtitle: `${shop.cat ? `${shop.cat} · ` : ""}© OpenStreetMap contributors`,
-              details: (
-                <div className="space-y-2">
-                  {shops.length ? <ul className="space-y-1 text-sm">{shops.map((name) => <li key={name}>{name}</li>)}</ul> : null}
-                  {/* The real place: Google's street photos open at the shop, no key needed. */}
-                  <a
-                    className="inline-block text-sm font-medium underline underline-offset-2"
-                    href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${shop.lat},${shop.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    See a real photo
-                  </a>
-                  <DirectionsFromHere lon={shop.lng} lat={shop.lat} label={shop.name} />
-                </div>
-              ),
-            });
-            return;
-          }
+        if (hit?.kind === "building" && typeof hit.props.school === "string" && hit.props.school) {
+          showPanel({
+            id: `school:${hit.props.school}`,
+            title: hit.props.school,
+            subtitle: "School · NYC DOE (LCGMS)",
+            details: <DirectionsFromHere lon={hit.lng} lat={hit.lat} label={hit.props.school} />,
+          });
+          return;
         }
         // Street level never opens the neighbourhood / complaints card: a
         // tap on a facade or the pavement clears a details sheet. The layers

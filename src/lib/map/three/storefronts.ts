@@ -1,6 +1,8 @@
 /** Storefront signboards and facades at street level. */
 import * as THREE from "three";
 import { atlasCell, facadeCategory } from "../storefrontCategory";
+import { cameraRay } from "../eyePick";
+import { BASE_M, BOARD, boardOffset, FACADE_H, facadeWidth, FLOOR_M, MAIN_PLATE_H, pickSign, PLATE_H, plateWidth, type StorefrontSign, WALL_GAP_M } from "../storefrontPick";
 import type { CustomLayerInterface } from "maplibre-gl";
 import { MercatorCoordinate, type MapLibreMap, REBUILD_M, movedM, sharedRenderer } from "./core";
 
@@ -8,19 +10,11 @@ export const STOREFRONT_LAYER = "city3d-storefront-signs";
 export const STOREFRONT_MIN_ZOOM = 17;
 const RADIUS_M = 200;
 const MAX = 64; // one 1024 x 1024 atlas: 2 x 32 slots of 512 x 32
-const PLATE_H = 0.8;
-const BASE_M = 3.2; // plate centre above the pavement on the ground floor
-const FLOOR_M = 3.5;
-const WALL_GAP_M = 0.15; // clear of the storefront band so depth never hides the plate
 
 export const SIGN_COLORS: Record<string, string> = {
   food: "#9a3412", shop: "#1e3a8a", health: "#047857", money: "#3f3f46", service: "#4c1d95", mall: "#111827",
 };
 
-export interface StorefrontSign {
-  name: string; cat: string; brg: number; sw: number; fl: number; lng: number; lat: number;
-  main?: number; dir?: string; kind?: string; w?: number;
-}
 
 // ---- Brand logos for the sign bands (server: OSM brand:wikidata → Wikidata P154, re-hosted in R2) ----
 
@@ -42,25 +36,37 @@ export function nearbyStorefronts(map: MapLibreMap, radius = RADIUS_M, max = MAX
   return signsNear(map, lng, lat, radius).slice(0, max);
 }
 
+/** Signs a browser test puts on the street (dev and the e2e build only): the e2e network has no city tiles. */
+const testSigns = (): StorefrontSign[] =>
+  (import.meta.env.DEV || import.meta.env.VITE_E2E) && typeof window !== "undefined" ? ((window as unknown as { __storefronts?: StorefrontSign[] }).__storefronts ?? []) : [];
+
 function signsNear(map: MapLibreMap, lng: number, lat: number, radius: number): Array<StorefrontSign & { d: number }> {
-  if (!map.getSource("city3d")) return [];
   const kx = 111_320 * Math.cos((lat * Math.PI) / 180);
   const seen = new Map<string, StorefrontSign & { d: number }>();
-  for (const f of map.querySourceFeatures("city3d", { sourceLayer: "storefronts" })) {
-    if (f.geometry.type !== "Point") continue;
-    const [x, y] = f.geometry.coordinates;
+  const add = (p: Omit<StorefrontSign, "lng" | "lat">, x: number, y: number) => {
     const d = Math.hypot((x - lng) * kx, (y - lat) * 111_320);
-    if (d > radius) continue;
-    const p = f.properties as Omit<StorefrontSign, "lng" | "lat">;
+    if (d > radius) return;
     const key = `${x.toFixed(7)},${y.toFixed(7)},${p.name}`;
     if (!seen.has(key)) seen.set(key, { ...p, lng: x, lat: y, d });
+  };
+  for (const s of testSigns()) add(s, s.lng, s.lat);
+  if (map.getSource("city3d")) {
+    for (const f of map.querySourceFeatures("city3d", { sourceLayer: "storefronts" })) {
+      if (f.geometry.type !== "Point") continue;
+      add(f.properties as Omit<StorefrontSign, "lng" | "lat">, f.geometry.coordinates[0], f.geometry.coordinates[1]);
+    }
   }
   return [...seen.values()].sort((a, b) => a.d - b.d);
 }
 
-/** The storefront sign nearest a point on a building's ground floor (eye-level picking). */
-export function storefrontAt(map: MapLibreMap, lng: number, lat: number, radius = 12): StorefrontSign | null {
-  return signsNear(map, lng, lat, radius)[0] ?? null;
+/**
+ * The shop a street-level tap at screen pixel (x, y) lands on: the sign plate, shop front or directory
+ * board its ray passes through, among the signs that are drawn. `maxT` is how far the ray gets before
+ * a wall stops it (metres), so a shop is not picked through a building in front of it.
+ */
+export function storefrontOnRay(map: MapLibreMap, x: number, y: number, maxT = Infinity): StorefrontSign | null {
+  const ray = cameraRay(map, x, y);
+  return ray ? pickSign(ray, nearbyStorefronts(map), maxT) : null;
 }
 
 /** The directory (main) sign nearest a clicked ground point, for the panel. */
@@ -164,7 +170,7 @@ export function createStorefrontLayer(): CustomLayerInterface {
     }
     // A main (mall / many-shop) sign also gets a small "Directory" board beside it.
     const signs = nearbyStorefronts(map).flatMap((s): Array<StorefrontSign & { dx?: number; z?: number }> =>
-      s.main ? [s, { ...s, name: "Directory", main: 0, sw: 1.2, dx: Math.max(0.8, s.sw) / 2 + 0.9, z: 1.6 }] : [s],
+      s.main ? [s, { ...s, name: "Directory", main: 0, sw: BOARD.w, dx: boardOffset(s), z: BOARD.z }] : [s],
     ).slice(0, MAX);
     // Real size at eye level; from higher up a 0.8 m plate is 2-4 px, so it
     // grows to stay about 14 px tall and readable (#67).
@@ -186,8 +192,8 @@ export function createStorefrontLayer(): CustomLayerInterface {
       const b = (s.brg * Math.PI) / 180;
       const n = new THREE.Vector3(Math.sin(b), Math.cos(b), 0);
       const t = new THREE.Vector3(-Math.cos(b), Math.sin(b), 0);
-      const h = (s.main ? 1.2 : PLATE_H) * grow;
-      const w = Math.max(0.8, s.sw) * Math.min(grow, 2);
+      const h = (s.main ? MAIN_PLATE_H : PLATE_H) * grow;
+      const w = plateWidth(s) * Math.min(grow, 2);
       const zc = Math.max(s.z ?? BASE_M + s.fl * FLOOR_M, h / 2 + 0.3);
       const pos = new THREE.Vector3((s.lng - c.lng) * kx, (s.lat - c.lat) * 111_320, zc)
         .addScaledVector(n, WALL_GAP_M * grow)
@@ -196,11 +202,11 @@ export function createStorefrontLayer(): CustomLayerInterface {
       mesh.setMatrixAt(i, m);
       // Ground-floor shop front under a ground-floor band (not the directory board).
       if (!s.fl && !s.dx && s.name !== "Directory" && grow < 1.5) {
-        const fw = Math.min(Math.max(s.sw + 1.2, 3), Math.max(3, s.w ?? 8), 8);
+        const fw = facadeWidth(s);
         const [cx, cy] = atlasCell(facadeCategory(s.kind, s.cat));
         cell.setXY(nf, cx, cy);
-        const fpos = new THREE.Vector3((s.lng - c.lng) * kx, (s.lat - c.lat) * 111_320, 1.45).addScaledVector(n, 0.06);
-        m.makeBasis(t.clone().multiplyScalar(fw), new THREE.Vector3(0, 0, 2.9), n).setPosition(fpos);
+        const fpos = new THREE.Vector3((s.lng - c.lng) * kx, (s.lat - c.lat) * 111_320, FACADE_H / 2).addScaledVector(n, 0.06);
+        m.makeBasis(t.clone().multiplyScalar(fw), new THREE.Vector3(0, 0, FACADE_H), n).setPosition(fpos);
         facades.setMatrixAt(nf, m);
         facades.setColorAt(nf, new THREE.Color().setScalar(0.92 + ((i * 7) % 17) / 100)); // ±8%, so a block never looks cloned
         nf++;

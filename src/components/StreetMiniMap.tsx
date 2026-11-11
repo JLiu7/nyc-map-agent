@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { usePullSheetUp } from "@/lib/store/pullSheet";
 import { Move, MoveDiagonal2 } from "lucide-react";
 import "@/lib/map/maplibreWorker";
 import { Map as MapLibreMapCtor, type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
@@ -328,6 +329,11 @@ export function StreetMiniMap({ main, getEye, onExit, onMap, filters }: {
   const dist = nearest ? distanceLabel(nearest.metres) : "";
   // Unmoved, it rides above Center on my location (.corner-locate: chat bar + pull sheet + 12 px, 44 px tall);
   // a fixed 168 px put the restroom chip under that button on a 375×667 phone (layout check).
+  // On a phone under 600 px tall there is no room for it between the quick buttons and an open card:
+  // measured on 320×568, a card left 52 to 73 px, and the map's Leave button rose onto Layers and Language
+  // (layout check, 2026-11-10). It steps aside while the card is up; "Map" in the street bar still leaves.
+  const cardUp = usePullSheetUp();
+  const noRoom = cardUp && !placed && typeof window !== "undefined" && window.innerHeight < 600;
   return (
     <div
       ref={frame}
@@ -335,7 +341,7 @@ export function StreetMiniMap({ main, getEye, onExit, onMap, filters }: {
       data-vehicles={dots.length}
       data-size={place.size}
       style={placed ? { right: place.right!, bottom: place.bottom! } : undefined}
-      className={`absolute z-20 flex flex-col items-end gap-[var(--sp-1)] ${placed ? "" : `${sheet ? "bottom-[calc(var(--edge)+36px)]" : "bottom-[calc(var(--chat-bar-h,56px)+var(--pull-sheet-h,0px)+64px)]"} lg:bottom-[calc(var(--edge)+36px)] right-[var(--edge)] sm:right-[calc(var(--edge)+68px)]`}`}
+      className={`absolute z-20 ${noRoom ? "hidden" : "flex"} flex-col items-end gap-[var(--sp-1)] ${placed ? "" : `${sheet ? "bottom-[calc(var(--edge)+36px)]" : "bottom-[calc(var(--chat-bar-h,56px)+var(--pull-sheet-h,0px)+64px)]"} lg:bottom-[calc(var(--edge)+36px)] right-[var(--edge)] sm:right-[calc(var(--edge)+68px)]`}`}
     >
       <div className="flex gap-[var(--sp-1)]">
         <button type="button" aria-label="Move map" title="Drag to move the map" className={`${handle} cursor-grab active:cursor-grabbing`} {...move}>

@@ -6,6 +6,7 @@
  */
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { cameraTransform } from "./cameraTransform";
+import { cameraRay } from "./eyePick";
 
 export interface PickTarget {
   kind: "restroom" | "place" | "busstop" | "entrance";
@@ -16,8 +17,6 @@ export interface PickTarget {
   h: number;
   props: Record<string, unknown>;
 }
-
-const EYE_M = 1.7;
 
 /**
  * Where the viewer stands: the camera's ground point. At eye level the map
@@ -43,30 +42,39 @@ export function setPickTargets(t: PickTarget[], group = "furniture"): void {
   targets = [...groups.values()].flat();
 }
 
+/** Half the width of a pole or kiosk as a tap target, metres; never under 18 px on screen. */
+const RADIUS_M = 0.5;
+
 /**
- * The model under a screen point. A model `h` metres tall standing on the
- * ground spans from its base up to (h - eye) / eye of the base's depth below
- * the horizon, above the horizon.
+ * The model under a screen point: the nearest one whose upright body (ground
+ * to `h` metres) the tap's ray passes within half a metre of, in front of the
+ * camera. Small or distant models keep an 18 px margin.
+ *
+ * This used to compare screen positions from `map.project`, which mirrors a
+ * point behind the camera to far below the screen. A bus stop pole 178 m
+ * behind the walker then counted as the nearest thing, as wide and tall as the
+ * whole phone screen, so every tap on a shop or a wall opened that bus stop
+ * (owner, 2026-11-10).
  */
 export function pickAt(map: MapLibreMap, x: number, y: number): PickTarget | null {
   if (!targets.length) return null;
-  const c = map.getCenter();
-  const b = (map.getBearing() * Math.PI) / 180;
-  const far = { lng: c.lng + (Math.sin(b) * 3000) / (111_320 * Math.cos((c.lat * Math.PI) / 180)), lat: c.lat + (Math.cos(b) * 3000) / 111_320 };
-  const hy = map.project([far.lng, far.lat]).y;
+  const ray = cameraRay(map, x, y);
+  if (!ray) return null;
+  const kx = 111_320 * Math.cos((ray.lat * Math.PI) / 180), ky = 111_320;
+  const [dx, dy, dz] = ray.dir;
+  const flat = dx * dx + dy * dy;
   let best: PickTarget | null = null;
-  let bestDepth = -Infinity;
+  let bestT = Infinity;
   for (const t of targets) {
-    const p = map.project([t.lng, t.lat]);
-    const depth = p.y - hy;
-    if (depth <= 0) continue; // behind or beyond the horizon
-    const top = hy - (depth * (t.h - EYE_M)) / EYE_M;
-    const half = Math.max(18, (depth * 0.5) / EYE_M);
-    if (y < top - 6 || y > p.y + 6 || Math.abs(x - p.x) > half) continue;
-    if (depth > bestDepth) {
-      bestDepth = depth; // nearest (lowest on screen) wins
-      best = t;
-    }
+    const e = (t.lng - ray.lng) * kx, n = (t.lat - ray.lat) * ky;
+    // Where the ray passes closest to the model's upright axis; from straight overhead, where it meets the ground.
+    const at = flat > 1e-4 ? (e * dx + n * dy) / flat : dz < 0 ? ray.alt / -dz : -1;
+    if (!(at > 0) || at >= bestT) continue; // behind the camera, or farther than one already found
+    const z = ray.alt + dz * at;
+    const off = Math.hypot(e - dx * at, n - dy * at, z - Math.min(Math.max(z, 0), t.h));
+    if (off > Math.max(RADIUS_M, (18 * at) / ray.f)) continue;
+    best = t;
+    bestT = at;
   }
   return best;
 }

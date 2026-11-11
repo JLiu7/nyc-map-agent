@@ -31,6 +31,8 @@ export interface PanelContent {
   subtitle?: string;
   /** Shown at the peek snap point: name + headline. */
   summary?: ReactNode;
+  /** A row of links or buttons under the title, there at the peek too (a shop's photo and map links). */
+  actions?: ReactNode;
   /** Shown when pulled up (mobile) / below the summary (desktop). */
   details?: ReactNode;
   /** Label for the minimized peek chip, e.g. "Q · 2 min". Defaults to title. */

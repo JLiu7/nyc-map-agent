@@ -176,19 +176,23 @@ export function MapPanel({
     </button>
   );
   const header = content ? (
-    <div className="flex items-start gap-2">
-      <Button type="button" size="icon" variant="ghost" aria-label="Back" className="-ml-2 h-7 w-7 shrink-0" onClick={back}>
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSnap("half")}>
-        <div className="truncate text-sm font-semibold">{content.title}</div>
-        {content.subtitle ? (
-          <div className="truncate text-[11px] text-muted-foreground">{content.subtitle}</div>
-        ) : null}
-        {content.summary}
-      </button>
-      {minimizeBtn}
-    </div>
+    <>
+      <div className="flex items-start gap-2">
+        <Button type="button" size="icon" variant="ghost" aria-label="Back" className="-ml-2 h-7 w-7 shrink-0" onClick={back}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <button type="button" className="min-h-6 min-w-0 flex-1 text-left" onClick={() => setSnap("half")}>
+          <div className="truncate text-sm font-semibold">{content.title}</div>
+          {content.subtitle ? (
+            <div className="truncate text-[11px] text-muted-foreground">{content.subtitle}</div>
+          ) : null}
+          {content.summary}
+        </button>
+        {minimizeBtn}
+      </div>
+      {/* Its own row, outside the title button: a link inside a button cannot be tapped by itself. */}
+      {content.actions ? <div data-testid="panel-actions" className="mt-1 flex flex-wrap gap-1.5">{content.actions}</div> : null}
+    </>
   ) : null;
   const body = content ? (
     <>
