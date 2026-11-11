@@ -182,6 +182,8 @@ export function depthAt(seg: Segment, f: number): number {
 
 /** On foot (walks, stairs in and out) the preview runs this many times faster than a ride (owner, 2026-10-27: walking was "super duper slow"). */
 const FOOT_RATE = 4;
+/** How fast the walk through a station moves on screen at 10x, metres a second. */
+const INSIDE_MPS = 2.5;
 const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" || seg.kind === "ascend";
 
 /**
@@ -189,13 +191,16 @@ const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" |
  * the parts on foot are held long enough to read and look around, and the ride, where
  * nothing changes, is short (owner, 2026-11-10: the ride sat on one caption for 20 s
  * while the walk through the station went by in 6). At 10x: a street walk 4 to 12 s,
- * real stairs 6 s, a walk through the station with the wait for the train 22 s, a ride
+ * real stairs 6 s, a walk through the station with the wait for the train 22 to 60 s by its length, a ride
  * 4 to 10 s. Other speeds scale all of it.
  */
 export function wallSeconds(seg: Segment, speed: number): number {
   const pace = 10 / speed;
   const foot = Math.min(12 * pace, Math.max(4 * pace, seg.realS / (speed * FOOT_RATE)));
-  if (seg.depths) return (seg.inside ? 22 : 6) * pace;
+  // Through a station the walk is paced by its length, about 2.5 m a second on screen plus the wait for
+  // the train, never under 22 s: a long way round Fulton St in 22 s went by too fast to follow (owner, 2026-11-10).
+  if (seg.inside) return Math.min(60, Math.max(22, (cumulative(seg.coords).at(-1) ?? 0) / INSIDE_MPS + 6)) * pace;
+  if (seg.depths) return 6 * pace;
   if (onFoot(seg)) return foot;
   return Math.min(10 * pace, Math.max(4 * pace, seg.realS / speed));
 }

@@ -182,3 +182,34 @@ describe("drawn", () => {
     expect(covers(floors, ex, ey, -10)).toBe(false);
   });
 });
+
+describe("stairwells", () => {
+  const xray = JSON.parse(readFileSync("public/transit/xray.json", "utf8")) as Record<string, WalkStation>;
+  // Fulton St and 14 St-Union Sq: before the wells were cut, 870 and 379 slab cells hung over their stairs.
+  for (const id of ["418", "635"]) {
+    it(`leaves head room over every stair tread at station ${id}`, () => {
+      const m = buildStation(xray[id])!;
+      const stairs = m.pieces.filter((g) => g.stair);
+      expect(stairs.length).toBeGreaterThan(10);
+      const treads = (x: number, y: number) => stairs.flatMap((g) => {
+        const [i, j] = [Math.floor((x - g.x0) / 0.5), Math.floor((y - g.y0) / 0.5)];
+        const h = i < 0 || j < 0 || i >= g.nx || j >= g.ny ? NaN : g.h[j * g.nx + i];
+        return Number.isNaN(h) ? [] : [h];
+      });
+      const { floors, ceilings } = drawn(m);
+      let over = 0, cells = 0;
+      const check = (runs: typeof floors, lift: number, rest: number) => {
+        for (const r of runs) for (let k = 0; k < Math.round(r.w / 0.5); k++) {
+          cells++;
+          const z = r.z + lift;
+          if (treads(r.x + (k + 0.5) * 0.5, r.y + 0.25).some((h) => h < z - rest && h + 1.8 > z)) over++;
+        }
+      };
+      // A ceiling 3.2 m over its floor, and a floor a stair is still climbing to.
+      check(ceilings, 3.2, -0.2);
+      check(floors, 0, 0.35);
+      expect(cells).toBeGreaterThan(10_000);
+      expect(over).toBe(0);
+    });
+  }
+});

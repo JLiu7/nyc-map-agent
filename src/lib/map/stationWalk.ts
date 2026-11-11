@@ -777,6 +777,32 @@ export const CEILING_M = 3.2;
 export const TRACK_DROP_M = 1.2;
 /** A floor, ceiling or track bed does not spread where another floor is this close to its height: it would cut through it. */
 const CLEAR_M = 1;
+/** Room a walker needs over a stair tread: a slab lower than this above one is opened. */
+const HEAD_M = 2.2;
+
+/**
+ * A slab with a stairwell cut in it: its cells are dropped wherever a stair's tread comes within a
+ * walker's height below it. A room's ceiling and the floor above it were drawn whole, so every stair
+ * climbed into a slab; at Fulton St that was 783 ceiling cells and 87 floor cells, and 236 of the 274 stations had it
+ * (owner, 2026-11-10: "the ceiling block the way").
+ * `lift` is how far above the piece's own heights the slab sits; `rest` is how close under the slab a
+ * tread may come and still be the landing that meets it.
+ */
+function wellsCut(m: StationModel, g: Piece, lift: number, rest: number): Piece {
+  const stairs = m.pieces.filter((p) => p.stair);
+  if (!stairs.length) return g;
+  const h = g.h.slice();
+  for (let c = 0; c < h.length; c++) {
+    if (Number.isNaN(h[c])) continue;
+    const at = centre(g, c), z = h[c] + lift;
+    for (const st of stairs) {
+      const k = cellAt(st, ...at);
+      if (k < 0 || Number.isNaN(st.h[k])) continue;
+      if (st.h[k] < z - rest && st.h[k] + HEAD_M > z) { h[c] = NaN; break; }
+    }
+  }
+  return { ...g, h };
+}
 
 /**
  * A grid carried one cell past its edge wherever `into` allows, on a grid one
@@ -830,8 +856,9 @@ export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: 
     const g = floorsOnly[n];
     const outside = (at: P) => { const c = cellAt(room, ...at); return c < 0 || Number.isNaN(room.h[c]); };
     const past = (lift: number) => (from: number, at: P) => outside(at) && free(at, room.h[from] + lift);
-    out.floors.push(...floorRuns(spread(g, past(0))));
-    out.ceilings.push(...floorRuns(spread(room, past(CEILING_M))));
+    // A floor is open over a stair still climbing to it (0.35 m: the last riser lands on it); a ceiling, over any stair that reaches it.
+    out.floors.push(...floorRuns(wellsCut(m, spread(g, past(0)), 0, 0.35)));
+    out.ceilings.push(...floorRuns(wellsCut(m, spread(room, past(CEILING_M)), CEILING_M, -0.2)));
     const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(g.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(g.h[c]) ? FLOOR : 0)) };
     out.beds.push(...floorRuns(spread(bed, past(-TRACK_DROP_M))));
   });

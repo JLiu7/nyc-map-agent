@@ -9,7 +9,7 @@ import type { CustomLayerInterface } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer, type MapLibreMap } from "./core";
 import { CELL_M, CEILING_M, drawn, floorsAt, outline, rooms, STAIR_W, toLngLat, toLocal, treads, TRACK_DROP_M, walls, type StationModel } from "../stationWalk";
 import { EYE_HEIGHT_M } from "../walk";
-import { placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
+import { guideSigns, placeSigns, type Bullet, type ExitName, type Sign, type SignInfo } from "../stationSigns";
 import { cornerLine } from "../cornerLine";
 import { readMap } from "../mapRead";
 
@@ -87,6 +87,8 @@ interface StationTrip {
   track: { at: [number, number]; angle: number };
   color: string;
   train: () => number | null;
+  /** Signs over the way itself: Exit signs when leaving, else the train's line. */
+  signs?: { exit: boolean; routes: Bullet[] };
 }
 
 /** The guide line: bright, unlit, a little above the floor so stair treads do not cover it. */
@@ -260,7 +262,9 @@ function signTexture(s: Sign): { tex: THREE.Texture; width: number } | null {
   const textW = words ? ctx.measureText(words).width : 0;
   const bulletsW = s.routes.length ? s.routes.length * (2 * r + gap) - gap : 0;
   const between = words && s.routes.length ? 40 : 0;
-  const rest = words || s.routes.length ? pad * 2 + textW + between + bulletsW : 0;
+  // A way sign with an arrow carries it after its bullets and words.
+  const tail = !exit && s.arrow ? 44 + 28 : 0;
+  const rest = words || s.routes.length ? pad * 2 + textW + between + bulletsW + tail : 0;
   c.width = Math.ceil(red + rest);
   c.height = SIGN.px;
   ctx.fillStyle = "#111214";
@@ -274,18 +278,26 @@ function signTexture(s: Sign): { tex: THREE.Texture; width: number } | null {
   ctx.font = SIGN.font;
   ctx.textBaseline = "middle";
   const mid = c.height / 2 + 8;
-  if (exit) {
-    ctx.fillText("Exit", pad, mid);
-    // The arrow: up the stairs.
-    const ax = red - pad - 22;
+  /** An arrow 44 px across centred on (ax, mid): up, or along the sign to the left or right. */
+  const arrow = (ax: number, way: NonNullable<Sign["arrow"]>) => {
     ctx.lineWidth = 9;
     ctx.strokeStyle = "#ffffff";
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.moveTo(ax, mid + 26); ctx.lineTo(ax, mid - 26);
-    ctx.moveTo(ax - 20, mid - 6); ctx.lineTo(ax, mid - 26); ctx.lineTo(ax + 20, mid - 6);
+    if (way === "up") {
+      ctx.moveTo(ax, mid + 26); ctx.lineTo(ax, mid - 26);
+      ctx.moveTo(ax - 20, mid - 6); ctx.lineTo(ax, mid - 26); ctx.lineTo(ax + 20, mid - 6);
+    } else {
+      const d = way === "left" ? -1 : 1;
+      ctx.moveTo(ax - 26 * d, mid); ctx.lineTo(ax + 26 * d, mid);
+      ctx.moveTo(ax + 6 * d, mid - 20); ctx.lineTo(ax + 26 * d, mid); ctx.lineTo(ax + 6 * d, mid + 20);
+    }
     ctx.stroke();
+  };
+  if (exit) {
+    ctx.fillText("Exit", pad, mid);
+    arrow(red - pad - 22, s.arrow ?? "up");
   }
   let x = red + pad;
   const drawBullets = () => {
@@ -299,6 +311,7 @@ function signTexture(s: Sign): { tex: THREE.Texture; width: number } | null {
   ctx.fillText(words, x, mid);
   x += textW + between;
   if (s.kind !== "way" && s.routes.length) drawBullets();
+  if (tail && s.arrow) arrow(c.width - pad - 22, s.arrow);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -318,11 +331,11 @@ function bullet(ctx: CanvasRenderingContext2D, b: Bullet, x: number, y: number, 
 }
 
 /** The station's signs, one face (or two, back to back) per sign; faces with the same wording share a texture. */
-function signMeshes(m: StationModel, info: SignInfo, exitName?: ExitName): THREE.Object3D[] {
+function signMeshes(m: StationModel, info: SignInfo, exitName?: ExitName, extra: Sign[] = []): THREE.Object3D[] {
   const faces = new Map<string, { mat: THREE.Material; geo: THREE.PlaneGeometry } | null>();
   const out: THREE.Object3D[] = [];
-  for (const s of placeSigns(m, info, exitName)) {
-    const key = `${s.kind}|${s.name}|${s.words ?? ""}|${s.routes.map((b) => b.short).join(",")}`;
+  for (const s of [...extra, ...placeSigns(m, info, exitName)]) {
+    const key = `${s.kind}|${s.name}|${s.words ?? ""}|${s.arrow ?? ""}|${s.routes.map((b) => b.short).join(",")}`;
     if (!faces.has(key)) {
       const t = signTexture(s);
       // Upright and facing -y before it is turned.
@@ -433,7 +446,9 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     group.add(mesh);
   }
 
-  let hung = signs ? signMeshes(m, signs) : [];
+  // Over the trip's own way: arrows before its turns, Exit signs leaving and the train's line going to it.
+  const onWay = trip?.signs ? guideSigns(trip.guide, trip.signs.exit, trip.signs.routes) : [];
+  let hung = signs ? signMeshes(m, signs, undefined, onWay) : [];
   group.add(...hung);
   /**
    * Hang the signs again with each street stair's corner on its Exit sign. The streets come from
@@ -443,7 +458,7 @@ function buildStationScene(m: StationModel, tracks: Array<Array<[number, number]
     if (!signs) return;
     const hang = () => {
       if (!group.parent) return;
-      const next = signMeshes(m, signs, exitNamer(map, m));
+      const next = signMeshes(m, signs, exitNamer(map, m), onWay);
       group.remove(...hung);
       for (const o of hung) ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).map?.dispose();
       hung = next;
@@ -521,7 +536,7 @@ export function createStationLayer(m: StationModel, tracks: Array<Array<[number,
   };
 }
 
-type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: number };
+type Eye = { lon: number; lat: number; bearing: number; pitch: number; z?: number; /** Vertical field of view in degrees, when it differs from the one the view was mounted with. */ fov?: number };
 
 /**
  * Street view below the street, drawn on its own canvas: MapLibre lifts any
@@ -556,6 +571,7 @@ export function mountStationView(canvas: HTMLCanvasElement, m: StationModel, tra
     if (eye) {
       const [x, y] = toLocal(m, eye.lon, eye.lat);
       const z = (eye.z ?? 0) + EYE_HEIGHT_M;
+      if (eye.fov && Math.abs(eye.fov - camera.fov) > 0.05) { camera.fov = eye.fov; camera.updateProjectionMatrix(); }
       // MapLibre's pitch: 0 looks straight down, 90 at the horizon, above 90 up.
       const b = (eye.bearing * Math.PI) / 180, p = (eye.pitch * Math.PI) / 180;
       camera.position.set(x, y, z);

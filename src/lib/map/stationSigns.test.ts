@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bulletsFor, trimFor } from "./stationSignWords";
-import { inManhattan, placeSigns, runsToward, SIGN_Z, type SignInfo } from "./stationSigns";
+import { guideSigns, inManhattan, placeSigns, runsToward, SIGN_Z, type SignInfo } from "./stationSigns";
 import { buildStation, toLocal, type WalkStation, type WalkWay } from "./stationWalk";
 
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
@@ -117,6 +117,39 @@ describe("exit signs", () => {
   });
   it("say Exit alone while the map has no streets yet", () => {
     expect(placeSigns(m, info(m), () => null).filter((s) => s.kind === "exit").every((s) => !s.words)).toBe(true);
+  });
+});
+
+describe("signs over a trip's way", () => {
+  // 20 m east, a left turn, 40 m north, then stairs up.
+  const way: Array<[number, number, number]> = [[0, 0, -10], [20, 0, -10], [20, 40, -10], [20, 48, -5]];
+  const four = bulletsFor("4", table);
+
+  it("hangs an arrow before the turn, facing the walker, and one ahead on the long straight", () => {
+    const signs = guideSigns(way, true, []);
+    const left = signs.find((s) => s.arrow === "left")!;
+    expect(left.kind).toBe("exit");
+    // Three metres before the corner, over the way, looking back west at the walker coming east.
+    expect(left.x).toBeGreaterThan(13);
+    expect(left.x).toBeLessThan(19);
+    expect(Math.cos(left.angle)).toBeCloseTo(-1, 1);
+    expect(left.z).toBeCloseTo(-10 + SIGN_Z, 1);
+    expect(signs.some((s) => s.arrow === "up" && s.y > 20)).toBe(true);
+    expect(signs.some((s) => s.arrow === "right")).toBe(false);
+  });
+
+  it("carries the train's line going to it, and hangs nothing on the stairs", () => {
+    const signs = guideSigns(way, false, four);
+    expect(signs.length).toBeGreaterThan(0);
+    for (const s of signs) {
+      expect(s.kind).toBe("way");
+      expect(s.routes.map((b) => b.short)).toEqual(["4"]);
+      expect(s.y).toBeLessThan(41);
+    }
+  });
+
+  it("hangs nothing on a way too short to turn", () => {
+    expect(guideSigns([[0, 0, -5], [4, 0, -5]], true, [])).toEqual([]);
   });
 });
 

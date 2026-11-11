@@ -74,6 +74,13 @@ const EYE_MAX_ZOOM = 24;
 
 /** Below this depth the station is drawn at eye level over the map, as in street view. */
 const INSIDE_M = -1.2;
+/**
+ * The view inside a station opens to this many degrees top to bottom. The map's own 37 is a narrow
+ * slot on a tall phone: about 17 degrees side to side, so a corridor was all wall (owner, 2026-11-10:
+ * "hard to see where you're going ... fov might be the issue"). It widens over the first metres down.
+ */
+const INSIDE_FOV = 66;
+const FOV_OVER_M = 2.5;
 /** How far off the trip's train first shows, metres from its stop to its middle: its front a few hundred metres up the tunnel. */
 const TRAIN_APPROACH_M = 340;
 
@@ -104,7 +111,7 @@ function lookPitch(seg: Segment, f: number): number {
   return Math.max(62, Math.min(96, 80 + (Math.atan2(dz, 0.01 * len) * 180) / Math.PI));
 }
 
-type StationEye = { lon: number; lat: number; bearing: number; pitch: number; z: number };
+type StationEye = { lon: number; lat: number; bearing: number; pitch: number; z: number; fov?: number };
 
 export function usePlayer(onCallout?: (text: string) => void) {
   const reduced = usePrefersReducedMotion();
@@ -184,7 +191,12 @@ export function usePlayer(onCallout?: (text: string) => void) {
     hideInside();
     const view: NonNullable<typeof inside.current> = { seg, eye: null, train: null, canvas: null, stop: () => {} };
     inside.current = view;
-    const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train };
+    // The line of the ride this walk leads to (or comes from), for the signs along the way.
+    const at = segsRef.current.indexOf(seg);
+    const ride = segsRef.current[seg.kind === "ascend" ? at - 1 : at + 1];
+    const line = ride?.kind === "ride" && ride.route ? ride.route.replace(/^([0-9A-Z])X$/, "$1") : null;
+    const bullets = walk.station.signs.stations.flatMap((s) => s.routes).filter((b) => b.route === line).slice(0, 1);
+    const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train, signs: { exit: seg.kind === "ascend", routes: bullets } };
     void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
       if (inside.current !== view) return;
       const { model, tracks, signs } = walk.station;
@@ -413,7 +425,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
       }
       const view = inside.current;
       if (view) {
-        view.eye = { lon: mark[0], lat: mark[1], bearing: eye.current?.bearing ?? pose.bearing, pitch: wait !== null ? 86 : lookPitch(seg, fm), z: depth };
+        const base = map.getVerticalFieldOfView();
+        const wide = Math.min(1, Math.max(0, (INSIDE_M - depth) / FOV_OVER_M));
+        view.eye = { lon: mark[0], lat: mark[1], bearing: eye.current?.bearing ?? pose.bearing, pitch: wait !== null ? 86 : lookPitch(seg, fm), z: depth, fov: base + (INSIDE_FOV - base) * wide };
         view.train = trainAt(seg, wait);
         if (view.canvas) view.canvas.style.display = eyeLeg && depth < INSIDE_M ? "" : "none";
       }

@@ -22,6 +22,8 @@ export type Sign = {
   kind: "name" | "exit" | "trains" | "way"; x: number; y: number; z: number; angle: number; back: boolean; name: string; routes: Bullet[];
   /** An exit: the street corner its stair comes up at. A way sign: "Uptown" or "Downtown". */
   words?: string;
+  /** Which way to go from under the sign; an Exit sign points up its stair when this is not set. */
+  arrow?: "up" | "left" | "right";
 };
 
 /** The street corner at a stair's top (local metres), when the map knows the streets there. */
@@ -99,6 +101,56 @@ export function inManhattan([lon, lat]: [number, number]): boolean {
  */
 export function runsToward(n: P, island: boolean): P {
   return island ? [-n[1], n[0]] : [n[1], -n[0]];
+}
+
+/** A turn sharper than this along the trip's way gets a sign (radians). */
+const TURN_RAD = 0.6;
+/** A sign hangs this far before its turn, and a straight stretch this long gets one pointing ahead. */
+const BEFORE_TURN_M = 3;
+const AHEAD_EVERY_M = 28;
+const MAX_WAY_SIGNS = 14;
+
+/**
+ * Signs over a trip's own way through the station, facing the walker: an arrow before each turn
+ * and one pointing ahead on a long straight, so the way shows at eye level and not only as a line
+ * on the floor (owner, 2026-11-10: "hard to see where you're going ... more signage"). Leaving,
+ * they are Exit signs; going to the train, they carry its line. `guide` is the way in walking
+ * order, local metres. Nothing hangs on stairs.
+ */
+export function guideSigns(guide: Array<[number, number, number]>, exit: boolean, routes: Bullet[]): Sign[] {
+  // The way at one-metre steps, so a zigzag of half-metre cells reads as one heading.
+  const pts: Array<[number, number, number]> = [];
+  let carry = 0;
+  for (let i = 1; i < guide.length; i++) {
+    const [a, b] = [guide[i - 1], guide[i]];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (!pts.length) pts.push(a);
+    for (let s = 1 - carry; s <= d; s += 1) pts.push([a[0] + ((b[0] - a[0]) * s) / d, a[1] + ((b[1] - a[1]) * s) / d, a[2] + ((b[2] - a[2]) * s) / d]);
+    carry = d > 0 ? (carry + d) % 1 : carry;
+  }
+  const W = 4, n = pts.length;
+  if (n < 2 * W + 2) return [];
+  const dir = (i: number, j: number) => Math.atan2(pts[j][1] - pts[i][1], pts[j][0] - pts[i][0]);
+  const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+  const flat = (i: number, j: number) => Math.abs(pts[j][2] - pts[i][2]) < 0.6;
+  const out: Sign[] = [];
+  const hang = (i: number, heading: number, arrow: Sign["arrow"]) =>
+    out.push({ kind: exit ? "exit" : "way", x: pts[i][0], y: pts[i][1], z: pts[i][2] + SIGN_Z, angle: heading + Math.PI, back: false, name: "", routes: exit ? [] : routes, arrow });
+  let last = -AHEAD_EVERY_M;
+  for (let i = W; i < n - W && out.length < MAX_WAY_SIGNS; i++) {
+    if (!flat(i - W, i + W)) continue;
+    const before = dir(i - W, i - 1), turn = wrap(dir(i + 1, i + W) - before);
+    // The sharpest point of a turn, not every metre of it.
+    const sharper = (k: number) => k >= W && k < n - W && Math.abs(wrap(dir(k + 1, k + W) - dir(k - W, k - 1))) > Math.abs(turn);
+    if (Math.abs(turn) > TURN_RAD && !sharper(i - 1) && !sharper(i + 1) && i - last > 6) {
+      hang(Math.max(0, i - BEFORE_TURN_M), before, turn > 0 ? "left" : "right");
+      last = i;
+    } else if (i - last >= AHEAD_EVERY_M && Math.abs(turn) < 0.2) {
+      hang(i, before, "up");
+      last = i;
+    }
+  }
+  return out;
 }
 
 /** Every sign in the station. `exitName` names the corner a street stair comes up at. */
