@@ -5,7 +5,7 @@
  * off the walls, then straightened wherever the walker can walk straight. Pure,
  * so it is tested without WebGL.
  */
-import { CELL_M, floorUnder, PLATFORM, STAIR_W, walkIn, type StationModel } from "./stationWalk";
+import { besideFlight, CELL_M, floorsAt, floorUnder, PLATFORM, STAIR_W, walkIn, type StationModel } from "./stationWalk";
 
 type P = [number, number];
 /** A point on the way, local metres, z the floor height (0 the street). */
@@ -154,7 +154,7 @@ export function routeThrough(m: StationModel, door: P, train: P): RoutePoint[] |
   if (best < 0) return null;
   const cells: RoutePoint[] = [];
   for (let id = best; id >= 0; id = prev.get(id) ?? -1) cells.unshift([...xy(id), height(id)]);
-  return [[door[0], door[1], 0], ...onFlights(m, straighten(m, cells))];
+  return [[door[0], door[1], 0], ...roundFeet(m, onFlights(m, straighten(m, cells)))];
 }
 
 /**
@@ -192,6 +192,82 @@ function onFlights(m: StationModel, pts: RoutePoint[]): RoutePoint[] {
       const near = nearestOnLine(best.f.line, [pts[k][0], pts[k][1]])!;
       if (near.d > ON_LINE_M) continue;
       out[k] = [near.at[0], near.at[1], pts[k][2]];
+    }
+  }
+  return out;
+}
+
+/** A turn onto (or off) a stair at its foot sharper than this, in degrees, is rounded. */
+const FOOT_TURN = 30;
+/** How far before the foot the rounded turn starts on the floor, and how far up the stair it ends, in metres. */
+const FOOT_IN_M = 1.5, FOOT_UP_M = 1;
+/** Points along each rounded turn. */
+const FOOT_STEPS = 8;
+
+/**
+ * Rounds the way's turn where it meets a stair at the stair's foot. At Fulton St the way along the hall reached the
+ * foot of the stair to the mezzanine at 97 degrees to it and turned there in one corner: the guide line kinked across
+ * the first treads, and the trip preview's eye, easing round, faced the stair's side wall as it began to climb
+ * (owner's trip recording, 2026-11-11). The turn now starts `FOOT_IN_M` before the foot and ends `FOOT_UP_M` up the
+ * stair, stepping onto the lowest treads from the side, which the scene leaves open (`FOOT_OPEN_M`).
+ */
+function roundFeet(m: StationModel, pts: RoutePoint[]): RoutePoint[] {
+  const flights = m.pieces.flatMap((g) => (g.flight && g.flight.line.length > 1 ? [g.flight] : []));
+  let out = pts.map((p) => [...p] as RoutePoint);
+  const flat = (u: RoutePoint, v: RoutePoint) => Math.abs(u[2] - v[2]) < 0.05;
+  for (let k = out.length - 2; k >= 1; k--) {
+    for (const dir of [-1, 1] as const) {
+      // The floor is on side `dir` of the junction k, the stair on the other.
+      const [fl, st] = [out[k + dir], out[k - dir]];
+      if (!fl || !st || !flat(fl, out[k]) || flat(st, out[k])) continue;
+      const z0 = out[k][2];
+      const f = flights.find((g) => {
+        const b = besideFlight(g, st[0], st[1]);
+        return Math.abs(z0 - Math.min(g.za, g.zb)) < 0.3 && st[2] > z0 && b.beside && b.d <= STAIR_W / 2;
+      });
+      if (!f) continue;
+      const [lo, hi] = [Math.min(f.za, f.zb), Math.max(f.za, f.zb)];
+      const [foot, head] = f.za <= f.zb ? [f.line[0], f.line.at(-1)!] : [f.line.at(-1)!, f.line[0]];
+      const span = Math.hypot(head[0] - foot[0], head[1] - foot[1]) || 1;
+      const up: P = [(head[0] - foot[0]) / span, (head[1] - foot[1]) / span];
+      const il = Math.hypot(out[k][0] - fl[0], out[k][1] - fl[1]);
+      if (il < 0.3) continue;
+      const inn: P = [(out[k][0] - fl[0]) / il, (out[k][1] - fl[1]) / il];
+      const turn = (Math.acos(Math.max(-1, Math.min(1, up[0] * inn[0] + up[1] * inn[1]))) * 180) / Math.PI;
+      if (turn <= FOOT_TURN || turn > 150) continue;
+      // Where the way coming in along the floor meets the stair's middle line: the corner to round.
+      const cross = inn[0] * up[1] - inn[1] * up[0];
+      const [rx, ry] = [foot[0] - out[k][0], foot[1] - out[k][1]];
+      // Metres up the stair's line from its foot to the corner.
+      const t = (rx * inn[1] - ry * inn[0]) / cross;
+      if (t < -0.5 || t > span / 2) continue;
+      const c: P = [foot[0] + up[0] * t, foot[1] + up[1] * t];
+      const a: RoutePoint = [c[0] - inn[0] * FOOT_IN_M, c[1] - inn[1] * FOOT_IN_M, z0];
+      const tb = Math.min(span - 0.5, Math.max(0, t) + FOOT_UP_M);
+      const b: RoutePoint = [foot[0] + up[0] * tb, foot[1] + up[1] * tb, lo + ((hi - lo) * tb) / span];
+      if (!floorsAt(m, a[0], a[1]).some((h) => Math.abs(h - z0) < 0.3)) continue;
+      const curve: RoutePoint[] = [];
+      let ok = true;
+      for (let s = 1; s < FOOT_STEPS; s++) {
+        const q = s / FOOT_STEPS, [u, v, w] = [(1 - q) * (1 - q), 2 * q * (1 - q), q * q];
+        const [x, y] = [u * a[0] + v * c[0] + w * b[0], u * a[1] + v * c[1] + w * b[1]];
+        const on = besideFlight(f, x, y);
+        const z = on.beside && on.d <= STAIR_W / 2 ? Math.max(z0, Math.min(hi, Math.max(lo, on.z))) : z0;
+        // Off the stair the turn must stay on the floor.
+        if (z === z0 && !floorsAt(m, x, y).some((h) => Math.abs(h - z0) < 0.3)) ok = false;
+        curve.push([x, y, z]);
+      }
+      if (!ok) continue;
+      // Drop the way's own points from `FOOT_IN_M` before the corner on the floor to past `b` up the stair.
+      const metresUp = (p: RoutePoint) => (p[0] - foot[0]) * up[0] + (p[1] - foot[1]) * up[1];
+      let i = k;
+      while (out[i + dir] && flat(out[i + dir], out[k]) && Math.hypot(out[i + dir][0] - c[0], out[i + dir][1] - c[1]) < FOOT_IN_M) i += dir;
+      let j = k;
+      while (out[j - dir] && !flat(out[j - dir], out[k]) && besideFlight(f, out[j - dir][0], out[j - dir][1]).d <= STAIR_W / 2 && metresUp(out[j - dir]) <= tb + 0.05) j -= dir;
+      const seq = [a, ...curve, b];
+      const [from, to] = dir === -1 ? [i - 1, j + 1] : [j - 1, i + 1];
+      out = [...out.slice(0, from + 1), ...(dir === -1 ? seq : seq.reverse()), ...out.slice(to)];
+      break;
     }
   }
   return out;

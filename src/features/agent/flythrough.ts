@@ -184,8 +184,14 @@ export function depthAt(seg: Segment, f: number): number {
 
 /** On foot (walks, stairs in and out) the preview runs this many times faster than a ride (owner, 2026-10-27: walking was "super duper slow"). */
 const FOOT_RATE = 4;
-/** How far ahead along the walk through a station the eye turns to face, metres. */
+/** How far ahead along the walk through a station the eye turns to face on a stair, metres. */
 const INSIDE_LOOK_M = 1.5;
+/**
+ * And on a level floor. Looking 1.5 m ahead there, the eye came to the foot of Fulton St's stair to the mezzanine,
+ * a 97 degree turn off the hall, still facing across it at the stair's far side wall (owner's trip recording,
+ * 2026-11-11); looking further ahead, it has turned onto the stair by the time it gets there.
+ */
+const INSIDE_LOOK_FLAT_M = 3;
 /** How fast the walk through a station moves on screen at 10x, metres a second. */
 const INSIDE_MPS = 2.5;
 const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" || seg.kind === "ascend";
@@ -215,7 +221,9 @@ export function poseAt(seg: Segment, f: number): Pose {
   // Inside a station the eye looks a short way ahead, not a fiftieth of the whole walk: on a 200 m walk that
   // was 4 m, so on a stair the view swung to its side wall well before the top (Fulton St, 2026-11-11).
   const len = seg.inside ? cumulative(seg.coords).at(-1) ?? 0 : 0;
-  const ahead = along(seg.coords, Math.min(1, f + (len > 0 ? Math.min(0.02, INSIDE_LOOK_M / len) : 0.02)));
+  const level = len > 0 && Math.abs(depthAt(seg, Math.min(1, f + 0.5 / len)) - depthAt(seg, f)) < 0.05;
+  const look = level ? INSIDE_LOOK_FLAT_M : INSIDE_LOOK_M;
+  const ahead = along(seg.coords, Math.min(1, f + (len > 0 ? Math.min(0.02, look / len) : 0.02)));
   const b = dist(center, ahead) > 0.5 ? bearing(center, ahead) : bearing(seg.coords[0], seg.coords[seg.coords.length - 1]);
   switch (seg.kind) {
     case "walk": return { center, bearing: b, pitch: 75, zoom: 18.5 };

@@ -644,7 +644,9 @@ export function walls(m: StationModel): Wall[] {
       }
       continue;
     }
-    out.push(...outline(g, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= RISER_M)));
+    // A stair's outline the floor carries on under (or over) is no edge: at Fulton St's stair from the hall to the
+    // mezzanine, the hall's platform cells round the stair's foot had yellow edge strips on three sides of it.
+    out.push(...outline(g, (look, h) => floorsAt(m, ...look).some((f) => Math.abs(f - h) <= RISER_M) || overStairUp(m, ...look, h) || overStairDown(m, ...look, h)));
   }
   return out;
 }
@@ -870,7 +872,24 @@ export function overStairDown(m: StationModel, x: number, y: number, h: number):
 export const OVER_STAIR_M = STAIR_HEAD_M + 1.7;
 
 /**
- * A room's floor laid over the stairs going down from it, out from its own cells, so `wellsCut` can open
+ * Is (x, y) on a stair, as the station data outlines it, that climbs from a floor at about height h? The data leaves
+ * that floor out under the stair's whole outline too, and inside a traced room a cell with no floor is drawn as track
+ * bed: at the foot of Fulton St's stair from the hall to the mezzanine, the hall had holes either side of the treads,
+ * dropped to the track bed with a yellow platform edge round each (owner's trip recording, 2026-11-11). The floor runs
+ * on under the stair; its treads and side walls stand on it.
+ */
+export function overStairUp(m: StationModel, x: number, y: number, h: number): boolean {
+  return m.pieces.some((g) => {
+    if (!g.stair || !g.flight) return false;
+    const [lo, hi] = [Math.min(g.flight.za, g.flight.zb), Math.max(g.flight.za, g.flight.zb)];
+    if (Math.abs(lo - h) > 0.75 || hi < h + 0.75) return false;
+    const k = cellAt(g, x, y);
+    return k >= 0 && !Number.isNaN(g.h[k]);
+  });
+}
+
+/**
+ * A room's floor laid over the stairs going down from it and under those climbing from it (`overStairUp`), out from its own cells, so `wellsCut` can open
  * just the stairwell as drawn. Left out, the floor had a hole the width of the stair's outline in the data:
  * at Fulton St, walking down a stair from the mezzanine showed walls round that hole and the stair's sloping
  * ceiling inside it (owner's trip recording, 2026-11-11).
@@ -879,21 +898,22 @@ export function overStairs(m: StationModel, g: Piece): Piece {
   if (!m.pieces.some((p) => p.stair && p.flight)) return g;
   const h = g.h.slice(), kind = g.kind.slice();
   const queue: number[] = [];
-  const reach = (c: number, z: number) => {
-    if (!Number.isNaN(h[c]) || !overStairDown(m, ...centre(g, c), z)) return;
+  // Laid cells take the kind of the floor they carry on from, so a platform stays platform round a stair's foot.
+  const reach = (c: number, z: number, k: number) => {
+    if (!Number.isNaN(h[c]) || !(overStairDown(m, ...centre(g, c), z) || overStairUp(m, ...centre(g, c), z))) return;
     h[c] = z;
-    kind[c] = FLOOR;
+    kind[c] = k || FLOOR;
     queue.push(c);
   };
   const around = (c: number, z: number) => {
     const [i, j] = [c % g.nx, Math.floor(c / g.nx)];
-    if (i > 0) reach(c - 1, z);
-    if (i + 1 < g.nx) reach(c + 1, z);
-    if (j > 0) reach(c - g.nx, z);
-    if (j + 1 < g.ny) reach(c + g.nx, z);
+    if (i > 0) reach(c - 1, z, kind[c]);
+    if (i + 1 < g.nx) reach(c + 1, z, kind[c]);
+    if (j > 0) reach(c - g.nx, z, kind[c]);
+    if (j + 1 < g.ny) reach(c + g.nx, z, kind[c]);
   };
   for (let c = 0; c < h.length; c++) if (!Number.isNaN(g.h[c])) around(c, g.h[c]);
-  while (queue.length) { const c = queue.pop()!; around(c, h[c]); }
+  while (queue.length) { const c = queue.shift()!; around(c, h[c]); }
   return { ...g, h, kind };
 }
 
@@ -1015,6 +1035,36 @@ function wellRims(m: StationModel, runs: Run[], ceiling: boolean): Rim[] {
   return out;
 }
 
+/** How far round each cell `smoothKinds` looks, in cells. */
+const KIND_R = 2;
+/**
+ * A floor's cells, each drawn as the kind (plain floor or platform) most of the cells round it are. The data's kinds
+ * change cell by cell, and at Fulton St a strip of plain floor one or two cells wide ran at an angle through the
+ * platform at the foot of the stair to the mezzanine: drawn in its darker surface, it looked like jagged holes in
+ * the floor (owner's trip recording, 2026-11-11). Only the drawing changes; edges and the walk keep the data's kinds.
+ */
+function smoothKinds(g: Piece): Piece {
+  const kind = g.kind.slice();
+  for (let j = 0; j < g.ny; j++)
+    for (let i = 0; i < g.nx; i++) {
+      const c = j * g.nx + i;
+      if (Number.isNaN(g.h[c])) continue;
+      let plat = 0, all = 0;
+      for (let dj = -KIND_R; dj <= KIND_R; dj++)
+        for (let di = -KIND_R; di <= KIND_R; di++) {
+          const [u, v] = [i + di, j + dj];
+          if (u < 0 || v < 0 || u >= g.nx || v >= g.ny) continue;
+          const n = v * g.nx + u;
+          if (Number.isNaN(g.h[n]) || Math.abs(g.h[n] - g.h[c]) > 0.3) continue;
+          all++;
+          if (g.kind[n] === PLATFORM) plat++;
+        }
+      if (plat * 2 > all) kind[c] = PLATFORM;
+      else if (plat * 2 < all && kind[c] === PLATFORM) kind[c] = FLOOR;
+    }
+  return { ...g, kind };
+}
+
 /**
  * What the scene draws flat: floors, the ceilings over rooms below the street,
  * and the track beds, each carried under its walls (see `spread`). Each spreads
@@ -1036,9 +1086,11 @@ export function drawn(m: StationModel): { floors: Run[]; ceilings: Run[]; beds: 
     const outside = (at: P) => { const c = cellAt(room, ...at); return c < 0 || Number.isNaN(room.h[c]); };
     const past = (lift: number) => (from: number, at: P) => outside(at) && free(at, room.h[from] + lift);
     // A floor is open over a stair still climbing to it (0.35 m: the last riser lands on it); a ceiling, over any stair that reaches it.
-    out.floors.push(...floorRuns(wellsCut(m, spread(overStairs(m, g), past(0)), 0, 0.35, floorWellOpen)));
+    const laid = smoothKinds(overStairs(m, g));
+    out.floors.push(...floorRuns(wellsCut(m, spread(laid, past(0)), 0, 0.35, floorWellOpen)));
     out.ceilings.push(...floorRuns(wellsCut(m, spread(room, past(CEILING_M)), CEILING_M, -0.2, wellOpen)));
-    const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(g.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(g.h[c]) ? FLOOR : 0)) };
+    // Track bed only where the room has no floor, not even one laid over or under a stair.
+    const bed: Piece = { ...room, h: room.h.map((h, c) => (Number.isNaN(laid.h[c]) ? h : NaN)), kind: room.kind.map((_, c) => (Number.isNaN(laid.h[c]) ? FLOOR : 0)) };
     out.beds.push(...floorRuns(spread(bed, past(-TRACK_DROP_M))));
   });
   out.rims = [...wellRims(m, out.ceilings, true), ...wellRims(m, out.floors, false)];
