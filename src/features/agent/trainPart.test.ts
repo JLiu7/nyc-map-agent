@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildStation, toLocal, type WalkStation, type WalkWay } from "@/lib/map/stationWalk";
-import { fromMiddle, trainPart, trainPartAt } from "./stationWalks";
+import { routeThrough } from "@/lib/map/stationRoute";
+import { buildStation, streetTops, toLocal, type WalkStation, type WalkWay } from "@/lib/map/stationWalk";
+import { fromMiddle, platformFoot, trainPart, trainPartAt } from "./stationWalks";
 
 const kx = 111_320 * Math.cos((40.71 * Math.PI) / 180);
 const ll = (x: number, y: number): [number, number] => [-74.0 + x / kx, 40.71 + y / 111_320];
@@ -41,4 +43,16 @@ describe("which part of the train stops by the stairs", () => {
   it("says nothing where no platform edge runs the train's way", () => {
     expect(trainPartAt(m, at(8, 54), 0)).toBeNull();
   });
+
+  it("finds the stairs on the train's own platform when a hall at the same height comes first (Fulton St)", () => {
+    // Fulton St's hall and its other 4/5 platform sit level with this one; walking back from the train
+    // used to run through them to a spot by the other platform, and no part of the train was named.
+    const xray = JSON.parse(readFileSync("public/transit/xray.json", "utf8")) as Record<string, WalkStation>;
+    const fulton = buildStation(xray["418"])!;
+    const track = { at: [61, 51] as [number, number], angle: (-127 * Math.PI) / 180 };
+    const route = routeThrough(fulton, streetTops(fulton)[0], track.at)!;
+    const foot = route[platformFoot(route, track)];
+    expect(Math.abs((foot[0] - track.at[0]) * -Math.sin(track.angle) + (foot[1] - track.at[1]) * Math.cos(track.angle))).toBeLessThanOrEqual(12);
+    expect(trainPartAt(fulton, foot, track.angle)).not.toBeNull();
+  }, 30_000); // Building and routing the whole Fulton St model takes several seconds on CI.
 });

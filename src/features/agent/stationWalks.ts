@@ -69,6 +69,24 @@ function platformEdge(m: StationModel, end: RoutePoint, travel: number): { track
   };
 }
 
+/** Further than this to the side of the train's track, the way has left the platform the train stops at. */
+const PLATFORM_SIDE_M = 12;
+
+/**
+ * Index of the foot of the stairs to the exit: walking back from the platform end of the way, the
+ * last point still on this platform. A hall or another platform at the same height (Fulton St's
+ * hall sits level with the 4/5) is not this platform, so the walk back stops where the way moves
+ * away from the train's track as well as where it climbs.
+ */
+export function platformFoot(route: RoutePoint[], track: InsideWalk["track"]): number {
+  const end = route[route.length - 1];
+  const [ux, uy] = [Math.cos(track.angle), Math.sin(track.angle)];
+  const on = (p: RoutePoint) => Math.abs(p[2] - end[2]) < 0.3 && Math.abs((p[0] - track.at[0]) * -uy + (p[1] - track.at[1]) * ux) <= PLATFORM_SIDE_M;
+  let foot = route.length - 1;
+  while (foot > 0 && on(route[foot - 1])) foot--;
+  return foot;
+}
+
 const metres = (p: RoutePoint[]) => p.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - p[i][0], q[1] - p[i][1], q[2] - p[i][2]), 0);
 
 async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Segment | null> {
@@ -83,8 +101,6 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
   // Where the way first reaches the platform: the foot of the stairs to the exit. The rider still steps
   // off at the station's stop point, the middle of the train, since the app cannot know their car; the
   // stairs are then described from there (owner, 2026-11-10).
-  let foot = whole.length - 1;
-  while (foot > 0 && Math.abs(whole[foot - 1][2] - whole[whole.length - 1][2]) < 0.3) foot--;
   const route = whole;
   // The train runs the way the ride goes, and stops beside the platform's edge.
   const travel = ride ? travelAngle(ride.coords, !down) : 0;
@@ -100,7 +116,7 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
   const guide = down ? route : [...route].reverse();
   const walkS = Math.max(30, Math.min(240, metres(route) / STATION_PACE));
   const waitS = down ? WAIT_DOWN_S : WAIT_UP_S;
-  const part = down ? null : trainPartAt(m, route[Math.min(route.length - 1, foot)], track.angle);
+  const part = down ? null : trainPartAt(m, route[platformFoot(route, track)], track.angle);
   const inside: InsideWalk = { station, guide, board, track, color: lineColor(ride?.route ?? ""), ...(part ? { trainPart: part } : {}) };
   const w = waitShare({ ...seg, realS: walkS + waitS, waitS });
   const name = ride?.route ? `the ${ride.route} train` : "the train";
