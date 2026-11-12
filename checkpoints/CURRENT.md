@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-11, 15:10 UTC. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-12. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## In flight
+
+**On a laptop the home screen had no language button, so the owner could not find how to switch language (#124, branch `fix/124-language-chip-desktop`, task NMA-0053).** The round language chip in the right-hand rail was drawn on phones only. It now shows at every size; Settings keeps its own Language choice. The layout tests pass at all four sizes with the chip showing.
 
 **Walking from Fulton St's 4/5 hall onto the stair up to the mezzanine, the trip preview met a false wall and pressed the camera into the stair's side (#121, branch `fix/fulton-stair-passage`, task NMA-0052).** The owner's recording on 2026-11-11 showed it at about 55 s. The hall's floor stopped short of the stair's foot, so the strip between them was drawn as track bed with yellow platform edges, and the route turned 97 degrees onto the lowest treads in one step. Floor is now laid where a stair rises from it, floor kinds are smoothed for drawing so stray platform patches go, the route rounds a sharp turn onto a stair with a curve that ends on the stair's middle line, and on level ground the camera looks 3 m ahead. In a simulated walk the eye faces up the stair by 61.5 s. Still close: at 61 s it passes near the stair's left side wall, because the stair's open foot is only about 0.84 m long. #120 (the walk down the middle of the stair from the mezzanine) merged and deployed on 2026-11-11.
 
@@ -24,6 +26,7 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Next
 
+- **Open the live site on a laptop once #124's pull request deploys and switch language from the rail.** The language chip showed on phones only. It should sit in the right-hand rail at 1280 px wide, and picking Español should change the buttons to Spanish.
 - **Record the 4 train trip to Fulton St once #121's pull request deploys and watch 50 to 66 s.** The walk from the hall onto the stair up to the mezzanine hit a false wall and pressed the camera into the stair (task NMA-0052). The floor should run straight to the first step with no dark band or yellow edge, the guide line should curve onto the stair, and the eye should face up it within a second of the foot.
 - **Record the 4 train trip to the E exit on Fulton Street once #119's pull request deploys.** Going down the stair from the mezzanine to the hall, the camera ran close to one side wall (task NMA-0051). From 60 to 70 s the eye should go down the middle of the stair, looking down it, with a wall on each side at the same distance.
 - **Check the stairwell edges from #112 in the same recording.** Stairwell edges in ceilings were jagged and showed the floor above (task NMA-0047); #112 deployed on 2026-11-11 and the first recording after it found #113's box in the hall. Under each stair the ceiling's edge should be straight along the stair's walls, and climbing a stair should show its ceiling and the wall at its head, never pieces of the floor above.

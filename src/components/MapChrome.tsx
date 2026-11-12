@@ -72,16 +72,16 @@ export function QrButton({ wide }: { wide?: boolean } = {}) {
 }
 
 /**
- * Phones only: the language, as a small chip in the rail. The menu row with Settings is gone on a
- * phone, and someone who does not read English must still be able to switch (owner, 2026-10-25;
- * it sat in the wider-screens column and showed nowhere until #54). Wider screens pick it in Settings.
+ * The language, as a small chip in the rail at every size. Someone who does not read English must
+ * be able to switch from the home screen (owner, 2026-10-25, phones, #54; 2026-11-12, laptops too,
+ * #124: the choice in Settings was too hard to find). Settings keeps its own Language choice.
  * A native select sits over the chip, so a phone opens its own picker.
  */
 function LangChip() {
   const lang = useLangPref();
   const t = useMenuT();
   return (
-    <label data-testid="lang-chip" className={`${ROUND} ${DARK} pointer-events-auto relative text-[13px] font-bold uppercase sm:hidden`}>
+    <label data-testid="lang-chip" className={`${ROUND} ${DARK} pointer-events-auto relative text-[13px] font-bold uppercase`}>
       {lang ?? <svg {...svg} width={20} height={20}><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" /></svg>}
       <select value={lang ?? ""} aria-label={t("language")} onChange={(e) => setLangPref((e.target.value || null) as AppLang | null)}
         className="absolute inset-0 cursor-pointer appearance-none opacity-0">
@@ -398,7 +398,7 @@ export function MapChrome() {
       <ZoomButtons map={map} />
       {map ? <Compass map={map} bearing={bearing} /> : null}
       <PhoneLayers open={layersOpen} onOpen={(v) => setOpenMenu(v ? "layers" : null)} />
-      {/* Language stays in sight on a phone (#54): the Settings chip sat past the edge of the task row. */}
+      {/* Language stays in sight at every size (#54, #124). */}
       <LangChip />
       {/* The QR code: wider screens here, a phone in Settings. */}
       <div className="hidden sm:flex"><QrButton /></div>
