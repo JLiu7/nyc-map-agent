@@ -198,6 +198,13 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    // The station model's source is credited in the map's credits at every size.
+    test("the map credits the station model's source", async ({ page }) => {
+      await open(page);
+      await expect(page.locator(".maplibregl-ctrl-attrib")).toContainText("Project Subway NYC", { timeout: 15_000 });
+      await expectLayout(page);
+    });
+
     test("home with the transit layers drawn", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();

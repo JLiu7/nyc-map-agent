@@ -1814,7 +1814,13 @@ export function MapView({
         initialViewState={viewState}
         // Street level looks past the horizon (MapLibre 5 allows pitch > 85);
         // the overhead map keeps its 85° ceiling.
-        attributionControl={{ compact: true }}
+        // Fulton St's rooms and stairs are traced from Project Subway NYC's station model, whose
+        // terms ask for this credit wherever it is used.
+        attributionControl={{
+          compact: true,
+          customAttribution:
+            'Fulton St station model: <a href="https://www.projectsubwaynyc.com" target="_blank" rel="noreferrer">Project Subway NYC</a> (projectsubwaynyc.com)',
+        }}
         maxPitch={walking ? WALK_MAX_PITCH : MAX_PITCH}
         minZoom={9}
         // An eye 1.7 m up sits around z22; the camera height comes from the
