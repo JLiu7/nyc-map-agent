@@ -557,6 +557,75 @@ Blocked/uncertain:
 Next:
 - After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
 
+### 2026-11-13 15:34:50 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:34:50Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"6032a45631aeed242add80623ab008ea436931b019c746e805ad8f1491c291d6","request_id":"31512711a9844912a87019a1521d71e4","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards
+
+### 2026-11-13 15:45:02 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Once #169 deploys, walk inside Fulton St on the live site: stand at -87.7, 35.1 looking SE and read Fulton St, Downtown & Brooklyn over the train; check an Exit sign flat on a wall, the turnstile arms at the fare line and the blue accessible gate","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:45:02Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"de6e4129e61ee6196f6420bfc02b67f1347811d91b3ee67b2e1d37202fde2638","request_id":"7dad7cad07ab4ff192b69934d650e394","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Once #169 deploys, walk inside Fulton St on the live site: stand at -87.7, 35.1 looking SE and read Fulton St, Downtown & Brooklyn over the train; check an Exit sign flat on a wall, the turnstile arms at the fare line and the blue accessible gate
+
+### 2026-11-13 16:06:31 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner to walk Fulton St on the live site after #169 deploys: one green Exit board over each exit stair's middle, facing the walker; the parent rebases feat/126-level-shell onto it","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:06:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"1c9bc2fb14d886e421616070b19b8436ef5f0c4bf7b90e8f3527af4923f01a26","request_id":"8a33a89ec6834865bc625b2104990bc4","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner to walk Fulton St on the live site after #169 deploys: one green Exit board over each exit stair's middle, facing the walker; the parent rebases feat/126-level-shell onto it
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

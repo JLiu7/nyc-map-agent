@@ -382,7 +382,7 @@ export function wallTexture(): THREE.Texture {
 /** One line of a sign: an arrow, route bullets, then words, left to right. */
 type SignLine = { arrow?: "up" | "down"; bullets?: Array<[string, string]>; text?: string };
 /** A sign to hang: where (the panel's middle), the way the walker faces when reading it, and its big and small lines. */
-type SignPlan = { at: P3; heading: number; lines: [SignLine, SignLine | null]; small?: boolean };
+export type SignPlan = { at: P3; heading: number; lines: [SignLine, SignLine | null]; small?: boolean };
 
 const SIGN_FONT = (px: number) => `bold ${px}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
 
@@ -438,10 +438,10 @@ function signLine(g: CanvasRenderingContext2D, line: SignLine, x: number, mid: n
  * A sign as the MTA hangs them: a black panel with a thin white rule along its top, white
  * Helvetica Bold, route bullets in their colours, a big first line and an optional smaller second
  * line. The panel widens to fit its words (up to 4 m; past that the lettering shrinks) and hangs
- * from two thin rods. The group's origin is the panel's middle; it faces -y (turn it with
- * rotation.z = -heading to face someone walking that way).
+ * from two thin rods (none when `rods` is false: a sign fixed flat on a wall). The group's origin is
+ * the panel's middle; it faces -y (turn it with rotation.z = -heading to face someone walking that way).
  */
-export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false): THREE.Group {
+export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false, rods = true): THREE.Group {
   const PX = 256, pad = 0.12, maxW = 4;
   let big = (small ? 0.15 : 0.24) * PX, little = 0.15 * PX;
   const [, probe] = canvas2d(4, 4);
@@ -455,7 +455,9 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   const row1 = big * 1.45, row2 = lines[1] ? little * 1.5 : 0;
   const w = Math.max(inner / PX + 2 * pad, small ? 0.7 : 1.4), h = (top + row1 + row2) / PX + 0.06;
   const [c, g] = canvas2d(Math.round(w * PX), Math.round(h * PX));
-  g.fillStyle = "#111214"; g.fillRect(0, 0, c.width, c.height);
+  // Exit boards in MTA green, the rest MTA black (owner, 2026-11-13: "exit sign doesnt have mta colors").
+  const bg = lines[0].text?.startsWith("Exit") ? 0x00933c : 0x111214;
+  g.fillStyle = `#${bg.toString(16).padStart(6, "0")}`; g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = "#f4f4f2"; g.fillRect(0, ruleAt, c.width, Math.max(2, 0.012 * PX));
   signLine(g, lines[0], pad * PX, top + row1 / 2, big, true);
   if (lines[1]) signLine(g, lines[1], pad * PX, top + row1 + row2 / 2 - little * 0.05, little, true);
@@ -465,12 +467,12 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   const group = new THREE.Group();
   const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, clippingPlanes: clip }));
   front.rotation.x = Math.PI / 2;
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0x111214, clippingPlanes: clip }));
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: bg, clippingPlanes: clip }));
   back.rotation.x = -Math.PI / 2;
   back.position.y = 0.01;
   group.add(front, back);
   const rodX = w / 2 - Math.min(0.3, w / 4);
-  for (const x of [-rodX, rodX]) {
+  for (const x of rods ? [-rodX, rodX] : []) {
     const rod = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.6), new THREE.MeshBasicMaterial({ color: 0x2a2c30, clippingPlanes: clip }));
     rod.position.set(x, 0.005, h / 2 + 0.3);
     group.add(rod);
