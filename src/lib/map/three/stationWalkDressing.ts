@@ -301,6 +301,7 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     return parts.every(([dx, r]) => walkNear(lane[0] + ux * dx, lane[1] + uy * dx, r).every((p) => Math.abs(p[2] - lane[2]) > 1.2));
   };
   const under = shell ? surfaceFinder(trisOf(shell.floors)) : null;
+  const gates: P3[] = [];
   for (const row of fareRows(model)) {
     const h = row.heading, rx = Math.sin(h), ry = Math.cos(h); // the way through
     const ax = -ry, ay = rx; // across the row, the way it is sorted
@@ -340,11 +341,13 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
       }
     }
     // The accessible gate: a wide lane past one end of the row or, where the row runs wall to wall,
-    // in its end lane. Never in a walk's way, a wall, or over a gap in the floor.
+    // in the lane nearest an end that has room. Never in a walk's way, a wall, or over a gap in the floor.
     const busy = (c0: number, c1: number) => through.some((t) => t + 0.65 > c0 && t - 0.65 < c1);
     // `half`: how far across the lane to check, past its leaf outside the row, inside its panels within.
     const fits = (c: number, half: number) => {
-      if (busy(c - WIDE_GATE_M / 2, c + WIDE_GATE_M / 2)) return false;
+      const [gx, gy] = here(c);
+      // Two fare lines meeting at a corner: one gate there, the other line's at its other end.
+      if (busy(c - WIDE_GATE_M / 2, c + WIDE_GATE_M / 2) || gates.some((g) => Math.hypot(g[0] - gx, g[1] - gy) < 1.1 && Math.abs(g[2] - row.z) < 1)) return false;
       for (let s = -half; s <= half + 0.01; s += 0.1) for (const r of [-0.2, 0, 0.2]) {
         const [x, y, z] = here(c + s, run + r);
         if (walkNear(x, y, 0.45).some((q) => Math.abs(q[2] - z) < 1.2)) return false;
@@ -353,16 +356,18 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
       }
       return true;
     };
-    const wide = ([[last + WIDE_LANE_OUT_M, 0.55], [first - WIDE_LANE_OUT_M, 0.55], [last - LANE_M / 2, 0.3], [first + LANE_M / 2, 0.3], [last - 1.5 * LANE_M, 0.3], [first + 1.5 * LANE_M, 0.3]] as const)
-      .find(([c, half]) => fits(c, half))?.[0];
+    const spots: Array<[number, number]> = [[last + WIDE_LANE_OUT_M, 0.55], [first - WIDE_LANE_OUT_M, 0.55]];
+    // Failing both ends, the lanes nearest them, working in.
+    for (let i = 0; i < row.panels.length - 1; i++) spots.push([last - (i + 0.5) * LANE_M, 0.3], [first + (i + 0.5) * LANE_M, 0.3]);
+    const wide = spots.find(([c, half]) => fits(c, half))?.[0];
     if (wide != null) {
       const gate = accessibleGate();
       const at = here(wide);
       gate.position.set(...at);
       // Its post on the side away from the row's middle.
       gate.rotation.z = -h + (wide > (first + last) / 2 ? Math.PI : 0);
-      gate.userData.row = { at, heading: h };
       group.add(gate);
+      gates.push(at);
     }
     // The panels' own turnstiles, each with its cabinet on the panel and its arms across the lane
     // beside it, unless that lane is a walk's way through (it has its own), the accessible gate's, or

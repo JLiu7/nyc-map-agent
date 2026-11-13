@@ -123,6 +123,8 @@ describe("Fulton St's dressing for walking inside", () => {
     const rows = fareRows(model);
     const gates = dressing.group.children.filter((c) => c.userData.accessible);
     expect(gates.length).toBe(rows.length);
+    // Where two lines meet at a corner, never two gates on top of each other.
+    for (const g of gates) expect(gates.filter((o) => o.position.distanceTo(g.position) < 1.1)).toHaveLength(1);
     for (const g of gates) {
       const { x, y, z } = g.position, ux = Math.cos(g.rotation.z), uy = Math.sin(g.rotation.z);
       // Nearer than 0.45 m to the leaf, a walker's body would touch it.
