@@ -335,6 +335,29 @@ Blocked/uncertain:
 Next:
 - After deploy, repeat the 4 train trip, Find exit, Not quite on the live site
 
+### 2026-11-13 13:14:01 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["Trip steps name stations by GTFS stop id, so the helper knows a train trip ends at Fulton St"],"decisions":["no new decisions"],"evidence":["otp, portal and routes tests pass (31); eslint clean on changed files"],"next_action":"After deploy, the 4 or 5 train trip, Find exit, Yes and Not quite on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T13:14:01Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"60465b44beafa829f5a7bf0eb7ac9798079e5b8729109a0c24598fd6be355b01","request_id":"def74646ebca4b0daa6023f96b3cf864","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- Trip steps name stations by GTFS stop id, so the helper knows a train trip ends at Fulton St
+
+Evidence:
+- otp, portal and routes tests pass (31); eslint clean on changed files
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After deploy, the 4 or 5 train trip, Find exit, Yes and Not quite on the live site
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
