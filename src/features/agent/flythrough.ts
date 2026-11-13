@@ -32,6 +32,14 @@ export interface Segment {
    * Fulton St: its wall-clock seconds, the first `waitS` of them on the platform.
    */
   paced?: { seconds: number; waitS: number };
+  /** A ride's vehicle ("bus", "subway"...) and its line colour, from the planner. */
+  mode?: string;
+  color?: string;
+  /**
+   * A bus ride starts at the stop (owner, 2026-11-13): the share of the leg spent there while the
+   * bus pulls in and the rider gets on, before it drives off.
+   */
+  board?: number;
 }
 
 /** A descend or ascend walked through the station's model at eye level, walls and all, along a guide line. */
@@ -135,7 +143,10 @@ export function buildTimeline(trip: Trip): Segment[] {
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
       segs.push({ kind: "descend", label: leg.label, coords: [p, s], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: leg.label }] });
     } else if (leg.kind === "ride") {
-      segs.push({ kind: "ride", label: leg.label, coords: leg.coords, realS: leg.durationS, underground: leg.underground, route: leg.route, callouts: [{ f: 0, text: leg.label }, ...leg.stops.map((s, i) => ({ f: 0, at: s.at, text: s.text, quiet: !speakStop(i, leg.stops.length) }))] });
+      const board = leg.mode === "bus" ? boardShare(leg.durationS) : undefined;
+      // At the stop first: "Wait for the M55 bus at Broadway/Fulton St", then the ride's own line once it leaves.
+      const wait = board ? [{ f: 0, text: `Wait for the ${leg.route} bus${leg.fromStop ? ` at ${leg.fromStop}` : ""}` }] : [];
+      segs.push({ kind: "ride", label: leg.label, coords: leg.coords, realS: leg.durationS, underground: leg.underground, route: leg.route, mode: leg.mode, color: leg.color, board, callouts: [...wait, { f: board ?? 0, text: leg.label }, ...leg.stops.map((s, i) => ({ f: 0, at: s.at, text: s.text, quiet: !speakStop(i, leg.stops.length) }))] });
     } else {
       const p: LngLatTuple = [leg.portal.lon, leg.portal.lat];
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
@@ -146,7 +157,8 @@ export function buildTimeline(trip: Trip): Segment[] {
   // Join the parts first, then place each callout on the line it ended up on.
   return joinUp(segs.filter((s) => s.coords.length >= 2)).map((s) => ({
     ...s,
-    callouts: s.callouts.map(({ at, ...c }) => (at ? { ...c, f: fractionOf(s.coords, at) } : c)),
+    // A bus ride's stops come after the time at the stop.
+    callouts: s.callouts.map(({ at, ...c }) => (at ? { ...c, f: (s.board ?? 0) + (1 - (s.board ?? 0)) * fractionOf(s.coords, at) } : c)),
   }));
 }
 
@@ -156,23 +168,27 @@ const WAIT_SHARE = { descend: 0.3, ascend: 0.2 };
 
 /** The share of a station leg spent on the platform waiting: the train pulling in, or out. */
 export const waitShare = (seg: Segment) =>
-  seg.paced ? seg.paced.waitS / seg.paced.seconds : seg.waitS ? Math.min(0.9, Math.max(seg.kind === "ascend" ? WAIT_SHARE.ascend : WAIT_SHARE.descend, seg.waitS / (seg.realS || 1))) : 0;
+  seg.kind === "ride" ? seg.board ?? 0 : seg.paced ? seg.paced.waitS / seg.paced.seconds : seg.waitS ? Math.min(0.9, Math.max(seg.kind === "ascend" ? WAIT_SHARE.ascend : WAIT_SHARE.descend, seg.waitS / (seg.realS || 1))) : 0;
+
+/** Legs that start with the wait: an ascend (the train pulling out), a bus ride (the bus pulling in). */
+const waitFirst = (seg: Segment) => seg.kind === "ascend" || seg.kind === "ride";
 
 /**
  * How far along its path the rider is at fraction f of a leg: a descend walks
- * then waits at the platform, an ascend waits (the train pulling out) then walks.
+ * then waits at the platform, an ascend waits (the train pulling out) then walks,
+ * a bus ride waits at the stop then rides.
  */
 export function moveAt(seg: Segment, f: number): number {
   const w = waitShare(seg);
   if (!w) return f;
-  return seg.kind === "ascend" ? Math.max(0, (f - w) / (1 - w)) : Math.min(1, f / (1 - w));
+  return waitFirst(seg) ? Math.max(0, (f - w) / (1 - w)) : Math.min(1, f / (1 - w));
 }
 
 /** How far through the wait on the platform the rider is at fraction f (0..1), or null while walking. */
 export function waitAt(seg: Segment, f: number): number | null {
   const w = waitShare(seg);
   if (!w) return null;
-  if (seg.kind === "ascend") return f < w ? f / w : null;
+  if (waitFirst(seg)) return f < w ? f / w : null;
   return f > 1 - w ? (f - (1 - w)) / w : null;
 }
 
@@ -219,7 +235,15 @@ export function wallSeconds(seg: Segment, speed: number): number {
   if (seg.inside) return Math.min(60, Math.max(22, (cumulative(seg.coords).at(-1) ?? 0) / INSIDE_MPS + 6)) * pace;
   if (seg.depths) return 6 * pace;
   if (onFoot(seg)) return foot;
-  return Math.min(10 * pace, Math.max(4 * pace, seg.realS / speed));
+  const ride = Math.min(10 * pace, Math.max(4 * pace, seg.realS / speed));
+  return ride / (1 - (seg.board ?? 0));
+}
+
+/** Seconds at the stop, at 10x, while the bus pulls in and the rider gets on. */
+const BOARD_S = 7;
+/** The share of a bus ride spent at the stop, so the ride itself keeps its usual 4 to 10 s at 10x. */
+export function boardShare(realS: number): number {
+  return BOARD_S / (BOARD_S + Math.min(10, Math.max(4, realS / 10)));
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

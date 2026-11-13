@@ -29,7 +29,7 @@ export function nextStopAt(segs: Segment[], i: number, f: number, destination: s
   const seg = segs[i];
   if (!seg) return destination;
   if (seg.kind === "ride") {
-    const stop = seg.callouts.slice(1).find((c) => c.f > f);
+    const stop = seg.callouts.find((c) => c.f > f && c.text !== seg.label);
     return stop?.text ?? rideEnds(seg.label).to ?? destination;
   }
   const ride = segs.slice(i + 1).find((s) => s.kind === "ride");
