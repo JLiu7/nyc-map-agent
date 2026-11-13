@@ -5,9 +5,12 @@ import type { DollhouseModel } from "./dollhouse";
 type P3 = [number, number, number];
 import { crossesWall, floorBothSides, shellOpenings, stationShell, surfaceFinder, walkPoints } from "./stationShell";
 
-const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
+// Every station model, so one built later is held to the same shell as Fulton St's.
+const STATIONS = ["fulton", "barclays", "cityhall"] as const;
+const load = (id: string) => JSON.parse(readFileSync(`public/transit/${id}-model.json`, "utf8")) as DollhouseModel;
 
-describe("Fulton St's shell for walking inside", () => {
+describe.each(STATIONS)("the %s model's shell for walking inside", (id) => {
+  const model = load(id);
   it("has no opening a person could lean or step through, except over the track", { timeout: 180_000 }, () => {
     const gaps = shellOpenings(model, stationShell(model));
     expect(gaps.slice(0, 20), `${gaps.length} open points along floor and stair edges`).toEqual([]);

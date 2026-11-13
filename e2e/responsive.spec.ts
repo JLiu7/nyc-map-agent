@@ -211,16 +211,18 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
-    // The dollhouse view of the Fulton St walk (#129) draws in the map and leaves every control usable.
+    // The dollhouse view of each station model's walk (#129: Fulton St, then Brooklyn Bridge–City Hall
+    // and Atlantic Av–Barclays Ctr) draws in the map and leaves every control usable.
     test("the dollhouse view of a station walk", async ({ page }) => {
       await open(page);
       await page.waitForFunction(() => "__dollhouse" in window, undefined, { timeout: 20_000 });
-      for (const at of [0, 0.6, 1]) {
-        await page.evaluate(async (f) => {
-          const w = window as unknown as { __dollhouse: (o: { at: number }) => Promise<() => void>; __stopDollhouse?: () => void };
+      const views: Array<[string, number]> = [["fulton", 0], ["fulton", 0.6], ["fulton", 1], ["cityhall", 0.5], ["barclays", 0.5]];
+      for (const [station, at] of views) {
+        await page.evaluate(async ([s, f]) => {
+          const w = window as unknown as { __dollhouse: (o: { at: number; station: string }) => Promise<() => void>; __stopDollhouse?: () => void };
           w.__stopDollhouse?.();
-          w.__stopDollhouse = await w.__dollhouse({ at: f });
-        }, at);
+          w.__stopDollhouse = await w.__dollhouse({ at: f, station: s });
+        }, [station, at] as const);
         expect(await page.evaluate(() => Boolean((window as unknown as { __map: { getLayer: (id: string) => unknown } }).__map.getLayer("dollhouse")))).toBe(true);
         await expectLayout(page);
       }
@@ -250,7 +252,7 @@ for (const size of SIZES) {
     // The station model's source is credited in the map's credits at every size.
     test("the map credits the station model's source", async ({ page }) => {
       await open(page);
-      await expect(page.locator(".maplibregl-ctrl-attrib")).toContainText("Project Subway NYC", { timeout: 15_000 });
+      await expect(page.locator(".maplibregl-ctrl-attrib")).toContainText("Project Subway NYC (projectsubwaynyc.com)", { timeout: 15_000 });
       await expectLayout(page);
     });
 

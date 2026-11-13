@@ -4,9 +4,12 @@ import type { DollhouseModel } from "./dollhouse";
 import { stationShell } from "./stationShell";
 import { toYUp, walkCollider, walkGeometry } from "./stationWalkGeometry";
 
-const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
+// Every station model, so one built later is held to the same shell as Fulton St's.
+const STATIONS = ["fulton", "barclays", "cityhall"] as const;
+const load = (id: string) => JSON.parse(readFileSync(`public/transit/${id}-model.json`, "utf8")) as DollhouseModel;
 
-describe("Fulton St's walk geometry", () => {
+describe.each(STATIONS)("the %s model's walk geometry", (id) => {
+  const model = load(id);
   it("turns the model's z up into three.js's y up without mirroring it", () => {
     expect(toYUp(1, 2, 3)).toEqual([1, 3, -2]);
   });
@@ -20,7 +23,8 @@ describe("Fulton St's walk geometry", () => {
       expect(c.indices.length * 3).toBe(c.vertices.length);
       expect([...c.vertices].every(Number.isFinite)).toBe(true);
     }
-    expect(g.lowest).toBeLessThan(-10);
+    // The floors reach down to the platforms: no walk goes below the lowest of them.
+    expect(g.lowest).toBeLessThanOrEqual(Math.min(...model.walks.flatMap((w) => w.path.map((p) => p[2]))) + 0.1);
   });
 
   it("has a floor or ramp under every point of every walk", { timeout: 60_000 }, () => {

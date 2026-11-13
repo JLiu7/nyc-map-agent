@@ -614,8 +614,8 @@ export function MapView({
     // Handle for headless QA (camera placement, fps sampling) in dev and the e2e build only; production compiles it away.
     if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
       (window as unknown as { __map?: unknown }).__map = map;
-      // Opens the dollhouse view of the Fulton St walk over the map (#129), until it is part of a trip.
-      (window as unknown as { __dollhouse?: unknown }).__dollhouse = (opts?: { seconds?: number; at?: number; exit?: [number, number] }) =>
+      // Opens the dollhouse view of a station walk over the map (#129): Fulton St unless `station` says.
+      (window as unknown as { __dollhouse?: unknown }).__dollhouse = (opts?: { seconds?: number; at?: number; exit?: [number, number]; station?: "fulton" | "cityhall" | "barclays" }) =>
         import("@/lib/map/dollhousePreview").then(({ showDollhouse }) => showDollhouse(map, opts));
     }
     // A style swap (the raster fallback) replaces every source, so the data
@@ -1819,12 +1819,12 @@ export function MapView({
         initialViewState={viewState}
         // Street level looks past the horizon (MapLibre 5 allows pitch > 85);
         // the overhead map keeps its 85° ceiling.
-        // Fulton St's rooms and stairs are traced from Project Subway NYC's station model, whose
-        // terms ask for this credit wherever it is used.
+        // The station models (Fulton St, Brooklyn Bridge–City Hall, Atlantic Av–Barclays Ctr) come
+        // from Project Subway NYC, whose terms ask for this credit wherever they are used.
         attributionControl={{
           compact: true,
           customAttribution:
-            'Fulton St station model: <a href="https://www.projectsubwaynyc.com" target="_blank" rel="noreferrer">Project Subway NYC</a> (projectsubwaynyc.com)',
+            'Station models: <a href="https://www.projectsubwaynyc.com" target="_blank" rel="noreferrer">Project Subway NYC</a> (projectsubwaynyc.com)',
         }}
         maxPitch={walking ? WALK_MAX_PITCH : MAX_PITCH}
         minZoom={9}

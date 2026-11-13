@@ -68,7 +68,7 @@ Heavy code is reached only through dynamic `import()` so each feature is its own
 | feature | status | data / upstream | our endpoint | caching | env (names only) | license / attribution |
 | --- | --- | --- | --- | --- | --- | --- |
 | Basemap | live | OpenFreeMap Liberty vector style (OSM) | direct | browser/CDN | `VITE_BASEMAP_STYLE` | © OpenMapTiles © OSM contributors (ODbL) |
-| Fulton St station model | live | Rooms and stairs traced from Project Subway NYC's 3D model (projectsubwaynyc.com) | bundled station data | n/a | none | Used with the author's permission; credit Project Subway NYC and projectsubwaynyc.com wherever it shows (map credits) |
+| Station models (Fulton St, Brooklyn Bridge–City Hall, Atlantic Av–Barclays Ctr) | live | Rooms, stairs and dollhouse walks traced from Project Subway NYC's 3D models (projectsubwaynyc.com) | bundled station data (`public/transit/*-model.json`) | n/a | none | Used with the author's permission, which covers all their models (owner, 2026-11-13); credit Project Subway NYC and projectsubwaynyc.com wherever it shows (map credits). Source meshes never go in the repository |
 | Fallback raster | live | tile.openstreetmap.org | direct | OSM tile policy | `VITE_TILE_URL` | © OSM contributors (ODbL) |
 | Neighborhoods / blocks / areas | live | NYC Open Data NTA `9nt8-h7nd`, CDs → Octo `core.area_shapes` | `/api/areas`, `/api/area/:block` | s-maxage 7d, browser 1d | `VITE_DATA_BACKEND` | NYC Open Data Terms of Use |
 | Noise (311) | live | Socrata `erm2-nwe9` → Octo raw/core/marts | `/api/aggregate`, `/api/blocks` | nightly ingest; s-maxage 1h | `SOCRATA_APP_TOKEN`, `SOCRATA_KEY_ID`, `SOCRATA_KEY_SECRET`, `VITE_SOCRATA_APP_TOKEN` | NYC Open Data |

@@ -347,7 +347,7 @@ describe("offline cache list (public/sw.js)", () => {
   });
 
   it("keeps the station data the trip preview walks once it has been seen (#132)", () => {
-    expect(how("/transit/fulton-model.json")).toBe("network-first");
+    for (const m of ["fulton", "cityhall", "barclays"]) expect(how(`/transit/${m}-model.json`)).toBe("network-first");
     expect(how("/transit/xray.json")).toBe("network-first");
     expect(how("/transit/../api/x.json")).toBe("bypass");
   });
