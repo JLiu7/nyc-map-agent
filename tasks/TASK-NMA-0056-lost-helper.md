@@ -358,6 +358,29 @@ Blocked/uncertain:
 Next:
 - After deploy, the 4 or 5 train trip, Find exit, Yes and Not quite on the live site
 
+### 2026-11-13 14:29:55 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["Find exit at Fulton St checked live after a train trip; Yes and Not quite both ask where you are"],"decisions":["no new decisions"],"evidence":["Live run 2026-11-13, receipt on #143 (comment 6855852902)"],"next_action":"Check the passage steps' stair flights against the real Fulton St station","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T14:29:55Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"12006ea6eba8a1b7cd0a8182d9c67fdea90bbfdd59e3a4aea7975f83d71ef568","request_id":"e53d32a3567647e185333db6f4c00193","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- Find exit at Fulton St checked live after a train trip; Yes and Not quite both ask where you are
+
+Evidence:
+- Live run 2026-11-13, receipt on #143 (comment 6855852902)
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Check the passage steps' stair flights against the real Fulton St station
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
