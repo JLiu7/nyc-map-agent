@@ -127,6 +127,13 @@ export function bestGuess(p: {
     return withTrip({ ...NONE, from: "trip", stage: "off", station: ride.off.name, stationId: ride.off.id });
   }
 
+  // A trip with no subway ride to get off (a bus while the line is out, or only a walk) still says where it
+  // ends. When that is a station, someone looking for its exit is most likely there.
+  if (p.trip && /\bstation$/i.test(p.trip.destination.label)) {
+    const st = p.nearest(p.trip.destination.at);
+    if (st && st.d <= AT_STATION_M) return { ...NONE, from: "trip", stage: "at", station: st.name, stationId: st.id };
+  }
+
   if (p.fix) {
     const st = p.nearest(p.fix.at);
     if (st && st.d <= 400) return { ...NONE, from: "lastFix", stage: "at", station: st.name, stationId: st.id, ageMin: p.signal.ageMin };

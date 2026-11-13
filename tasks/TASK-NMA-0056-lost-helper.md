@@ -266,6 +266,29 @@ Blocked/uncertain:
 Next:
 - Let CI pass and auto-merge #144, then check the placement questions at Fulton St on the live site and post the receipt on #143
 
+### 2026-11-13 08:34:15 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["#144 merged; merged main into fix/lost-guess-trip-without-subway again. The task record takes main's copy; this branch's earlier entries (the M15 trip that ended at Fulton St station with no subway exit, and the destination-station guess) are in #149's commits"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Let CI pass and auto-merge #149, then ask for the 4 train trip to Fulton St on the live site, close the card, tap Find exit and read the guess","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T08:34:15Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"89e22e4aeaeafd761be92abf6e7a8b40edf10242b198e63a6b0bdb83cf5d2bd4","request_id":"cc4d21d2a132479f85e2a473476a8c9c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- #144 merged; merged main into fix/lost-guess-trip-without-subway again. The task record takes main's copy; this branch's earlier entries (the M15 trip that ended at Fulton St station with no subway exit, and the destination-station guess) are in #149's commits
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Let CI pass and auto-merge #149, then ask for the 4 train trip to Fulton St on the live site, close the card, tap Find exit and read the guess
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

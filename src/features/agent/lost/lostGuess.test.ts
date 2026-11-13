@@ -18,6 +18,20 @@ const trip: ActiveTrip = {
     { kind: "walk" },
   ],
 };
+/**
+ * The trip the live site planned for "Take the 4 train from Grand Central to Fulton St" on 2026-11-12 at
+ * 23:47, with the 4 out between Grand Central and Utica Av: the M15 bus, then a walk to Fulton St station.
+ * No subway ride, so no station to get off at. Stops and turns trimmed.
+ */
+const busTrip: ActiveTrip = {
+  id: "live-m15",
+  destination: { label: "Fulton St station", at: [-74.007582, 40.710374] },
+  legs: [
+    { kind: "walk", label: "Walk to 2 Av/E 41 St" },
+    { kind: "ride", route: "M15", label: "M15 bus 2 Av/E 41 St → Pearl St/Fulton St (toward SOUTH FERRY via 2 AV)", stops: [{ at: [-73.97388, 40.747638], text: "2 Av/E 39 St" }] },
+    { kind: "walk", label: "Walk from Pearl St/Fulton St to Fulton St station" },
+  ],
+};
 const stations = [FULTON, GCT];
 const nearest = (at: [number, number]) => {
   const d = (s: typeof FULTON) => Math.hypot((s.lon - at[0]) * 84_000, (s.lat - at[1]) * 111_000);
@@ -89,5 +103,17 @@ describe("best guess (#131)", () => {
   });
   it("offline, the exit's signs are the way meanwhile", () => {
     expect(offlineReply("Fulton St & Nassau St", "en")).toBe("No connection here. I'll send this when you're back online. Meanwhile, follow the Exit signs for Fulton St & Nassau St.");
+  });
+});
+
+describe("a trip with no subway ride (live, 2026-11-12)", () => {
+  it("guesses the station the trip ends at, not 'I can't tell'", () => {
+    const g = bestGuess({ ...base, trip: busTrip, signal: sig(null) });
+    expect(g).toMatchObject({ from: "trip", stage: "at", station: "Fulton St", stationId: "A38" });
+    expect(guessText(g, "en")).toBe("You're probably at Fulton St. Is that right?");
+  });
+  it("still asks when the trip ends at a street address", () => {
+    const g = bestGuess({ ...base, trip: { ...busTrip, destination: { label: "Fulton St & Nassau St", at: [-74.0083, 40.7103] } }, signal: sig(null) });
+    expect(g.stage).toBeNull();
   });
 });
