@@ -26,6 +26,12 @@ export interface Segment {
   waitS?: number;
   /** The walk through the station's walkable model, when one was found (./stationWalks). */
   inside?: InsideWalk;
+  /**
+   * A walk played at its own slow pace whatever the speed, so its spoken directions can be followed
+   * (owner, 2026-11-12: walking through a station is the most confusing part). The dollhouse walk at
+   * Fulton St: its wall-clock seconds, the first `waitS` of them on the platform.
+   */
+  paced?: { seconds: number; waitS: number };
 }
 
 /** A descend or ascend walked through the station's model at eye level, walls and all, along a guide line. */
@@ -150,7 +156,7 @@ const WAIT_SHARE = { descend: 0.3, ascend: 0.2 };
 
 /** The share of a station leg spent on the platform waiting: the train pulling in, or out. */
 export const waitShare = (seg: Segment) =>
-  seg.waitS ? Math.min(0.9, Math.max(seg.kind === "ascend" ? WAIT_SHARE.ascend : WAIT_SHARE.descend, seg.waitS / (seg.realS || 1))) : 0;
+  seg.paced ? seg.paced.waitS / seg.paced.seconds : seg.waitS ? Math.min(0.9, Math.max(seg.kind === "ascend" ? WAIT_SHARE.ascend : WAIT_SHARE.descend, seg.waitS / (seg.realS || 1))) : 0;
 
 /**
  * How far along its path the rider is at fraction f of a leg: a descend walks
@@ -205,6 +211,7 @@ const onFoot = (seg: Segment) => seg.kind === "walk" || seg.kind === "descend" |
  * 4 to 10 s. Other speeds scale all of it.
  */
 export function wallSeconds(seg: Segment, speed: number): number {
+  if (seg.paced) return seg.paced.seconds;
   const pace = 10 / speed;
   const foot = Math.min(12 * pace, Math.max(4 * pace, seg.realS / (speed * FOOT_RATE)));
   // Through a station the walk is paced by its length, about 2.5 m a second on screen plus the wait for

@@ -612,7 +612,12 @@ export function MapView({
       void installBlockTiles(map).then((swapped) => swapped && setStyleEpoch((epoch) => epoch + 1));
     blockTiles();
     // Handle for headless QA (camera placement, fps sampling) in dev and the e2e build only; production compiles it away.
-    if (import.meta.env.DEV || import.meta.env.VITE_E2E) (window as unknown as { __map?: unknown }).__map = map;
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
+      (window as unknown as { __map?: unknown }).__map = map;
+      // Opens the dollhouse view of the Fulton St walk over the map (#129), until it is part of a trip.
+      (window as unknown as { __dollhouse?: unknown }).__dollhouse = (opts?: { seconds?: number; at?: number; exit?: [number, number] }) =>
+        import("@/lib/map/dollhousePreview").then(({ showDollhouse }) => showDollhouse(map, opts));
+    }
     // A style swap (the raster fallback) replaces every source, so the data
     // has to be re-attached and re-pushed.
     map.on("style.load", () => {

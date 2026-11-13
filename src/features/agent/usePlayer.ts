@@ -16,6 +16,10 @@ import { initialPlayback, isActive, playback, type Playback } from "./playback";
 import type { PlaybackSpeed, Trip } from "./schema";
 import { setMarker, setPreviewDim, setXray } from "./tripLayer";
 import { walkLine, walkPlace } from "./walkPlace";
+import { dollhouseLeg } from "./dollhouseLeg";
+import type { DollhouseView } from "@/lib/map/dollhousePreview";
+import type { DollhouseState } from "@/lib/map/three/dollhouse";
+import { useFlag } from "@/lib/flags";
 
 export type Speed = PlaybackSpeed;
 export interface PlayerState extends Playback {
@@ -112,6 +116,10 @@ function lookPitch(seg: Segment, f: number): number {
 }
 
 /** The street a trip's exit comes up on, from its step ("Use the E exit on Fulton Street at Fulton St"), for the Exit signs on the way. */
+/** The dollhouse walk's pace: seconds on the platform (the overview, the train pulling out, where you got off), then metres a second. */
+const DOLL_WAIT_S = 12;
+const DOLL_WALK_MPS = 1.2;
+
 function exitStreet(seg: Segment): string | undefined {
   if (seg.kind !== "ascend") return undefined;
   return /\bexit (?:on|by) (.+?) at /.exec(seg.label)?.[1];
@@ -140,6 +148,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const playedSpeed = useRef<Speed>(pb.speed);
   /** Which restart and leg `elapsed` belongs to; a new one starts the leg at 0. */
   const counted = useRef({ restart: -1, seg: -1 });
+  /** Seconds into the leg the progress bar was dragged to, until the loop picks them up. */
+  const seekAt = useRef<number | null>(null);
   const lastCallout = useRef("");
   const styledSeg = useRef(-1);
   const say = useRef(onCallout);
@@ -183,10 +193,22 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const stairs = useRef<{ station: string; streetXray: boolean } | null>(null);
   /** A station walked at eye level: the leg, the eye and train it draws each frame, its canvas below the street, and how to take it down. */
   const inside = useRef<{ seg: Segment; eye: StationEye | null; train: number | null; canvas: HTMLCanvasElement | null; stop: () => void } | null>(null);
+  /**
+   * Leaving a downtown 4 or 5 at Fulton St (#129): the station model in the map with a figure walking
+   * it, seen from behind and above, through that leg and on along the street walk after it.
+   */
+  const doll = useRef<{ seg: Segment; next: Segment | undefined; state: DollhouseState; view: DollhouseView | null; stop: () => void } | null>(null);
+  const dollhouseOn = useRef(false);
+  dollhouseOn.current = useFlag("dollhouseWalk");
+  const hideDoll = useCallback(() => {
+    doll.current?.stop();
+    doll.current = null;
+  }, []);
   const hideInside = useCallback(() => {
     inside.current?.stop();
     inside.current = null;
-  }, []);
+    hideDoll();
+  }, [hideDoll]);
   /**
    * Draw a station leg's walls, guide line and train (owner, 2026-11-08): below the street on a
    * canvas over the map, as street view does; an elevated platform on the map itself.
@@ -203,7 +225,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
     const line = ride?.kind === "ride" && ride.route ? ride.route.replace(/^([0-9A-Z])X$/, "$1") : null;
     const bullets = walk.station.signs.stations.flatMap((s) => s.routes).filter((b) => b.route === line).slice(0, 1);
     const trip = { guide: walk.guide, board: walk.board, track: walk.track, color: walk.color, train: () => view.train, signs: { exit: seg.kind === "ascend", routes: bullets, words: exitStreet(seg) } };
-    void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
+    const firstPerson = () => void import("@/lib/map/three/stationScene").then(({ createStationLayer, mountStationView, STATION_LAYER }) => {
       if (inside.current !== view) return;
       const { model, tracks, signs } = walk.station;
       if (model.elevated) {
@@ -222,7 +244,29 @@ export function usePlayer(onCallout?: (text: string) => void) {
       view.canvas = canvas;
       view.stop = () => { unmount(); canvas.remove(); };
     });
-  }, [hideInside]);
+    // Leaving a downtown 4 or 5 at Fulton St, a figure walks the station model seen from above (#129),
+    // to the exit the trip chose; with no walk to that exit, the first-person walk plays instead.
+    if (!dollhouseOn.current || !dollhouseLeg(seg, ride)) { firstPerson(); return; }
+    const d: NonNullable<typeof doll.current> = { seg, next: segsRef.current[at + 1], state: { walk: null, wait: null, street: null }, view: null, stop: () => {} };
+    doll.current = d;
+    const exit = seg.coords[seg.coords.length - 1] ?? null;
+    void import("@/lib/map/dollhousePreview")
+      .then(({ openDollhouse }) => openDollhouse(map, exit, () => d.state, exitStreet(seg) ?? null))
+      .catch(() => null)
+      .then((opened) => {
+        if (doll.current !== d) { opened?.stop(); return; }
+        if (!opened) { doll.current = null; if (inside.current === view) firstPerson(); return; }
+        d.view = opened;
+        d.stop = opened.stop;
+        // Slow and spoken (owner, 2026-11-12): the walk keeps a walking pace whatever the speed, and the
+        // voice says where on the train the figure got off, then each turn and stair, in the app's language.
+        seg.paced = { seconds: DOLL_WAIT_S + opened.lengthM / DOLL_WALK_MPS, waitS: DOLL_WAIT_S };
+        const w = DOLL_WAIT_S / seg.paced.seconds;
+        seg.callouts = opened.callouts.map((c) => ({ f: c.wait ? 0 : w + (1 - w) * Math.min(c.f, 0.97), text: c.text }));
+        const tripId = pbRef.current.tripId;
+        if (tripId) translate(tripId, segsRef.current, true);
+      });
+  }, [hideInside, translate]);
 
   const leaveEye = useCallback((map: MapLibreMap) => {
     if (!eye.current) return;
@@ -328,6 +372,19 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const setSpeed = useCallback((speed: Speed) => dispatch({ type: "speed", speed }), []);
   const skip = useCallback(() => dispatch({ type: "skip" }), []);
   const back = useCallback(() => dispatch({ type: "back" }), []);
+  /** Jump to a spot (0 to 1) of the whole preview, as dragging a video's bar does. */
+  const seek = useCallback((f: number) => {
+    const s = pbRef.current;
+    const all = segsRef.current.map((x) => (reduced ? 3 : wallSeconds(x, s.speed)));
+    if (!isActive(s) || !all.length) return;
+    const sum = all.reduce((a, b) => a + b, 0);
+    let t = Math.max(0, Math.min(1, f)) * sum, seg = 0;
+    while (seg < all.length - 1 && t >= all[seg]) { t -= all[seg]; seg++; }
+    // Never the very end of a leg: that would count as finished and move on.
+    seekAt.current = Math.min(t, all[seg] * 0.999);
+    setProgress(f);
+    dispatch({ type: "seek", seg });
+  }, [reduced]);
 
   const on = isActive(pb);
   useEffect(() => { setPreviewing(on); }, [on]);
@@ -342,10 +399,17 @@ export function usePlayer(onCallout?: (text: string) => void) {
   // One loop per (run, leg) while playing. Every exit path cancels its frame,
   // so a new trip or speed never leaves an old loop drawing over the new one.
   useEffect(() => {
-    if (pb.status !== "playing") return;
+    // Paused, the loop runs only to settle the camera on a spot the progress bar was dragged to.
+    const settling = pb.status === "paused" && seekAt.current !== null;
+    if (pb.status !== "playing" && !settling) return;
     let alive = true;
     const s0 = pbRef.current;
-    if (counted.current.restart !== s0.restart || counted.current.seg !== s0.seg) {
+    const settleUntil = performance.now() + 700;
+    if (seekAt.current !== null) {
+      elapsed.current = seekAt.current;
+      seekAt.current = null;
+      counted.current = { restart: s0.restart, seg: s0.seg };
+    } else if (counted.current.restart !== s0.restart || counted.current.seg !== s0.seg) {
       // A new leg starts at 0; a restart also re-styles the map and repeats the first callout.
       elapsed.current = 0;
       if (counted.current.restart !== s0.restart) {
@@ -372,7 +436,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
         playedSpeed.current = s.speed;
       }
       const dt = (now - prev) / 1000;
-      elapsed.current += dt;
+      if (!settling) elapsed.current += dt;
       prev = now;
       const total = reduced ? 3 : wallSeconds(seg, s.speed);
       const f = reduced ? 1 : Math.min(1, elapsed.current / total);
@@ -394,7 +458,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
       }
       // The walk through the station can arrive after its leg has started.
       if (seg.inside) showInside(map, seg);
-      else if (inside.current) hideInside();
+      else if (inside.current) { inside.current.stop(); inside.current = null; }
+      // The dollhouse lasts through its leg and the street walk after it.
+      const dh = doll.current && (doll.current.seg === seg || doll.current.next === seg) ? doll.current : null;
+      if (doll.current && !dh) hideDoll();
+      if (dh) dh.state = dh.seg === seg ? { walk: wait !== null ? 0 : fm, wait, street: null } : { walk: 1, wait: null, street: { lon: mark[0], lat: mark[1], heading: pose.bearing } };
       const eyeLeg = mode === "map" && usesEye(seg);
       if (!eyeLeg && eye.current) leaveEye(map);
       if (eyeLeg) {
@@ -410,7 +478,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
         // Waiting to board, turn to face the track the train comes in on. Getting off, keep facing the way out:
         // watching the train leave meant seconds of dark tunnel (owner, 2026-11-10).
         e.bearing = approachBearing(e.bearing, seg.inside && wait !== null && seg.kind !== "ascend" ? faceTrain(seg.inside, false) : pose.bearing, dt, 4);
-        const rig = eyeRig(mark, e.bearing, depth, !seg.inside);
+        const rig = (dh?.view && dh.view.rig(dt)) || eyeRig(mark, e.bearing, depth, !seg.inside);
         const cam = map.calculateCameraOptionsFromTo(new LngLat(...rig.eye), rig.eyeAlt, new LngLat(...rig.look), rig.lookAlt);
         const to: Cam = { center: rig.look, zoom: cam.zoom ?? map.getZoom(), pitch: cam.pitch ?? 0, bearing: cam.bearing ?? e.bearing, elevation: rig.lookAlt };
         e.t += dt;
@@ -453,7 +521,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
       const { text, quiet } = calloutInfoAt(seg, f);
       if (text !== lastCallout.current) {
         lastCallout.current = text;
-        if (!quiet) say.current?.(inLang(text));
+        // Dragging back and forth along the bar stays quiet; playing from there speaks again.
+        if (!quiet && !settling) say.current?.(inLang(text));
         setCallout(inLang(text));
       }
       if (now - progressAt.current >= PROGRESS_MS) {
@@ -461,6 +530,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
         const all = segsRef.current.map((x) => (reduced ? 3 : wallSeconds(x, s.speed)));
         const sum = all.reduce((a, b) => a + b, 0) || 1;
         setProgress((all.slice(0, s.seg).reduce((a, b) => a + b, 0) + f * total) / sum);
+      }
+      if (settling) {
+        if (now < settleUntil) rafId.current = requestAnimationFrame(tick);
+        return;
       }
       if (elapsed.current >= total) {
         alive = false;
@@ -474,11 +547,13 @@ export function usePlayer(onCallout?: (text: string) => void) {
       alive = false;
       cancelAnimationFrame(rafId.current);
     };
-  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs, showInside, hideInside, inLang]);
+  }, [pb.status, pb.seg, pb.run, reduced, leaveEye, showStairs, showInside, hideInside, hideDoll, inLang]);
 
   // Where the trip ended: the street and what to look for at the destination.
   useEffect(() => {
     if (pb.status !== "ended") return;
+    // Arrived: the station layer goes, so it stops drawing over the map.
+    hideDoll();
     const end = segsRef.current.at(-1)?.coords.at(-1);
     const map = getMapInstance();
     place.current = { read: null, readAt: 0, at: 0 };
@@ -490,8 +565,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
       camKind.current = "other";
       frameLeg(map, last.coords, reduced);
     }
-  }, [pb.status, leaveEye, reduced]);
+  }, [pb.status, leaveEye, reduced, hideDoll]);
 
   const state: PlayerState = { ...pb, active: isActive(pb), playing: pb.status === "playing", segs, callout, where, progress: pb.status === "ended" ? 1 : progress };
-  return { state, load, start, select, stop, release, toggle, setSpeed, skip, back };
+  return { state, load, start, select, stop, release, toggle, setSpeed, skip, back, seek };
 }

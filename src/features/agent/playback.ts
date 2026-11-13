@@ -34,6 +34,11 @@ export type PlaybackEvent =
   | { type: "back" }
   /** The animation reached the end of the current leg. */
   | { type: "legDone" }
+  /**
+   * Dragged on the progress bar to a spot in leg `seg` (owner, 2026-11-12: a bar to trace the walk
+   * back, like a video's). Playing keeps playing from there; anything else holds still on that spot.
+   */
+  | { type: "seek"; seg: number }
   | { type: "stop" };
 
 export const initialPlayback: Playback = { status: "idle", tripId: null, speed: 10, seg: 0, segCount: 0, run: 0, restart: 0 };
@@ -74,6 +79,9 @@ export function playback(s: Playback, e: PlaybackEvent): Playback {
       const seg = s.status === "ended" ? s.seg : Math.max(0, s.seg - 1);
       return { ...s, seg, status: s.status === "ended" ? "playing" : s.status, run: s.run + 1, restart: s.restart + 1 };
     }
+    case "seek":
+      if (s.status === "idle") return s;
+      return { ...s, seg: Math.max(0, Math.min(s.segCount - 1, e.seg)), status: s.status === "playing" ? "playing" : "paused", run: s.run + 1 };
     case "stop":
       return s.status === "idle" ? s : { ...s, status: "idle", tripId: null, seg: 0, segCount: 0, run: s.run + 1 };
   }

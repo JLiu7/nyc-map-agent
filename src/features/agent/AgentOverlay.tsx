@@ -1001,6 +1001,7 @@ export default function AgentOverlay() {
           trip={trip} state={player.state} speed={player.state.speed}
           onToggle={player.toggle} onSpeed={(s) => { setPrefSpeed(s); player.setSpeed(s); }}
           onBack={player.back} onNext={player.skip}
+          onSeek={player.seek}
           onAlert={(route) => setSelectedLine(route)}
           onClose={() => { player.stop(); setTrip(null); clearTripBuses(); }}
           onUse={() => {

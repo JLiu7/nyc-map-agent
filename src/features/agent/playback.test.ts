@@ -81,6 +81,18 @@ describe("trip preview playback", () => {
     expect(playback(initialPlayback, { type: "back" })).toBe(initialPlayback);
   });
 
+  it("seeking jumps to a leg: playing keeps playing, anything else holds still there", () => {
+    const playing = run(load("a", 3), { type: "play" });
+    expect(playback(playing, { type: "seek", seg: 2 })).toMatchObject({ status: "playing", seg: 2, run: playing.run + 1, restart: playing.restart });
+    const ready = run(load("a", 3));
+    expect(playback(ready, { type: "seek", seg: 1 })).toMatchObject({ status: "paused", seg: 1 });
+    const end = run(load("a", 2), { type: "play" }, { type: "legDone" }, { type: "legDone" });
+    expect(end.status).toBe("ended");
+    expect(playback(end, { type: "seek", seg: 0 })).toMatchObject({ status: "paused", seg: 0 });
+    expect(playback(ready, { type: "seek", seg: 9 }).seg).toBe(2);
+    expect(playback(initialPlayback, { type: "seek", seg: 1 })).toBe(initialPlayback);
+  });
+
   it("a trip with no drawable legs never plays", () => {
     expect(run(load("a", 0), { type: "play" }).status).toBe("idle");
   });

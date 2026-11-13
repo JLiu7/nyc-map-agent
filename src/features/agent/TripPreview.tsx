@@ -1,5 +1,5 @@
 import "@/components/task-screens.css";
-import { BellRing, Clock, MapPin, Pause, PartyPopper, Play, SkipBack, SkipForward, TriangleAlert, X } from "lucide-react";
+import { BellRing, ChevronDown, Clock, MapPin, Pause, PartyPopper, Play, SkipBack, SkipForward, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLeftCard } from "@/lib/store/leftColumn";
@@ -20,6 +20,8 @@ export function TripPreview(p: {
   onToggle: () => void; onSpeed: (s: PlaybackSpeed) => void;
   /** Back one step of the walkthrough, and on to the next. */
   onBack: () => void; onNext: () => void;
+  /** Drag the bar to a spot (0 to 1) of the preview, back or forward, as on a video. */
+  onSeek?: (f: number) => void;
   onClose: () => void; onUse: () => void; onOther: () => void;
   /** Ask again by subway, by bus, on foot or with the least walking (src/features/agent/tripChoices.ts). */
   onChoice?: (c: TripChoice) => void;
@@ -52,139 +54,98 @@ export function TripPreview(p: {
   // A desktop: the trip is a card in the one left column, with the ask box under it.
   const desktop = useMediaQuery("(min-width: 1024px)");
   const { slot, top } = useLeftCard(`trip:${trip.id}`, desktop);
-  const [level, setLevel] = useState<SheetLevel>(1);
+  const [level, setLevel] = useState<SheetLevel>(0);
   // Playing, the sheet drops to its one bar so the walk has the screen (owner, 2026-11-10: the panel hid half the station).
   useEffect(() => { if (state.playing) setLevel(0); }, [state.playing]);
   const close = <button type="button" className="task-action task-close" aria-label="Close trip" onClick={p.onClose}><X size={18} /></button>;
   const playBtn = (size: string) => <button type="button" className={`task-action ${size} shrink-0 rounded-full p-0`} aria-label={state.playing ? "Pause preview" : "Play preview"} onClick={p.onToggle}>
     {state.playing ? <Pause size={22} /> : <Play size={22} />}
   </button>;
-  const speeds = <div className="grid flex-1 grid-cols-4 gap-1 rounded-[14px] bg-slate-900/50 p-1" role="group" aria-label="Playback speed">
-    {PLAYBACK_SPEEDS.map((s) => <button type="button" key={s} aria-pressed={s === p.speed} onClick={() => p.onSpeed(s)} className={`h-10 rounded-[10px] text-sm font-semibold ${s === p.speed ? "bg-slate-50 text-slate-900" : "text-slate-200"}`}>{s}×</button>)}
+  const speeds = <div className="grid min-w-0 flex-1 grid-cols-4 gap-0.5 rounded-[12px] bg-slate-900/50 p-0.5" role="group" aria-label="Playback speed">
+    {PLAYBACK_SPEEDS.map((s) => <button type="button" key={s} aria-pressed={s === p.speed} onClick={() => p.onSpeed(s)} className={`h-9 min-w-0 rounded-[10px] text-[13px] font-semibold ${s === p.speed ? "bg-slate-50 text-slate-900" : "text-slate-200"}`}>{s}×</button>)}
   </div>;
   const weather = w ? `${w.summary} · ${Math.round(w.tempC)}°C / ${Math.round(w.tempC * 9 / 5 + 32)}°F${w.precipPct >= 40 ? ` · ${w.precipPct}% rain` : ""}` : null;
   const notice = alert ? <button type="button" disabled={!alertRoute || !p.onAlert} onClick={() => alertRoute && p.onAlert?.(alertRoute)}
     className="task-panel flex max-w-full items-center gap-1.5 rounded-full border-amber-500/40 px-3 py-2 text-left text-[13px] text-amber-200">
     <TriangleAlert size={14} className="shrink-0" aria-hidden /><span className="truncate">{plainAlertText(alert)}</span></button> : null;
-  const bar = <div role="progressbar" aria-label="Preview progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-1.5 shrink-0 overflow-hidden rounded bg-slate-400/25"><div className="h-full bg-amber-500" style={{ width: `${progress}%` }} /></div>;
+  // The bar drags like a video's: back to see the station walk again, or ahead (owner, 2026-11-12).
+  const bar = p.onSeek
+    ? <input type="range" aria-label="Preview progress" data-testid="trip-seek" min={0} max={1000} step={1} value={Math.round(progress * 10)}
+      onChange={(e) => p.onSeek?.(Number(e.target.value) / 1000)}
+      className="h-6 w-full shrink-0 cursor-pointer accent-amber-500" />
+    : <div role="progressbar" aria-label="Preview progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-1.5 shrink-0 overflow-hidden rounded bg-slate-400/25"><div className="h-full bg-amber-500" style={{ width: `${progress}%` }} /></div>;
   const place = trip.destination.label.split(",")[0];
   const stepBtn = (label: string, onClick: () => void, icon: ReactNode) =>
     <button type="button" className="task-action task-secondary h-10 w-10 shrink-0 rounded-full p-0" aria-label={label} onClick={onClick}>{icon}</button>;
-  // The walkthrough's bar on a phone: what to do now, in full, then back / play / next and how far along.
-  const player = <div className="flex flex-col gap-2" data-testid="trip-heading">
-    <div className="flex items-start gap-2">
+  const [more, setMore] = useState(false);
+  // On a phone the sheet itself is the "more": pulled up, it shows the details.
+  const open = wide ? more : level > 0;
+  const toggleMore = () => (wide ? setMore((m) => !m) : setLevel((l) => (l === 0 ? 2 : 0)));
+  // Where you are now: the step's place once it plays, the start before, and the destination at the end.
+  const now = state.status === "ended" ? t("atPlace").replace("{p}", place) : started ? (state.where ?? state.callout) : trip.origin.label;
+  // The first view is only three things (owner, 2026-11-12): where to, where you are now, and the bar.
+  // Everything else waits behind the destination's chevron.
+  const head = <div className="flex flex-col gap-1.5" data-testid="trip-heading">
+    <div className="flex items-center gap-2">
+      {playBtn("h-11 w-11")}
       <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-semibold leading-snug" aria-live="polite" data-testid="trip-caption">{state.status === "ended" ? t("atPlace").replace("{p}", place) : state.callout}</p>
-        {state.where ? <p className="mt-0.5 flex items-center gap-1 text-[12px] text-slate-300" data-testid="trip-where"><MapPin size={12} className="shrink-0" aria-hidden /><span className="truncate">{state.where}</span></p> : null}
+        <button type="button" className="flex min-h-7 max-w-full items-center gap-1 text-left" aria-expanded={open} aria-label="Trip details" onClick={toggleMore}>
+          <span className="truncate text-[15px] font-bold" title={`${trip.origin.label} → ${trip.destination.label}`}>To {place}</span>
+          {impact ? <TriangleAlert size={14} className={`shrink-0 ${impact.blocks ? "text-red-300" : "text-amber-300"}`} aria-hidden /> : null}
+          <ChevronDown size={16} className={`shrink-0 text-slate-300 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+        <p className="flex items-center gap-1 text-[13px] text-slate-300" aria-live="polite">
+          <MapPin size={12} className="shrink-0" aria-hidden /><span className="truncate" data-testid="trip-caption">{now}</span>
+        </p>
       </div>
       {close}
     </div>
-    <div className="flex items-center gap-2">
-      {stepBtn("Previous step", p.onBack, <SkipBack size={16} />)}
-      {playBtn("h-11 w-11")}
-      {stepBtn("Next step", p.onNext, <SkipForward size={16} />)}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[12px] text-slate-300" data-testid="trip-step">{Math.min(state.seg + 1, state.segs.length)} / {state.segs.length}</span>
-        {bar}
-      </div>
-      {state.status === "ended" ? <button type="button" className="task-action task-secondary shrink-0 px-3" data-testid="trip-done" onClick={p.onClose}>{t("done")}</button> : null}
-    </div>
+    {bar}
   </div>;
-  const rest = (phone: boolean) => <>
-    {phone ? null : bar}
-    {phone && started ? null : state.status === "ended" ? <div className="flex items-center gap-2.5">
-      <p className="min-w-0 flex-1 truncate text-[14px] text-slate-300">At {place}</p>
-      {/* The trip is over: one plain way to put it away, beside the small close at the top. */}
-      <button type="button" className="task-action task-secondary shrink-0 px-4" data-testid="trip-done" onClick={p.onClose}>Done</button>
-    </div> : <>
-      {state.active ? <p className="text-[13px] text-slate-300" aria-live="polite">{state.callout}</p> : null}
-      {state.where ? <p className="flex items-center gap-1.5 text-[13px] text-slate-200" data-testid="trip-where">
-        <MapPin size={14} className="shrink-0" aria-hidden /><span className="truncate">{state.where}</span></p> : null}
-    </>}
+  const details = <div className="flex flex-col gap-2.5" data-testid="trip-details">
+    {/* A trip the day's changes break says so first, whole. */}
+    {impactBox}
+    <p className="flex items-center gap-1.5 text-[13px] text-slate-300"><Clock size={14} className="shrink-0" aria-hidden />Leave {leave} · about {minutes} min</p>
+    {started && state.callout && state.callout !== now ? <p className="text-[13px] text-slate-200">{state.callout}</p> : null}
+    {notice}
+    {weather ? <p className="text-[13px] text-slate-300">{weather}</p> : null}
+    <div className="flex items-center gap-1.5">
+      {stepBtn("Previous step", p.onBack, <SkipBack size={16} />)}
+      <span className="shrink-0 text-[12px] tabular-nums text-slate-300" data-testid="trip-step">{Math.min(state.seg + 1, state.segs.length)} / {state.segs.length}</span>
+      {stepBtn("Next step", p.onNext, <SkipForward size={16} />)}
+      {speeds}
+    </div>
     {/* A trip planned for later: the answer says "tap Remind me", so the button is here too. */}
     {trip.scheduled?.future ? <button type="button" className="task-action task-secondary flex items-center justify-center gap-1.5" data-testid="preview-remind"
       onClick={() => { saveReminder(trip); toast(t("remindSaved").replace("{t}", remindAt(trip))); }}>
       <BellRing size={16} aria-hidden />{t("remindMe")}</button> : null}
-    {/* The trip card hides the chat answer, so the ways to go live here too (owner, 2026-10-26). */}
-    {p.onChoice ? <div role="group" aria-label="Other ways to go" data-testid="trip-choices" className="flex gap-1.5 overflow-x-auto">
+    {p.onChoice ? <div role="group" aria-label="Other ways to go" data-testid="trip-choices" className="flex flex-wrap gap-1.5">
       {TRIP_CHOICES.map((c) => <button type="button" key={c} onClick={() => p.onChoice?.(c)}
         className="h-9 shrink-0 rounded-full border border-slate-500/40 px-3 text-[13px] font-semibold text-slate-100 hover:bg-slate-800">
         {t(c === "subway" ? "bySubway" : c === "bus" ? "byBus" : c === "walk" ? "byWalk" : "lessWalking")}</button>)}
     </div> : null}
-    <div className="grid grid-cols-2 gap-2">
-      <button type="button" className="task-action" onClick={p.onUse}>Use this route</button>
-      <button type="button" className="task-action task-secondary" onClick={p.onOther}>{t("otherOptions")}</button>
-    </div>
-  </>;
+    {state.status === "ended"
+      ? <button type="button" className="task-action task-secondary" data-testid="trip-done" onClick={p.onClose}>{t("done")}</button>
+      : <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="task-action" onClick={p.onUse}>Use this route</button>
+        <button type="button" className="task-action task-secondary" onClick={p.onOther}>{t("otherOptions")}</button>
+      </div>}
+  </div>;
   const balloons = state.status === "ended" ? <ArrivedBubble key={state.restart} text={t("arrivedAt").replace("{p}", place)} where={state.where} /> : null;
-  // A phone: the trip rests as one line on the chat (Play, where to, how long) and pulls up, so the route stays on the map (owner, 2026-10-25).
+  // A phone: one pull sheet; resting, it is just the three things, and pulled up it shows the rest (owner, 2026-10-25).
   if (!wide) return <>
-    <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel} onClose={p.onClose}
-      header={started ? player : <div className="flex items-center gap-2.5" data-testid="trip-heading">
-        {playBtn("h-11 w-11")}
-        <button type="button" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>
-          <span className="truncate text-[15px] font-bold" title={`${trip.origin.label} → ${trip.destination.label}`}>To {trip.destination.label}</span>
-          <span className={`truncate text-xs ${impact?.blocks ? "text-red-300" : "text-amber-200"}`}>{impact ? (impact.blocks ? "Blocked · " : "Changes · ") : ""}Leave {leave} · about {minutes} min</span>
-        </button>
-        {close}
-      </div>}>
-      <div className="pull-sheet-body mt-2 flex flex-col gap-2.5">
-        {impactBox}
-        {rest(true)}
-        {notice}
-        {weather ? <p className="text-[13px] text-slate-300">{weather}</p> : null}
-        {started ? speeds : null}
-      </div>
+    <PullSheet testId="trip-sheet" label="Trip preview" level={level} onLevel={setLevel} onClose={p.onClose} header={head}>
+      <div className="pull-sheet-body mt-2">{details}</div>
     </PullSheet>
     {balloons}
   </>;
-  if (slot) return <>
-    {createPortal(
-      <section aria-label="Trip preview" className={`task-panel ${top ? "flex" : "hidden"} min-h-0 flex-col gap-2.5 overflow-y-auto rounded-2xl p-3`}>
-        <div className="flex items-center gap-2" data-testid="trip-heading">
-          <Clock className="h-5 w-5 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1"><h2 className="text-[15px] font-semibold">{leave}</h2>
-            <p className="text-[13px] text-slate-300">{trip.origin.label} → {trip.destination.label} · about {minutes} min</p></div>
-          {close}
-        </div>
-        {impactBox}
-        {notice}
-        {weather ? <p className="text-[13px] text-slate-300">{weather}</p> : null}
-        <div className="flex items-center gap-2.5">
-          {playBtn("h-[52px] w-[52px]")}
-          {speeds}
-        </div>
-        {rest(false)}
-      </section>,
-      slot,
-    )}
-    {balloons}
-  </>;
-  return <>
-    <div className="task-top flex flex-col gap-2" data-testid="trip-heading">
-      <div className="flex items-center gap-2">
-        <div className="task-panel flex min-w-0 flex-1 items-center gap-2.5 rounded-[18px] px-3.5 py-2">
-          <Clock className="h-5 w-5 shrink-0" aria-hidden />
-          <div className="min-w-0"><h2 className="text-[15px] font-semibold">{leave}</h2>
-            <p className="text-[13px] text-slate-300">{trip.origin.label} → {trip.destination.label} · about {minutes} min</p></div>
-        </div>
-        {close}
-      </div>
-      {impactBox}
-      <div className="flex flex-wrap gap-2">
-        {weather ? <span className="task-panel rounded-full px-3 py-2 text-[13px]">{weather}</span> : null}
-        {notice}
-      </div>
-    </div>
-    <section className="task-panel task-bottom flex flex-col gap-2.5" aria-label="Trip preview">
-      <div className="flex items-center gap-2.5">
-        {playBtn("h-[52px] w-[52px]")}
-        {speeds}
-      </div>
-      {rest(false)}
-    </section>
-    {balloons}
-  </>;
+  const card = (className: string) => <section aria-label="Trip preview" className={`task-panel ${className} flex-col gap-2.5 overflow-y-auto`}>
+    {head}
+    {more ? details : null}
+  </section>;
+  // A desktop: the trip is a card in the left column with the chat, the ask box under it (owner, 2026-10-28).
+  if (slot) return <>{createPortal(card(`${top ? "flex" : "hidden"} min-h-0 rounded-2xl p-3`), slot)}{balloons}</>;
+  return <>{card("task-bottom flex")}{balloons}</>;
 }
 
 /** You've arrived, said like a reply: a speech bubble just above the chat bar. Nothing to dismiss; Done or close puts it away with the trip. */

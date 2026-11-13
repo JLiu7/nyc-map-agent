@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { executeCommand, type ExecutorContext } from "./executor";
-import { buildTimeline, calloutAt, calloutInfoAt, poseAt, speakStop, wallSeconds } from "./flythrough";
+import { buildTimeline, calloutAt, calloutInfoAt, poseAt, speakStop, waitAt, wallSeconds } from "./flythrough";
 import { command, streamEvent, trip as tripSchema, type Trip } from "./schema";
 import { readEvents } from "./stream";
 import { afterWake } from "./useWakePhrase";
@@ -77,6 +77,13 @@ describe("flythrough timeline", () => {
     // In at the entrance, and out from the exit.
     expect(segs[0].coords.at(-1)).toEqual([-73.9901, 40.7345]);
     expect(buildTimeline(out)[4].coords[0]).toEqual([-73.9762, 40.7522]);
+  });
+  it("plays a paced station walk slowly whatever the speed, the platform first", () => {
+    const walk = { ...segs[3], kind: "ascend" as const, paced: { seconds: 160, waitS: 12 } };
+    for (const speed of [2, 5, 10, 30]) expect(wallSeconds(walk, speed)).toBe(160);
+    // The first 12 of its 160 seconds are on the platform, the train pulling out.
+    expect(waitAt(walk, 0.05)).toBeCloseTo(0.05 / (12 / 160), 5);
+    expect(waitAt(walk, 0.1)).toBeNull();
   });
   it("holds the parts on foot long enough to read and keeps the ride short", () => {
     // A 7 minute ride: capped at 10 s at 10x, however long it really is.

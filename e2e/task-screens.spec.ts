@@ -4,6 +4,12 @@ import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
 import { slow } from "./slow";
 
+/** The trip card shows only where to, where you are and the bar; the rest opens from "Trip details". */
+async function tripDetails(page: import("@playwright/test").Page) {
+  const b = page.getByRole("button", { name: "Trip details", exact: true });
+  if ((await b.getAttribute("aria-expanded")) === "false") await b.click();
+}
+
 const trip = JSON.parse(readFileSync(new URL("./fixtures/agent-trip.json", import.meta.url), "utf8")) as Record<string, unknown>;
 const stream = (events: unknown[]) => events.map((e) => JSON.stringify(e)).join("\n") + "\n";
 async function ask(page: Page, text: string) {
@@ -25,34 +31,28 @@ for (const width of [390, 1280]) {
     const preview = page.getByRole("region", { name: "Trip preview" });
     await expect(preview).toBeVisible();
     await expect(preview.getByLabel("Play preview", { exact: true })).toBeVisible();
-    const speed = preview.getByRole("button", { name: "5×", exact: true });
-    // A phone keeps the speeds off the trip card; they wait in the pulled-up sheet once the preview plays.
-    if (width >= 640) {
-      await speed.click();
-      await expect(speed).toHaveAttribute("aria-pressed", "true");
-    } else await expect(speed).toHaveCount(0);
+    // The card's first view is three things: where to, where you are now, and the bar (owner, 2026-11-12).
+    await expect(preview.getByRole("button", { name: "Use this route", exact: true })).toHaveCount(0);
+    await expect(preview.getByLabel("Preview progress")).toBeVisible();
+    await expect(page.getByTestId("trip-caption")).not.toBeEmpty();
     await preview.getByLabel("Play preview", { exact: true }).click();
     await expect(preview.getByLabel("Pause preview")).toBeVisible();
-    if (width < 640) {
-      // Playing, the sheet is one bar: the step in words, back / pause / next, and how far along.
-      await expect(preview).toHaveAttribute("data-level", "0");
-      await expect(page.getByTestId("trip-caption")).not.toBeEmpty();
-      await expect(page.getByTestId("trip-step")).toContainText("/");
-      await expect(preview.getByRole("button", { name: "Use this route", exact: true })).toHaveCount(0);
-      // Paused, so the preview does not move on by itself between the taps (a slow machine was at step 4 by then).
-      await preview.getByLabel("Pause preview").click();
-      const step = async () => Number((await page.getByTestId("trip-step").textContent())?.split("/")[0]);
-      const at = await step();
-      await preview.getByLabel("Next step").click();
-      await expect.poll(step).toBe(at + 1);
-      await preview.getByLabel("Previous step").click();
-      await expect.poll(step).toBe(at);
-      await page.getByTestId("sheet-grip").click();
-      await speed.click();
-      await expect(speed).toHaveAttribute("aria-pressed", "true");
-      await page.getByTestId("sheet-grip").click();
-      await page.getByTestId("sheet-grip").click();
-    }
+    if (width < 640) await expect(preview).toHaveAttribute("data-level", "0");
+    // Paused, so the preview does not move on by itself between the taps (a slow machine was at step 4 by then).
+    await preview.getByLabel("Pause preview").click();
+    await tripDetails(page);
+    const speed = preview.getByRole("button", { name: "5×", exact: true });
+    await speed.click();
+    await expect(speed).toHaveAttribute("aria-pressed", "true");
+    const step = async () => Number((await page.getByTestId("trip-step").textContent())?.split("/")[0]);
+    const at = await step();
+    await preview.getByLabel("Next step").click();
+    await expect.poll(step).toBe(at + 1);
+    await preview.getByLabel("Previous step").click();
+    await expect.poll(step).toBe(at);
+    // Folded again, the card is the three things.
+    await page.getByRole("button", { name: "Trip details", exact: true }).click();
+    await expect(page.getByTestId("trip-step")).toBeHidden();
     const panel = await preview.boundingBox();
     const bar = await page.getByTestId("agent-bar").boundingBox();
     expect(panel).not.toBeNull();
@@ -171,6 +171,7 @@ for (const width of [390, 1280]) {
     await page.route("**/routed-foot/route/**", (r) => r.fulfill({ json: { code: "Ok", routes: [{ distance: 450, duration: 360, geometry: { type: "LineString", coordinates: coords }, legs: [{ steps: coords.map((location, i) => ({ distance: 150, name: "W 42 St", maneuver: { location, type: i === 2 ? "arrive" : "depart", bearing_after: 30 } })) }] }] } }));
     await page.goto("/");
     await ask(page, "Walk from 7 Av to Times Square");
+    await tripDetails(page);
     await page.getByRole("button", { name: "Use this route", exact: true }).click();
     await expect(page.getByRole("region", { name: "Walking guidance", exact: true })).toBeVisible();
     const checkpoint = page.getByRole("region", { name: "Landmark checkpoint" });
@@ -206,6 +207,7 @@ test("I'm lost asks the agent once and the page stays responsive", async ({ page
   await page.route("**/routed-foot/route/**", (r) => r.fulfill({ json: { code: "Ok", routes: [{ distance: 450, duration: 360, geometry: { type: "LineString", coordinates: coords }, legs: [{ steps: coords.map((location, i) => ({ distance: 150, name: "W 42 St", maneuver: { location, type: i === 2 ? "arrive" : "depart", bearing_after: 30 } })) }] }] } }));
   await page.goto("/");
   await ask(page, "Walk from 7 Av to Times Square");
+  await tripDetails(page);
   await page.getByRole("button", { name: "Use this route", exact: true }).click();
   await page.getByRole("button", { name: "I'm lost", exact: true }).first().click();
   await expect.poll(() => questions.length).toBe(2);
@@ -235,6 +237,7 @@ test("the trip card asks again with the least walking", async ({ page }) => {
   });
   await page.goto("/");
   await ask(page, "Walk from 7 Av to Times Square");
+  await tripDetails(page);
   const choices = page.getByTestId("trip-choices");
   await expect(choices).toBeVisible();
   await choices.getByRole("button", { name: "Least walking", exact: true }).click();
