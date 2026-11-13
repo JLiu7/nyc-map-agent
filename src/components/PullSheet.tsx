@@ -21,6 +21,9 @@ export interface PullSheetProps {
   ownBack?: boolean;
 }
 
+/** The sheet whose height --pull-sheet-h holds: the one showing. */
+let heightOwner: object | null = null;
+
 /**
  * A sheet that rests as one line on the chat bar and comes up from behind it:
  * swipe or tap up to open (two steps), down to close a step, sideways for the
@@ -53,12 +56,33 @@ export function PullSheet({ level, onLevel, onSide, header, children, testId, la
     const el = ref.current;
     const root = document.documentElement;
     if (!el) return;
-    const publish = () => root.style.setProperty("--pull-sheet-h", window.innerWidth < 640 ? `${Math.ceil(el.getBoundingClientRect().height) + 8}px` : "0px");
+    // Only the sheet showing owns the height. One stepping under a new sheet re-renders after the new
+    // one has published, and its cleanup must not wipe that height (locate would drop onto the sheet).
+    const me = {};
+    heightOwner = me;
+    let last = "";
+    const publish = () => {
+      if (heightOwner !== me) return;
+      const h = window.innerWidth < 640 ? `${Math.ceil(el.getBoundingClientRect().height) + 8}px` : "0px";
+      if (h !== last) root.style.setProperty("--pull-sheet-h", (last = h));
+    };
     publish();
+    // A ResizeObserver only reports when the browser draws a frame, and a phone busy drawing the map can
+    // hold frames back for a second: the sheet grows and locate sits on its grip until then. New content
+    // in the sheet is a DOM change, which a MutationObserver reports straight after the render.
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
     ro?.observe(el);
+    const mo = typeof MutationObserver === "undefined" ? null : new MutationObserver(publish);
+    mo?.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden", "data-level"] });
     window.addEventListener("resize", publish);
-    return () => { ro?.disconnect(); window.removeEventListener("resize", publish); root.style.removeProperty("--pull-sheet-h"); };
+    return () => {
+      ro?.disconnect();
+      mo?.disconnect();
+      window.removeEventListener("resize", publish);
+      if (heightOwner !== me) return;
+      heightOwner = null;
+      root.style.removeProperty("--pull-sheet-h");
+    };
   }, [top]);
   // Open on a phone, locate rides just above the sheet (owner, 2026-10-27: "there isn't even a button
   // to zoom to my location"); only a full-height sheet leaves no room, so it steps aside then.

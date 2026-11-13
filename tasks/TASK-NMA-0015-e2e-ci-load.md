@@ -97,6 +97,29 @@ Blocked/uncertain:
 Next:
 - Merge #46 when its checks pass, then confirm e2e on main's next run
 
+### 2026-11-13 07:25:30 UTC — agent:claude-code/00f3208d-d84f-464f-b359-f7045fe546b9
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/00f3208d-d84f-464f-b359-f7045fe546b9","blocked":[],"changed":["src/components/PullSheet.tsx, e2e/sign-camera.spec.ts, checkpoints/CURRENT.md"],"completed":["Center on my location sat on a pull sheet's grip in CI, because the sheet republished its height only on a drawn frame; it now republishes on content changes, and only the showing sheet owns the height (PR #155)"],"decisions":["no new decisions"],"evidence":["In CI's Playwright image the stale height gives exactly the 43x11 px overlap; a new test that freezes resize reports fails on main and passes with the fix; 36 of 36 runs of the two specs pass at four sizes"],"next_action":"Watch PR #155's e2e job; once it merges, rebase PRs 151 and 153 on main","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0015","timestamp":"2026-11-13T07:25:30Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"0d1d5c213b432a7be8d10a63d9433d282c3576da9cbf7d34ed22064323dcbc05","request_id":"22ea7b8058c843c78644df741a4d2038","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0015"} -->
+
+Completed:
+- Center on my location sat on a pull sheet's grip in CI, because the sheet republished its height only on a drawn frame; it now republishes on content changes, and only the showing sheet owns the height (PR #155)
+
+Evidence:
+- In CI's Playwright image the stale height gives exactly the 43x11 px overlap; a new test that freezes resize reports fails on main and passes with the fix; 36 of 36 runs of the two specs pass at four sizes
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/components/PullSheet.tsx, e2e/sign-camera.spec.ts, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Watch PR #155's e2e job; once it merges, rebase PRs 151 and 153 on main
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

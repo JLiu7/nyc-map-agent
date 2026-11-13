@@ -57,6 +57,27 @@ for (const size of SIZES) {
   });
 }
 
+// A phone busy drawing the map can hold frames back for a second, and a ResizeObserver only reports
+// on a frame. Here it never reports: Center on my location still has to clear the grown sheet's grip.
+test("Center on my location clears the sheet as it grows, before the next frame", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
+  });
+  await mockNetwork(page);
+  await page.goto("/?flags=+signCamera");
+  const sheet = page.getByTestId("sign-camera");
+  await expect(sheet).toBeVisible({ timeout: slow(15_000) });
+  await feed(page, FULTON, "Fulton St");
+  await expect(page.getByTestId("sign-near")).toHaveText("Fulton St", { timeout: slow(20_000) });
+  await feed(page, CLARK, "Exit");
+  await expect(page.getByTestId("sign-exit")).toContainText("This exit", { timeout: slow(20_000) });
+  const grip = (await sheet.getByTestId("sheet-grip").boundingBox())!;
+  const locate = (await page.getByTestId("locate-button").first().boundingBox())!;
+  expect(locate.y + locate.height).toBeLessThanOrEqual(grip.y);
+  await expectLayout(page);
+});
+
 test("the sign camera speaks the app's language", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await mockNetwork(page);
