@@ -312,6 +312,29 @@ Blocked/uncertain:
 Next:
 - Let CI pass and auto-merge the fix, then repeat the live steps and post the receipt on #143
 
+### 2026-11-13 12:33:10 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["Not quite at Fulton St now starts the placement questions instead of passing the rider to the agent"],"decisions":["no new decisions"],"evidence":["src/features/agent/lost tests pass (18); eslint clean on changed files"],"next_action":"After deploy, repeat the 4 train trip, Find exit, Not quite on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T12:33:10Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"533743e758f5e52d77d68c11bf574adca18872a6e34c1cf0b5278444eaa1c6f9","request_id":"e142e36ebde3486f87c37fcc102dd919","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- Not quite at Fulton St now starts the placement questions instead of passing the rider to the agent
+
+Evidence:
+- src/features/agent/lost tests pass (18); eslint clean on changed files
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After deploy, repeat the 4 train trip, Find exit, Not quite on the live site
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
