@@ -166,7 +166,8 @@ jobs:
   e2e:
     runs-on: [self-hosted, org-pool]
     # Two Playwright workers on the shared VPS (#31) take longer than six did on a hosted runner.
-    timeout-minutes: 30
+    # At 30 minutes, 169 tests were cancelled about two from the end (2026-11-13).
+    timeout-minutes: 45
     container: { image: mcr.microsoft.com/playwright:v1.56.1-noble }
     env:
       HOME: /root
