@@ -261,6 +261,39 @@ for (const size of SIZES) {
       await context.setOffline(false);
     });
 
+    // At Fulton St the helper pins down where in the station someone is (#143): tap questions, then the place and the way out.
+    test("the where-am-I questions inside Fulton St", async ({ page }) => {
+      const legs = (trip.legs as Array<Record<string, unknown>>).map((l) => (l.kind === "exit"
+        ? { ...l, station: { id: "229", name: "Fulton St", lon: -74.00657, lat: 40.70942 }, portal: { lon: -74.00797, lat: 40.71009, type: "Stair", elevatorOnly: false, outage: null, label: "Fulton St & Broadway" }, label: "Use the exit at Fulton St & Broadway" }
+        : l));
+      const fulton = { ...trip, legs };
+      await open(page, [
+        { type: "command", command: { type: "showRoute", trip: fulton } },
+        { type: "command", command: { type: "openPanel", trip: fulton } },
+        { type: "text", text: "Take this route." },
+      ]);
+      await ask(page, "Plan a trip to Fulton St");
+      await page.getByRole("button", { name: "Close trip" }).first().click();
+      await page.getByRole("button", { name: "Find exit", exact: true }).click();
+      await expect(page.getByTestId("lost-thread")).toContainText("Fulton St");
+      await page.getByRole("button", { name: "Yes", exact: true }).click();
+      const answers = page.getByTestId("lost-answers");
+      await expect(answers).toBeVisible({ timeout: 15_000 });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expectLayout(page);
+
+      // Answer each question with its first choice until the helper says where it thinks you are.
+      const showMe = page.getByRole("button", { name: "Show me", exact: true });
+      for (let i = 0; i < 6 && !(await showMe.isVisible()); i++) {
+        if (await page.getByRole("button", { name: "No sign nearby" }).isVisible()) await page.getByRole("button", { name: "No sign nearby" }).click();
+        else await answers.getByRole("button").first().click();
+      }
+      await expect(showMe).toBeVisible();
+      await expect(page.getByTestId("lost-thread")).toContainText(/You're most likely|my best guess/);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expectLayout(page);
+    });
+
     test("home with the transit layers drawn", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();

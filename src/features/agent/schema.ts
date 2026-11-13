@@ -302,6 +302,8 @@ export const requestBody = z.object({
     guess: z.string().max(600).optional(),
     /** "lost": how the network and the position fix look ("no network, last fix 6 min ago"). */
     signal: z.string().max(200).optional(),
+    /** "lost": where in the station the helper's questions put them, and the way out it gave ("in a passage inside the turnstiles; then: Take the stairs up."). */
+    place: z.string().max(800).optional(),
   }).optional(),
 });
 export type AgentRequest = z.infer<typeof requestBody>;

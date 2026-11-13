@@ -5,6 +5,7 @@
 import { LngLat, type Map as MaplibreMap } from "maplibre-gl";
 import type { DollhouseModel, DollhouseRig, DollhouseState } from "@/lib/map/three/dollhouse";
 import type { WalkCallout } from "@/lib/map/three/dollhouseCallouts";
+import type { PlaceSign, PlaceWalk, Spot } from "@/lib/map/stationPlace";
 import { readMap } from "@/lib/map/mapRead";
 import { cornerLine } from "@/lib/map/cornerLine";
 
@@ -101,4 +102,49 @@ export async function showDollhouse(map: MaplibreMap, opts: { seconds?: number; 
   };
   frame = requestAnimationFrame(step);
   return () => { cancelAnimationFrame(frame); view.stop(); map.setMaxZoom(maxZoom); };
+}
+
+/** What placing someone inside Fulton St needs (#143): the walks, their signs, the spots, and the way out. */
+export type StationPlaceKit = {
+  walks: PlaceWalk[];
+  signs: PlaceSign[];
+  spots: Spot[];
+  /** The walk index that comes up at `exit`, or null. */
+  walkTo: (exit: [number, number] | null) => number | null;
+  /** The street corner each walk comes up at, as the map reads it. */
+  corners: Array<string | null>;
+  /** The lines at the platform the walks start from: "4/5". */
+  lines: string;
+  /** The walk's directions from `fromM` metres along it to the street, in English. */
+  steps: (walk: number, fromM: number) => string[];
+};
+
+/**
+ * Loads the station model and lays out its spots and signs for the where-am-I questions. The model,
+ * three.js and the sign planner load only here, when someone at Fulton St asks where they are.
+ */
+export async function loadStationPlace(map: MaplibreMap | null): Promise<StationPlaceKit> {
+  const [{ planSigns, walkPlaces, walkLength, pickWalk }, { walkCallouts }, place, m] = await Promise.all([
+    import("@/lib/map/three/dollhouse"), import("@/lib/map/three/dollhouseCallouts"), import("@/lib/map/stationPlace"), loadModel(),
+  ]);
+  const corners = m.walks.map((w) => {
+    try { return map ? cornerLine(readMap(map).placeAt(w.exit)) : null; } catch { return null; }
+  });
+  const signs = place.signsFromPlans(m.walks.flatMap((w, i) => planSigns(m, w, corners[i])));
+  const gates = m.walks.flatMap((w, i) => { const g = walkPlaces(w.path).gates; return g ? [{ walk: i, at: g.at }] : []; });
+  return {
+    walks: m.walks,
+    signs,
+    spots: place.stationSpots(m.walks, signs, gates),
+    corners,
+    lines: m.lines.map((l) => l[0]).join("/"),
+    walkTo: (exit) => {
+      const w = exit ? pickWalk(m, exit) : null;
+      return w ? m.walks.indexOf(w) : null;
+    },
+    steps: (walk, fromM) => {
+      const path = m.walks[walk].path, len = walkLength(path);
+      return walkCallouts(m, path, corners[walk]).filter((c) => !c.wait && c.f * len >= fromM - 1).map((c) => c.text);
+    },
+  };
 }

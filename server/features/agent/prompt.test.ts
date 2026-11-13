@@ -97,6 +97,11 @@ describe("underground helper context", () => {
     expect(p).toContain("no network");
     expect(p).toContain("Treat the guess as a guess");
   });
+  it("passes where the helper's questions placed them, to build on (#143)", () => {
+    const p = systemPrompt("now", null, "transit", undefined, undefined, undefined, { stage: "lost", station: "Fulton St", exit: "Fulton St & Broadway", guess: "You're probably at Fulton St.", place: "in a passage inside the turnstiles; then: Take the stairs up." });
+    expect(p).toContain("placed them in a passage inside the turnstiles");
+    expect(p).toContain("Never list every exit");
+  });
   it("says nothing about underground otherwise, and trips close with an offer to start", () => {
     const p = systemPrompt("now", null);
     expect(p).not.toContain("underground at");
