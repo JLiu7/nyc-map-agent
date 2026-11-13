@@ -580,6 +580,29 @@ Blocked/uncertain:
 Next:
 - Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards
 
+### 2026-11-13 15:45:02 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Once #169 deploys, walk inside Fulton St on the live site: stand at -87.7, 35.1 looking SE and read Fulton St, Downtown & Brooklyn over the train; check an Exit sign flat on a wall, the turnstile arms at the fare line and the blue accessible gate","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:45:02Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"de6e4129e61ee6196f6420bfc02b67f1347811d91b3ee67b2e1d37202fde2638","request_id":"7dad7cad07ab4ff192b69934d650e394","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Once #169 deploys, walk inside Fulton St on the live site: stand at -87.7, 35.1 looking SE and read Fulton St, Downtown & Brooklyn over the train; check an Exit sign flat on a wall, the turnstile arms at the fare line and the blue accessible gate
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
