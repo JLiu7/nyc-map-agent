@@ -242,7 +242,8 @@ for (const size of SIZES) {
     });
 
     // Fulton St's card offers Walk inside (#126); the walk fills the screen with its back button and,
-    // on a screen without touch, the keys hint; Back to the map closes it.
+    // on a screen without touch, the keys hint; Back to the map closes it. The walls and ceilings it
+    // draws are the ones baked from the model (pnpm build:station-shell).
     test("walking inside Fulton St", async ({ page }) => {
       await open(page);
       // Open the card the way a map tap does, so it carries the station's details.
@@ -253,7 +254,9 @@ for (const size of SIZES) {
       const walkInside = page.getByTestId("walk-inside");
       await expect(walkInside).toBeVisible({ timeout: 15_000 });
       await expectLayout(page);
+      const shell = page.waitForResponse((r) => r.url().endsWith("/transit/fulton-shell.json"));
       await walkInside.click();
+      expect((await shell).ok()).toBe(true);
       const walk = page.getByTestId("station-walk");
       await expect(walk).toBeVisible();
       await expect(walk.locator("canvas")).toBeVisible({ timeout: 30_000 });

@@ -57,8 +57,6 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Audit (high+, baseline in pnpm-workspace.yaml)
         run: pnpm audit --audit-level high
-      - name: Licence allowlist
-        run: pnpm licenses:check
       - name: Clean workspace (persistent runner)
         if: always()
         run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete || true

@@ -557,6 +557,10 @@ Blocked/uncertain:
 Next:
 - After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
 
+### 2026-11-13 15:05:09 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Close the 57 remaining hole spots in the outline shell (stairwell columns between stair and level ceilings, plus ceiling-to-wall cracks), fix the shell gap test for the ceiling-step strips, then record the walk, run Pro checks and open the PR","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:05:09Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"d4aadfced53aff84ba663abdfed3eee734b597324348086d357822167b5226c6","request_id":"2ecd89139ae9443282c0e3162e018d3e","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
 ### 2026-11-13 15:34:50 UTC — claude-code
 
 <!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:34:50Z"} -->
@@ -578,6 +582,12 @@ Blocked/uncertain:
 - none
 
 Next:
+- Close the 57 remaining hole spots in the outline shell (stairwell columns between stair and level ceilings, plus ceiling-to-wall cracks), fix the shell gap test for the ceiling-step strips, then record the walk, run Pro checks and open the PR
+
+### 2026-11-13 15:19:01 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Replace the 0.5 m wall slabs with one continuous wall per level outline whose top stops under any floor overhead, then check it at the broken stair (-104.5, 23.8, floor -2.1) in the pane using the dev readout","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:19:01Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"994341a7680ea0ea19a685521ce1c5e6e0b3604a6c197ac50d24fa383280d2d8","request_id":"2d60f3ed799a45b1a036f91671368607","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
 - Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards
 
 ### 2026-11-13 15:45:02 UTC — claude-code
@@ -601,6 +611,12 @@ Blocked/uncertain:
 - none
 
 Next:
+- Replace the 0.5 m wall slabs with one continuous wall per level outline whose top stops under any floor overhead, then check it at the broken stair (-104.5, 23.8, floor -2.1) in the pane using the dev readout
+
+### 2026-11-13 15:39:56 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Fix the three stationShell tests broken by the padded wall caps, then in the owner's order: one MTA-coloured board per exit, ceilings that slope with each stair, the wall across the passage at (-65.2, 30.2), an exit at the top of each street stair; screenshot each in the pane","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:39:56Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"37404ab678213fbdd4335a8bee346d2398fa6a2ebddd048e2c5244f7ec5c2ce4","request_id":"6326fbe74d8c41888fc0a72d7b299d79","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
 - Once #169 deploys, walk inside Fulton St on the live site: stand at -87.7, 35.1 looking SE and read Fulton St, Downtown & Brooklyn over the train; check an Exit sign flat on a wall, the turnstile arms at the fare line and the blue accessible gate
 
 ### 2026-11-13 16:06:31 UTC — claude-code
@@ -624,7 +640,307 @@ Blocked/uncertain:
 - none
 
 Next:
+- Fix the three stationShell tests broken by the padded wall caps, then in the owner's order: one MTA-coloured board per exit, ceilings that slope with each stair, the wall across the passage at (-65.2, 30.2), an exit at the top of each street stair; screenshot each in the pane
+
+### 2026-11-13 15:43:26 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Fix the three stationShell tests broken by the padded wall caps, then in the owner's order: one MTA-coloured board per exit, ceilings that slope with each stair, the wall across the passage at (-65.2, 30.2), walking into a street picture returns to Street view; screenshot each in the pane","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:43:26Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"6997f45aa5cc4a69a717c48db01d1523cbeeac4c25687813bca1d4938c49ed1f","request_id":"dd8d601b335e46479a59329f01b863be","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Fix the three stationShell tests broken by the padded wall caps, then in the owner's order: one MTA-coloured board per exit, ceilings that slope with each stair, the wall across the passage at (-65.2, 30.2), walking into a street picture returns to Street view; screenshot each in the pane
+
+### 2026-11-13 15:49:42 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner to choose: rebuild walls and ceilings once in Blender on the Pro (extrude walkable 3 m, voxel remesh, flip inward, bake) or keep fixing stationShell; fix the three shell tests either way","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:49:42Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"7f880b1cf2f7afa28b016d9047563b39ea2c8659505a0aa21517f7017a2bb80c","request_id":"2e10da1d76fc4e4da99b749eda7b7b61","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner to choose: rebuild walls and ceilings once in Blender on the Pro (extrude walkable 3 m, voxel remesh, flip inward, bake) or keep fixing stationShell; fix the three shell tests either way
+
+### 2026-11-13 16:11:49 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Compare the Blender-baked shell (boolean union, dev ?baked-shell) against stationShell at the owner's reported spots and send screenshots; switch over if it looks right; fix the three stationShell tests","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:11:49Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"914bee79d4c9df45dba4a9142c0c5e3182588407019734fa9a2c1934d7246ca2","request_id":"79c67c5ebd6f4e67a431a59669f80bc8","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Compare the Blender-baked shell (boolean union, dev ?baked-shell) against stationShell at the owner's reported spots and send screenshots; switch over if it looks right; fix the three stationShell tests
+
+### 2026-11-13 16:15:40 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner to choose: try a Manifold (manifold-3d) union of the walkable prisms for straight walls, or keep fixing stationShell; the voxel bake was no better. Then fix the three shell tests","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:15:40Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"fab30339a3c54ac44b5351a10a9341af51031b3a47bdcc0e0afd0c7254fed766","request_id":"062a9b31dee147f8bf3f351691b629df","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner to choose: try a Manifold (manifold-3d) union of the walkable prisms for straight walls, or keep fixing stationShell; the voxel bake was no better. Then fix the three shell tests
+
+### 2026-11-13 16:27:30 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner is walking the Manifold shell (?baked-shell); on their OK move the merge script into the repo, use it for walls, ceilings and collisions, replace the three shell tests","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:27:30Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"fdb1df2b17f91c10fb5c9d7faf99c4c1cb868270ca9b3d86c2d6becd1336d4c0","request_id":"af9106d4bcbe41f796a21dea3c214f76","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner is walking the Manifold shell (?baked-shell); on their OK move the merge script into the repo, use it for walls, ceilings and collisions, replace the three shell tests
 - Owner to walk Fulton St on the live site after #169 deploys: one green Exit board over each exit stair's middle, facing the walker; the parent rebases feat/126-level-shell onto it
+
+### 2026-11-13 16:30:54 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner walks ?baked-shell (Manifold walls now also collide); signs session adds fork and dead-end boards; on owner OK move the merge script into the repo and replace the three shell tests","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:30:54Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"8d047273bcdfcaabdfa9ad787b9c257e192d64d1a31ccb2e6ac85fd7241e7b72","request_id":"023f0af8dc544b77a53b54c40b197bd7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner walks ?baked-shell (Manifold walls now also collide); signs session adds fork and dead-end boards; on owner OK move the merge script into the repo and replace the three shell tests
+
+### 2026-11-13 16:40:16 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Compare walk bot and defect counts, old shell vs Manifold shell (BAKED_SHELL), on the Pro; report to the owner","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:40:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"f592153e04fac66bb6a6e279616057f7cf6e6257983276731df5f11a62846c8b","request_id":"cb715dc434b1474a9417c60a43694dcb","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Compare walk bot and defect counts, old shell vs Manifold shell (BAKED_SHELL), on the Pro; report to the owner
+
+### 2026-11-13 16:52:48 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Defect check fixed (faceIndex bug). Manifold shell 149 spots vs old 163: no ceilings from above, in-the-way, low-head or open-up; track side 97 vs 85, holes 52 vs 59. Walk bot still stops on both shells (old 3, Manifold 4 plus 1 wedge on walk 6). On owner OK: move the Manifold script into the repo and switch.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T16:52:48Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b86bffb6788fbacd5a1c629942afa2923cebdaee30a349687a8125ef8fb37ac9","request_id":"019be8d497f94093b86fde5ca08f7200","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Defect check fixed (faceIndex bug). Manifold shell 149 spots vs old 163: no ceilings from above, in-the-way, low-head or open-up; track side 97 vs 85, holes 52 vs 59. Walk bot still stops on both shells (old 3, Manifold 4 plus 1 wedge on walk 6). On owner OK: move the Manifold script into the repo and switch.
+
+### 2026-11-13 17:11:46 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Owner OK'd the switch: Fulton St's walk now draws walls baked by pnpm build:station-shell (manifold-3d). Waiting on Pro checks (walk bot, defects, lint, tsc, size; size was 8.3 kB over). Then mark #168 ready, arm auto-merge, check the VPS deploy.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T17:11:46Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"95445e246c1eaae3db091bacc6bed4ed060cf3dcf3e4adda23b72fff3d841d63","request_id":"71b4b2dce8d245e282391aa47e6d1b4c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Owner OK'd the switch: Fulton St's walk now draws walls baked by pnpm build:station-shell (manifold-3d). Waiting on Pro checks (walk bot, defects, lint, tsc, size; size was 8.3 kB over). Then mark #168 ready, arm auto-merge, check the VPS deploy.
+
+### 2026-11-13 17:49:16 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"PR #168 ready with auto-merge: Fulton St walk draws Manifold-baked walls; all 17 walk tests pass. After it deploys, walk it on the live site and show the owner.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T17:49:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"385305c66e8480315edc0b4ec2f833f2b603aeb038d899b8038b7e26a196fae3","request_id":"3f32a063fdfc4be590aa199b78c6dd6e","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- PR #168 ready with auto-merge: Fulton St walk draws Manifold-baked walls; all 17 walk tests pass. After it deploys, walk it on the live site and show the owner.
+
+### 2026-11-13 17:58:53 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"PR #168 fixes pushed (CI licence step removed at owner's ask, walk bot setup timeout, signs test canvas stub). Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T17:58:53Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"9e7cfb43f3dc8e5a9be1bf4e68efefe4c3843e3b098a709ba6444b4bd1bc2bf5","request_id":"55f5be3d85a24b9095370b17d24ad6fe","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- PR #168 fixes pushed (CI licence step removed at owner's ask, walk bot setup timeout, signs test canvas stub). Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.
+
+### 2026-11-13 18:06:19 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"PR #168: all tests pass in CI; knip flagged unused polygon-clipping, removed. Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T18:06:19Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"ffceb441e409b1b277c812e692715b6248fa293ee7365f3d24848f3b968d057a","request_id":"24d1865a33e54485ac3c8487863245e2","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- PR #168: all tests pass in CI; knip flagged unused polygon-clipping, removed. Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.
+
+### 2026-11-13 18:17:40 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"PR #168: merged main (CURRENT.md conflict, both kept), sign test timeout raised. Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T18:17:40Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"daeee8afca36dc153ee7e24618cc0dd9a13da8afae82f4bf640a1e26cdb8322c","request_id":"dd41cce0fc7645f6923a0173dbf772b0","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- PR #168: merged main (CURRENT.md conflict, both kept), sign test timeout raised. Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.
 
 ## Handoff
 

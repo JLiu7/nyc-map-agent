@@ -8,7 +8,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { DollhouseModel } from "./dollhouse";
-import { SMOOTH_SEAMS, toYUp, walkGeometry } from "./stationWalkGeometry";
+import { bakedShellSurfaces, type BakedShell, SMOOTH_SEAMS, toYUp, walkGeometry } from "./stationWalkGeometry";
+import { stationShell } from "./stationShell";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 /** The body: centre this far over the feet (capsule half height 0.5 + radius 0.3 + float 0.25). */
@@ -27,10 +28,12 @@ beforeAll(async () => {
   // The colliders the walk scene builds, with the flags it gives them.
   const flags = RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES | RAPIER.TriMeshFlags.MERGE_DUPLICATE_VERTICES;
   expect(flags).toBe(SMOOTH_SEAMS);
-  const geo = walkGeometry(model);
+  const shell = stationShell(model);
+  // The walls the walk draws: baked by scripts/build-station-shell.ts. OLD_SHELL=1 walks the walls built at run time.
+  const geo = process.env.OLD_SHELL ? walkGeometry(model, shell) : { ...walkGeometry(model, shell), ...bakedShellSurfaces(model, shell, JSON.parse(readFileSync("public/transit/fulton-shell.json", "utf8")) as BakedShell) };
   for (const c of geo.colliders) world.createCollider(RAPIER.ColliderDesc.trimesh(c.vertices, c.indices, flags));
   lowest = geo.lowest;
-}, 60_000);
+}, 180_000); // Building the baked walls into colliders takes over a minute on a CI runner.
 
 /** Walks one walk one way, `off` metres to its left, following its line from point to point. */
 function walk(wi: number, way: "up" | "down", off: number): Run {

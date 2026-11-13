@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import {
-  CAR_M, CARS, DOORS_ALONG_M, dispose, LIGHT_ASIDE_M, LIGHT_EVERY_M, LIGHT_UP_M, planSigns, signMesh, trainCars, turnstile, walkAt, walkLength, walkPlaces,
+  CAR_M, CARS, DOORS_ALONG_M, dispose, planSigns, signMesh, trainCars, turnstile, walkPlaces,
   type DollhouseModel, type P3, type SignPlan,
 } from "./dollhouse";
 import { gatePanels, inWalkWay, inWall, surfaceFinder, walkPoints, type Shell, type ShellWall } from "./stationShell";
@@ -243,6 +243,40 @@ function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWal
 
 /** A sign, a lamp or a fare line already hung this close to another of its kind is the same one. */
 const SAME_PLACE_M = 1.5;
+/** How far back from a walk's street end its street picture stands, clear of the end wall. */
+const STREET_PICTURE_IN_M = 0.4;
+/** The street picture fits inside the stair, under its ceiling (owner, 2026-11-13: the first one was too big). */
+const STREET_PICTURE_W_M = 1.4, STREET_PICTURE_H_M = 1.52;
+
+/** A painted street at dusk with a green MTA-style "Exit to street" board across the top. */
+function streetPicture(where: string, side: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 556;
+  const g = c.getContext("2d")!;
+  const sky = g.createLinearGradient(0, 0, 0, 380);
+  sky.addColorStop(0, "#7fb2e5"); sky.addColorStop(1, "#d8e6f0");
+  g.fillStyle = sky; g.fillRect(0, 0, 512, 556);
+  // Buildings: a row of blocks with lit windows.
+  const blocks: Array<[number, number, number, string]> = [[0, 150, 120, "#8a7f74"], [110, 90, 110, "#a39484"], [215, 170, 95, "#6f6a66"], [305, 60, 120, "#9b8f86"], [420, 130, 92, "#7d746c"]];
+  for (const [x, top, w, col] of blocks) {
+    g.fillStyle = col; g.fillRect(x, top, w, 420 - top);
+    g.fillStyle = "#f3e2a6";
+    for (let y = top + 16; y < 400; y += 26) for (let wx = x + 10; wx < x + w - 14; wx += 22) if ((wx * 7 + y * 3) % 5) g.fillRect(wx, y, 10, 14);
+  }
+  // Sidewalk and street.
+  g.fillStyle = "#b9b4ac"; g.fillRect(0, 420, 512, 50);
+  g.fillStyle = "#4a4a4c"; g.fillRect(0, 470, 512, 86);
+  g.fillStyle = "#e9c443"; for (let x = 10; x < 512; x += 70) g.fillRect(x, 508, 40, 6);
+  // The board: MTA green, white type.
+  g.fillStyle = "#00933c"; g.fillRect(0, 0, 512, 150);
+  g.fillStyle = "#ffffff"; g.textBaseline = "middle";
+  g.font = "bold 44px Helvetica, Arial, sans-serif"; g.fillText("↑ Exit to street", 22, 38);
+  g.font = "bold 32px Helvetica, Arial, sans-serif"; g.fillText(where, 22, 86, 468);
+  g.font = "28px Helvetica, Arial, sans-serif"; g.fillText(side, 22, 124, 468);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 /** A fare line: the model's gate panels standing side by side, the walk way through them along `run`. */
 export type FareRow = { panels: Array<{ at: P3; heading: number }>; heading: number; z: number };
@@ -349,8 +383,6 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     const k = `${Math.round(x * 10)},${Math.round(y * 10)},${Math.round(z)}`;
     return !seen.has(k) && !!seen.add(k);
   }).map(([x, y, z]): P3 => [x, y, z]));
-  const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
-  const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
   const placed: Placed[] = [];
   // A stair's board hangs over the middle of the stair, not over the walk, which may climb at one side
   // (owner, 2026-11-13: the Broadway & John St board hung off to the left of its stair).
@@ -388,17 +420,38 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     placed.push({ at: spot.at, heading: spot.heading, b: { half: box.half * k, y0: box.y0, y1: box.y1, z0: box.z0 * k, z1: box.z1 * k } });
     group.add(sign);
   }
-  for (const walk of model.walks) {
-    const total = walkLength(walk.path);
-    for (let d = 2; d < total; d += LIGHT_EVERY_M) {
-      const p = walkAt(walk.path, d / total);
-      const at: P3 = [p.x - Math.cos(p.heading) * LIGHT_ASIDE_M, p.y + Math.sin(p.heading) * LIGHT_ASIDE_M, p.z + LIGHT_UP_M];
-      if (!fresh("lamp", at)) continue;
-      const lamp = new THREE.Mesh(lampGeo, lampMat);
-      lamp.position.set(...at);
-      lamp.rotation.z = -p.heading;
-      group.add(lamp);
-    }
+  // At the top of every street stair, a flat picture of the street outside with a green Exit board
+  // over it, so the end of the walk reads as the way out (owner, 2026-11-13), not a blank wall.
+  // Which side of its corner each exit comes up on: its bearing from the middle of the exits that
+  // share that corner's name (or of all exits when it has the corner to itself).
+  const named = model.walks.map((w) => ({ w, name: corner(w.exit) ?? "Fulton St" }));
+  const sideOf = (w: (typeof model.walks)[number], name: string) => {
+    const same = named.filter((x) => x.name === name && (x.w.exit[0] !== w.exit[0] || x.w.exit[1] !== w.exit[1]));
+    const pool = (same.length ? [...same.map((x) => x.w), w] : model.walks).map((x) => x.path[x.path.length - 1]);
+    const cx = pool.reduce((a, p) => a + p[0], 0) / pool.length, cy = pool.reduce((a, p) => a + p[1], 0) / pool.length;
+    const e = w.path[w.path.length - 1];
+    const deg = ((Math.atan2(e[0] - cx, e[1] - cy) * 180) / Math.PI + 360) % 360;
+    return ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"][Math.round(deg / 45) % 8] + " side";
+  };
+  const pictured: P3[] = [];
+  for (const { w: walk, name } of named) {
+    const n = walk.path.length, end = walk.path[n - 1], prev = walk.path[n - 2];
+    // Walks that come up within 4 m of each other share one way out, and one picture.
+    if (!prev || pictured.some((q) => Math.hypot(q[0] - end[0], q[1] - end[1]) < 4 && Math.abs(q[2] - end[2]) < 1)) continue;
+    pictured.push(end);
+    // Face down the stair: the way from a point 3 m back along the walk, not the last short step.
+    let from = prev;
+    for (let i = n - 2; i >= 0; i--) { from = walk.path[i]; if (Math.hypot(end[0] - from[0], end[1] - from[1]) > 3) break; }
+    const heading = Math.atan2(end[0] - from[0], end[1] - from[1]);
+    const back = STREET_PICTURE_IN_M;
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(STREET_PICTURE_W_M, STREET_PICTURE_H_M), new THREE.MeshBasicMaterial({ map: streetPicture(name, sideOf(walk, name)) }));
+    pic.rotation.x = Math.PI / 2;
+    pic.position.z = 0.3 + STREET_PICTURE_H_M / 2;
+    const holder = new THREE.Group();
+    holder.add(pic);
+    holder.position.set(end[0] - Math.sin(heading) * back, end[1] - Math.cos(heading) * back, end[2]);
+    holder.rotation.z = -heading;
+    group.add(holder);
   }
 
   // The fare lines. Each walk goes through its own turnstile where it crosses a line; the panels'
