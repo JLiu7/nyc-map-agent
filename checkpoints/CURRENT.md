@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-12. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-13. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## In flight
+
+**Walking inside Fulton St had no signs, turnstiles or train, and Street view had no way in (#126, branch `feat/126-walk-in-and-board`, task NMA-0055).** The walk from #153 now hangs the station's signs, kept clear of the walls (owner, 2026-11-13: signs stuck through walls), puts a turnstile on each of the model's 163 fare-gate panels, and stands the downtown 4 train at the platform. Near a door, Board the train (or E) steps the walker in while the camera watches from the platform, then the train pulls out and a card says "On the downtown 4 train". In Street view within 35 m of a Fulton St stair a green "Walk inside Fulton St" button opens the walk at that stair. Stair walls and ceilings that poked through the floor above are now cut short under it, which closed the dark slits in the right-hand wall. Not done: a few small dark spikes still hang at one ceiling edge near the platform's fare gates, and the street minimap still overlaps the view switcher on phones (older than this change).
 
 **Tapping Find exit after a trip to Fulton St said "I can't tell where you are" on the live site (2026-11-12, branch `fix/lost-guess-trip-without-subway`).** That night the 4 was out, so the planner sent the trip by the M15 bus and a walk to Fulton St station; with no subway ride there was no station to get off at, and the guess had nothing. When a trip ends at a station, the helper now guesses that station. Not done: the live check after it deploys.
 
