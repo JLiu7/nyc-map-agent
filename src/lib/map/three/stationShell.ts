@@ -30,18 +30,60 @@ const DOOR_SILL_M = 0.15;
 const DOOR_HEAD_M = 2.2;
 /** How much of each end of a walk (where it meets the street) is left walled. */
 const DOOR_END_M = 0.6;
+/** Wall tops and ceilings that pass under another floor are cut into pieces this long to follow it. */
+const CAP_PIECE_M = 0.5;
 /** With no floor below, a wall still reaches this far down, past the bottom of any view. */
 const SKIRT_M = 3;
 /** Steeper than this (|normal z| below) a piece of the model is an upright wall, not a floor. */
 const UPRIGHT_NZ = 0.3;
 /** Flatter than this a walkable piece is a floor; between the two it is a stair. */
-const FLAT_NZ = 0.97;
+export const FLAT_NZ = 0.97;
+
+/**
+ * The model's fare gates: upright panels under 2 m long and 1.6 m tall, standing in rows across the
+ * walks (163 of its 169 uprights; the rest are the platform edges' faces). Nine numbers, one triangle.
+ */
+export function isGatePanel(t: ArrayLike<number>): boolean {
+  const xs = [t[0], t[3], t[6]], ys = [t[1], t[4], t[7]], zs = [t[2], t[5], t[8]];
+  const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  return span < 2 && Math.max(...zs) - Math.min(...zs) < 1.6;
+}
+
+/** Each fare-gate panel of the model once: the middle of its foot, and the way it runs (atan2 dx, dy). */
+export function gatePanels(model: DollhouseModel): Array<{ at: P3; heading: number }> {
+  const seen = new Set<string>();
+  const out: Array<{ at: P3; heading: number }> = [];
+  for (let i = 0; i < model.t.length; i += 3) {
+    const t = tri(model.v, model.t, i);
+    const nz = normalZ(t);
+    if (nz == null || nz >= UPRIGHT_NZ) continue;
+    const flat = t.flat();
+    if (!isGatePanel(flat)) continue;
+    // The panel's two bottom corners: the lowest two of its triangle pair share them.
+    const lo = Math.min(t[0][2], t[1][2], t[2][2]);
+    const xs = t.map((p) => p[0]), ys = t.map((p) => p[1]);
+    const ax = Math.min(...xs), bx = Math.max(...xs), ay = Math.min(...ys), by = Math.max(...ys);
+    const key = [ax, bx, ay, by, lo].map((n) => n.toFixed(1)).join();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // The panel runs between the two corners of its triangle that lie furthest apart seen from above.
+    let dx = 0, dy = 0;
+    for (const [a, b] of [[0, 1], [1, 2], [0, 2]]) {
+      const ex = t[b][0] - t[a][0], ey = t[b][1] - t[a][1];
+      if (ex * ex + ey * ey > dx * dx + dy * dy) { dx = ex; dy = ey; }
+    }
+    out.push({ at: [(ax + bx) / 2, (ay + by) / 2, lo], heading: Math.atan2(dx, dy) });
+  }
+  return out;
+}
 
 /** A wall slab: its centre line from a to b, foot and top heights at each end, and its thickness. */
 export type ShellWall = {
   a: [number, number]; b: [number, number]; foot: [number, number]; top: [number, number]; thick: number;
   /** The sill below or the lintel above a doorway a walk passes through. */
   door?: "sill" | "lintel";
+  /** Cut short under a floor overhead (a stair passing beneath another walk), so its top stays out of sight. */
+  capped?: true;
 };
 
 export type Shell = {
@@ -301,13 +343,64 @@ export function stationShell(model: DollhouseModel, onEdge?: (p: P3, q: P3, kind
     walls.push(...cutWall(wall, cuts));
   }
 
+  // A wall's top and a ceiling stand a wall's height over their own floor or stair. Down a stair that
+  // passes under another floor, that height comes up through the floor above and shows there as a
+  // sliver or a slanted shard (owner, 2026-11-13). Wherever a floor lies overhead, the top is capped
+  // just under it; elsewhere (over a stairwell's opening) it stays where it was, so nothing opens.
+  const capAt = (x: number, y: number, own: number) => {
+    const top = own + SHELL_WALL_M;
+    let cap = top;
+    for (const h of under(x, y)) if (h > own + 0.5 && h < top + 0.05) cap = Math.min(cap, h - 0.02);
+    return cap;
+  };
+  for (const w of [...walls]) {
+    if (w.door) continue;
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    const n = Math.max(1, Math.ceil(L / CAP_PIECE_M));
+    const at = (k: number) => [w.a[0] + (w.b[0] - w.a[0]) * k, w.a[1] + (w.b[1] - w.a[1]) * k] as const;
+    const caps = Array.from({ length: n + 1 }, (_, i) => {
+      const k = i / n, [x, y] = at(k), top = w.top[0] + (w.top[1] - w.top[0]) * k;
+      return { k, top, cap: capAt(x, y, top - SHELL_WALL_M) };
+    });
+    if (caps.every((c) => c.cap >= c.top - 1e-3)) continue;
+    walls.splice(walls.indexOf(w), 1);
+    const ux = (w.b[0] - w.a[0]) / (L || 1), uy = (w.b[1] - w.a[1]) / (L || 1);
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = at(caps[i].k), [x1, y1] = at(caps[i + 1].k);
+      const foot = (k: number) => w.foot[0] + (w.foot[1] - w.foot[0]) * k;
+      walls.push({
+        a: [x0 - ux * 0.03, y0 - uy * 0.03], b: [x1 + ux * 0.03, y1 + uy * 0.03],
+        foot: [Math.min(foot(caps[i].k), caps[i].cap - 0.1), Math.min(foot(caps[i + 1].k), caps[i + 1].cap - 0.1)],
+        top: [caps[i].cap, caps[i + 1].cap],
+        thick: w.thick,
+        ...(caps[i].cap < caps[i].top - 1e-3 || caps[i + 1].cap < caps[i + 1].top - 1e-3 ? { capped: true as const } : {}),
+      });
+    }
+  }
+
   // The ceiling: each floor and stair raised a wall's height, except where something else is already
-  // overhead lower than that (a stair or a floor above is the ceiling there).
+  // overhead lower than that (a stair or a floor above is the ceiling there), capped as the walls are.
   const ceiling: number[] = [];
+  const roof = (t: [P3, P3, P3]) => {
+    const caps = t.map((p) => capAt(p[0], p[1], p[2]));
+    const mids: P3[] = [[0, 1], [1, 2], [0, 2]].map(([i, j]) => [(t[i][0] + t[j][0]) / 2, (t[i][1] + t[j][1]) / 2, (t[i][2] + t[j][2]) / 2]);
+    const capped = caps.some((c, i) => c < t[i][2] + SHELL_WALL_M - 1e-3) || mids.some((m) => capAt(m[0], m[1], m[2]) < m[2] + SHELL_WALL_M - 1e-3);
+    const long = Math.max(...[[0, 1], [1, 2], [0, 2]].map(([i, j]) => Math.hypot(t[i][0] - t[j][0], t[i][1] - t[j][1])));
+    if (capped && long > CAP_PIECE_M) {
+      // Split across the longest side and cap each half.
+      const e = [[0, 1], [1, 2], [0, 2]].reduce((b, [i, j]) => (Math.hypot(t[i][0] - t[j][0], t[i][1] - t[j][1]) > Math.hypot(t[b[0]][0] - t[b[1]][0], t[b[0]][1] - t[b[1]][1]) ? [i, j] : b), [0, 1]);
+      const [i, j] = e, k = 3 - i - j;
+      const m: P3 = [(t[i][0] + t[j][0]) / 2, (t[i][1] + t[j][1]) / 2, (t[i][2] + t[j][2]) / 2];
+      roof([t[i], m, t[k]]);
+      roof([m, t[j], t[k]]);
+      return;
+    }
+    for (let q = 0; q < 3; q++) ceiling.push(t[q][0], t[q][1], capped ? caps[q] : t[q][2] + SHELL_WALL_M);
+  };
   for (const t of walkable) {
     const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3, cz = (t[0][2] + t[1][2] + t[2][2]) / 3;
     if (under(cx, cy).some((h) => h > cz + 0.5 && h < cz + SHELL_WALL_M)) continue;
-    for (const p of t) ceiling.push(p[0], p[1], p[2] + SHELL_WALL_M);
+    roof(t);
   }
   return { floors, stairs, uprights, walls, bridges, ceiling };
 }

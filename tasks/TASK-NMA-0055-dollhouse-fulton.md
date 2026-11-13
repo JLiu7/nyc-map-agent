@@ -488,6 +488,75 @@ Blocked/uncertain:
 Next:
 - Watch #153's CI; if trip-station e2e still fails (Send stays disabled after typing), debug the Ask box remount on the React 19 branch
 
+### 2026-11-13 13:29:35 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T13:29:35Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"4982520baebf917925eea3fd99ae8f6987dc52ca67893b62c81caa003642065e","request_id":"ae31996dd1be406889739ec982438497","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
+
+### 2026-11-13 13:29:45 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T13:29:45Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"4982520baebf917925eea3fd99ae8f6987dc52ca67893b62c81caa003642065e","request_id":"efa173875a3046b68417c2b11920acf1","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
+
+### 2026-11-13 13:51:00 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T13:51:00Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"4982520baebf917925eea3fd99ae8f6987dc52ca67893b62c81caa003642065e","request_id":"82fd904c73fd496789ac7a88ee2147e4","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

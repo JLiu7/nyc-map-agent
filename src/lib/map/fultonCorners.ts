@@ -25,3 +25,6 @@ const CORNERS: Record<string, string> = {
 export function fultonCorner(exit: readonly [number, number]): string | null {
   return CORNERS[`${exit[0]},${exit[1]}`] ?? null;
 }
+
+/** Every Fulton St model exit's spot (lon, lat): where its stair meets the street. */
+export const FULTON_EXITS: ReadonlyArray<readonly [number, number]> = Object.keys(CORNERS).map((k) => k.split(",").map(Number) as [number, number]);

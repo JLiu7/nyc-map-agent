@@ -14,7 +14,10 @@ import { Joystick, useJoystickStore } from "ecctrl/input";
 import { ArrowLeft } from "lucide-react";
 import type { DollhouseModel } from "@/lib/map/three/dollhouse";
 import { buildFigure, concreteTexture, pickWalk, treadTexture, walkAt, walkLength, wallTexture } from "@/lib/map/three/dollhouse";
+import { walkDressing, type WalkDressing } from "@/lib/map/three/stationWalkDressing";
+import { fultonCorner } from "@/lib/map/fultonCorners";
 import { SMOOTH_SEAMS, toYUp, walkGeometry, type Surface, type WalkGeometry } from "@/lib/map/three/stationWalkGeometry";
+import { stationShell } from "@/lib/map/three/stationShell";
 import { loadModel } from "@/lib/map/dollhousePreview";
 
 /** The figure's body: a capsule 1.6 m tall floating 0.25 m over the floor, so it climbs stairs. */
@@ -94,12 +97,37 @@ function Guide({ path }: { path: Array<[number, number, number]> }) {
   return <primitive object={line} />;
 }
 
-function Walker({ start, heading, lowest, walls }: { start: THREE.Vector3; heading: number; lowest: number; walls: React.MutableRefObject<THREE.Object3D[]> }) {
+/** Within this of a door (metres, feet level with the platform) the train can be boarded. */
+const BOARD_NEAR_M = 1.8;
+/** The doors open while the walker is this close to the train's side. */
+const DOORS_NEAR_M = 8;
+/** After a drag, the camera stays where it was put this long before it eases behind again. */
+const HOLD_AFTER_DRAG_MS = 1200;
+/** How fast the camera swings behind (share of the gap closed per second). */
+const SWING_PER_S = 2.2;
+
+/** Shortest signed turn from a to b, in radians. */
+const turn = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+
+/** Nearer than this to the figure's middle, the camera would sit inside it, so the figure hides. */
+const HIDE_FIGURE_M = 1.1;
+
+export type Ride = "walking" | "boarding" | "riding";
+
+function Walker({ start, heading, lowest, walls, dressing, ride, onNearDoor, onRide }: {
+  start: THREE.Vector3; heading: number; lowest: number; walls: React.MutableRefObject<THREE.Object3D[]>;
+  dressing: WalkDressing; ride: Ride; onNearDoor: (near: boolean) => void; onRide: (r: Ride) => void;
+}) {
   const body = useRef<EcctrlHandle>(null);
   const cam = useRef<React.ElementRef<typeof CameraControls>>(null);
   const keys = useKeys();
   const walked = useRef(0);
   const last = useRef(start.clone());
+  const dragged = useRef({ on: false, at: -Infinity });
+  const near = useRef(false);
+  const doors = useRef(0);
+  /** The boarding: from where the figure stood to the door and in, then the train pulls out. */
+  const board = useRef<{ t: number; from: THREE.Vector3; door: THREE.Vector3; inside: THREE.Vector3 } | null>(null);
   const figure = useMemo(() => {
     const { group, stride } = buildFigure();
     // The figure stands on z and faces +y; the controller stands on y and faces +z.
@@ -119,18 +147,84 @@ function Walker({ start, heading, lowest, walls }: { start: THREE.Vector3; headi
     // Behind the figure, looking the way the walk goes down into the station.
     const back = new THREE.Vector3(-Math.sin(heading), 0, Math.cos(heading)).multiplyScalar(3.2);
     void c.setLookAt(start.x + back.x, start.y + 1.2, start.z + back.z, start.x, start.y + LOOK_UP_M, start.z, false);
+    const down = () => { dragged.current.on = true; };
+    const up = () => { dragged.current = { on: false, at: performance.now() }; };
+    c.addEventListener("controlstart", down);
+    c.addEventListener("controlend", up);
+    return () => { c.removeEventListener("controlstart", down); c.removeEventListener("controlend", up); };
   }, [start, heading]);
 
-  useFrame((state) => {
-    const b = body.current, c = cam.current;
+  // Board (the button, E or Enter): walk to the nearest door and step in.
+  useEffect(() => {
+    if (ride !== "boarding" || board.current) return;
+    const b = body.current;
     if (!b) return;
+    const p = b.currPos;
+    let best: THREE.Vector3 | null = null;
+    for (const [x, y, z] of dressing.doors) {
+      const d = new THREE.Vector3(...toYUp(x, y, z));
+      if (!best || d.distanceTo(p) < best.distanceTo(p)) best = d;
+    }
+    if (!best) return;
+    // Into the car: across the platform edge, toward the track.
+    const [dx, dy] = dressing.track.dir;
+    const track = new THREE.Vector3(...toYUp(...dressing.track.at));
+    const across = new THREE.Vector3(...toYUp(-dy, dx, 0));
+    if (across.dot(track.clone().sub(best)) < 0) across.negate();
+    const inside = best.clone().add(across.clone().multiplyScalar(1.6));
+    // The camera stands back on the platform, a little along it, and watches the walker step in and
+    // the train pull out; following into the car it would see only the car's grey insides.
+    const along = new THREE.Vector3(...toYUp(dx, dy, 0));
+    const eye = best.clone().addScaledVector(across, -3.2).addScaledVector(along, -3.5).add(new THREE.Vector3(0, 1.7, 0));
+    const look = best.clone().add(new THREE.Vector3(0, 1.1, 0));
+    if (cam.current) {
+      // The walker steps into the car out of the camera's sight line, so only walls hold it back now.
+      cam.current.colliderMeshes = walls.current;
+      void cam.current.setLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z, true);
+    }
+    board.current = { t: 0, from: new THREE.Vector3(p.x, p.y + FEET_Y, p.z), door: best, inside };
+  }, [ride, dressing, walls]);
+
+  useFrame((state, dt) => {
+    const b = body.current, c = cam.current;
+    if (!b?.body) return;
+    const p = b.currPos;
+    const feet = p.y + FEET_Y;
+    // The model's frame (z up) for the dressing: x, -z, y.
+    const mx = p.x, my = -p.z, mz = feet;
+
+    if (board.current) {
+      // Scripted: no controls. Walk to the door, step in, the doors shut and the train pulls out.
+      const k = board.current;
+      k.t += dt;
+      const walkS = Math.max(0.6, k.from.distanceTo(k.door) / 1.4);
+      let at: THREE.Vector3;
+      if (k.t < walkS) at = k.from.clone().lerp(k.door, k.t / walkS);
+      else if (k.t < walkS + 1) at = k.door.clone().lerp(k.inside, k.t - walkS);
+      else at = k.inside.clone();
+      const closeT = walkS + 1.2, leaveT = closeT + 1.2;
+      doors.current = k.t < closeT ? 1 : Math.max(0, 1 - (k.t - closeT) / 0.8);
+      dressing.train.open(doors.current);
+      // Pulls out at about 1 m/s², the figure riding inside.
+      const gone = k.t > leaveT ? 0.5 * 1.1 * (k.t - leaveT) ** 2 : 0;
+      const [dx, dy] = dressing.track.dir;
+      dressing.train.position.set(dressing.track.at[0] + dx * gone, dressing.track.at[1] + dy * gone, dressing.track.at[2]);
+      const shift = new THREE.Vector3(...toYUp(dx * gone, dy * gone, 0));
+      at.add(shift);
+      b.body.setTranslation({ x: at.x, y: at.y - FEET_Y, z: at.z }, true);
+      b.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      walked.current += dt * 1.4;
+      figure.stride(walked.current, k.t < walkS + 1);
+      if (ride !== "riding" && k.t > leaveT + 4.5) onRide("riding");
+      return;
+    }
+
     const j = Object.values(useJoystickStore.getState().joysticks)[0];
-    const k = keys.current;
+    const kk = keys.current;
     // Dev and test hook: window.__walkDrive = { x, y } steers like the joystick (x right, y ahead of the camera).
     const drive = import.meta.env.DEV ? (window as unknown as { __walkDrive?: { x: number; y: number } }).__walkDrive : undefined;
-    b.setMovement({ ...k, joystick: drive ?? (j?.active ? { x: j.x, y: j.y } : { x: 0, y: 0 }) });
-    const p = b.currPos;
-    if (import.meta.env.DEV) Object.assign(window, { __walkBody: b, __walkCamera: state.camera });
+    b.setMovement({ ...kk, joystick: drive ?? (j?.active ? { x: j.x, y: j.y } : { x: 0, y: 0 }) });
+    if (import.meta.env.DEV) Object.assign(window, { __walkBody: b, __walkCamera: state.camera, __walkScene: state.scene, __walkControls: c, __THREE: THREE });
     // Fell out of the station somehow: back to the start.
     if (p.y < lowest - 6) {
       b.body.setTranslation(start, true);
@@ -139,9 +233,37 @@ function Walker({ start, heading, lowest, walls }: { start: THREE.Vector3; headi
     walked.current += Math.hypot(p.x - last.current.x, p.z - last.current.z);
     last.current.copy(p);
     figure.stride(walked.current, b.isMoving);
+    // In a tight stairwell the camera is pushed in against the figure; seen from inside its head it
+    // only blocks the view, so it fades out of sight until the camera can back off again.
+    figure.object.visible = state.camera.position.distanceTo(p) > HIDE_FIGURE_M;
+    dressing.turnstiles(mx, my, mz);
+
+    // The doors open as the walker comes up to the train, and Board shows at a door.
+    let doorD = Infinity;
+    for (const d of dressing.doors) if (Math.abs(d[2] - mz) < 0.7) doorD = Math.min(doorD, Math.hypot(d[0] - mx, d[1] - my));
+    const want = doorD < DOORS_NEAR_M ? 1 : 0;
+    doors.current += Math.sign(want - doors.current) * Math.min(Math.abs(want - doors.current), dt / 0.9);
+    dressing.train.open(doors.current);
+    const isNear = doorD < BOARD_NEAR_M;
+    if (isNear !== near.current) { near.current = isNear; onNearDoor(isNear); }
+
     if (c) {
-      c.colliderMeshes = walls.current;
+      // The train counts as a wall for the camera, so it never swings into a car.
+      if (c.colliderMeshes.length !== walls.current.length + 1) c.colliderMeshes = [...walls.current, dressing.train];
       void c.moveTo(p.x, p.y + LOOK_UP_M, p.z, true);
+      // A chase camera: it eases round behind the way the figure walks, unless someone just dragged
+      // it, or the figure is walking back toward it (S), which would spin the view round.
+      const v = b.body.linvel();
+      const speed = Math.hypot(v.x, v.z);
+      const held = dragged.current.on || performance.now() - dragged.current.at < HOLD_AFTER_DRAG_MS;
+      if (speed > 0.4 && !held) {
+        const az = c.azimuthAngle;
+        const facing = -Math.sin(az) * v.x - Math.cos(az) * v.z; // along the camera's view, flat
+        if (facing > -0.3 * speed) {
+          const want = Math.atan2(-v.x, -v.z);
+          void c.rotateAzimuthTo(az + turn(az, want) * Math.min(1, SWING_PER_S * dt), false);
+        }
+      }
     }
   });
 
@@ -154,6 +276,14 @@ function Walker({ start, heading, lowest, walls }: { start: THREE.Vector3; headi
       <CameraControls ref={cam} makeDefault minDistance={0.8} maxDistance={6} smoothTime={0.12} />
     </>
   );
+}
+
+/** Signs, lamps, the fare lines and the train, shared with the dollhouse; turned from z up to y up. */
+function Dressing({ dressing }: { dressing: WalkDressing }) {
+  useEffect(() => () => dressing.dispose(), [dressing]);
+  // Declared, not built in a memo: React runs a memo twice in development, and the second wrapper
+  // would take the dressing away from the one it keeps.
+  return <group rotation-x={-Math.PI / 2}><primitive object={dressing.group} /></group>;
 }
 
 export function StationWalk({ exit, onClose }: { exit: [number, number] | null; onClose: () => void }) {
@@ -171,7 +301,21 @@ export function StationWalk({ exit, onClose }: { exit: [number, number] | null; 
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
-  const geo = useMemo(() => (model ? walkGeometry(model) : null), [model]);
+  const shell = useMemo(() => (model ? stationShell(model) : null), [model]);
+  const geo = useMemo(() => (model && shell ? walkGeometry(model, shell) : null), [model, shell]);
+  const [ride, setRide] = useState<Ride>("walking");
+  const [nearDoor, setNearDoor] = useState(false);
+  // Walk again starts a fresh round: a new scene, the train back at the platform.
+  const [round, setRound] = useState(0);
+  const dressing = useMemo(() => (model && shell ? walkDressing(model, fultonCorner, shell) : null), [model, shell, round]); // eslint-disable-line react-hooks/exhaustive-deps
+  const boardTrain = () => { if (ride === "walking") setRide("boarding"); };
+  // E or Enter at a door boards, as the button does.
+  useEffect(() => {
+    if (!nearDoor || ride !== "walking") return;
+    const key = (e: KeyboardEvent) => { if ((e.code === "KeyE" || e.key === "Enter") && !typing(e.target)) { e.preventDefault(); setRide("boarding"); } };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [nearDoor, ride]);
   const start = useMemo(() => {
     if (!model) return null;
     const walk = (exit && pickWalk(model, exit)) || [...model.walks].sort((a, b) => walkLength(b.path) - walkLength(a.path))[0];
@@ -185,8 +329,8 @@ export function StationWalk({ exit, onClose }: { exit: [number, number] | null; 
 
   return (
     <div data-testid="station-walk" className="fixed inset-0 z-[70] bg-[#1d1f23] touch-none select-none">
-      {geo && start ? (
-        <Canvas camera={{ fov: 62, near: 0.05, far: 300 }} dpr={[1, 2]} gl={{ antialias: true }}>
+      {geo && start && dressing ? (
+        <Canvas key={round} camera={{ fov: 62, near: 0.05, far: 300 }} dpr={[1, 2]} gl={{ antialias: true }}>
           <color attach="background" args={["#1d1f23"]} />
           <hemisphereLight args={[0xfdfbf3, 0x55524c, 1.6]} />
           <ambientLight intensity={0.5} />
@@ -195,7 +339,9 @@ export function StationWalk({ exit, onClose }: { exit: [number, number] | null; 
             <Physics timeStep={1 / 60}>
               <Station geo={geo} walls={walls} />
               <Guide path={start.path} />
-              <Walker start={start.at} heading={start.heading} lowest={geo.lowest} walls={walls} />
+              <Dressing dressing={dressing} />
+              <Walker start={start.at} heading={start.heading} lowest={geo.lowest} walls={walls} dressing={dressing}
+                ride={ride} onNearDoor={setNearDoor} onRide={setRide} />
             </Physics>
           </Suspense>
         </Canvas>
@@ -207,9 +353,26 @@ export function StationWalk({ exit, onClose }: { exit: [number, number] | null; 
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Back to the map
       </button>
-      {touch ? (
+      {nearDoor && ride === "walking" ? (
+        <button type="button" onClick={boardTrain} data-testid="board-train"
+          className="absolute bottom-[calc(env(safe-area-inset-bottom)+128px)] left-1/2 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-[#00933c] px-5 text-base font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          Board the train{touch ? "" : " (E)"}
+        </button>
+      ) : null}
+      {ride === "riding" ? (
+        <div role="status" data-testid="riding" className="absolute inset-x-4 top-1/3 mx-auto max-w-sm rounded-2xl bg-black/70 p-5 text-center text-white backdrop-blur">
+          <p className="text-lg font-semibold">On the downtown 4 train</p>
+          <p className="mt-1 text-sm text-white/80">Next stop: Wall St</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <button type="button" data-testid="walk-again" onClick={() => { setRide("walking"); setNearDoor(false); setRound((r) => r + 1); }}
+              className="h-11 rounded-full bg-white px-4 text-sm font-semibold text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Walk again</button>
+            <button type="button" onClick={onClose} className="h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Back to the map</button>
+          </div>
+        </div>
+      ) : null}
+      {touch && ride === "walking" ? (
         <Joystick joystickWrapperStyle={{ left: 24, bottom: "calc(env(safe-area-inset-bottom) + 24px)", position: "absolute" }} />
-      ) : (
+      ) : ride !== "walking" ? null : (
         <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
           WASD or arrow keys to walk · drag to look
         </p>

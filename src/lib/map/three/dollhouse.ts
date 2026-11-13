@@ -22,7 +22,7 @@ import * as THREE from "three";
 import type { CustomLayerInterface, Map as MaplibreMap } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer } from "./core";
 
-type P3 = [number, number, number];
+export type P3 = [number, number, number];
 type DollhouseWalk = { exit: [number, number]; path: P3[] };
 export type DollhouseModel = {
   origin: [number, number];
@@ -64,7 +64,7 @@ const EXIT_MATCH_M = 50;
 const GLIDE_MS = 1500;
 /** Lexington Avenue line green, for the train's stripe. */
 const LEX_GREEN = 0x00933c;
-const CAR_M = 15.5, CARS = 10;
+export const CAR_M = 15.5, CARS = 10;
 /** The train pulls out over this many metres of the figure's walk, then it is gone. */
 const PULL_OUT_M = 25;
 /** The share of the wait spent on the overview of the platform before the camera eases in. */
@@ -74,7 +74,7 @@ const OVERVIEW_TILT = (15 * Math.PI) / 180;
 /** The map's vertical field of view (MapLibre's default), to fit the train in the overview. */
 const MAP_FOV = (36.87 * Math.PI) / 180;
 /** Ceiling lights: a strip this far above the walk, every few metres, cut away above this height over the feet. */
-const LIGHT_UP_M = 2.9, LIGHT_EVERY_M = 5, LIGHT_CUT_M = 3.2, LIGHT_ASIDE_M = 1.3;
+export const LIGHT_UP_M = 2.9, LIGHT_EVERY_M = 5, LIGHT_CUT_M = 3.2, LIGHT_ASIDE_M = 1.3;
 /** Signs on the levels above are cut away over this height above the feet. */
 const SIGN_CUT_M = 4;
 /** One step's rise, for the stair treads' stripes. */
@@ -392,7 +392,7 @@ function signLine(g: CanvasRenderingContext2D, line: SignLine, x: number, mid: n
  * from two thin rods. The group's origin is the panel's middle; it faces -y (turn it with
  * rotation.z = -heading to face someone walking that way).
  */
-function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false): THREE.Group {
+export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false): THREE.Group {
   const PX = 256, pad = 0.12, maxW = 4;
   let big = (small ? 0.15 : 0.24) * PX, little = 0.15 * PX;
   const [, probe] = canvas2d(4, 4);
@@ -430,7 +430,7 @@ function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small
 }
 
 /** A waist-high turnstile, walked through along +y: its body to the right of the lane, its three arms across it. */
-function turnstile(): { group: THREE.Group; rotor: THREE.Group } {
+export function turnstile(): { group: THREE.Group; rotor: THREE.Group } {
   const group = new THREE.Group();
   const steel = 0xc7ccd3;
   const body = box(0.3, 0.9, 0.95, steel);
@@ -470,7 +470,77 @@ function emergencyGate(): THREE.Group {
   return group;
 }
 
-function dispose(root: THREE.Object3D) {
+/**
+ * The fare line at `gates`: turnstiles, the high exit gate and the emergency gate, the walk going
+ * through the middle turnstile. Each rotor comes with where it turns, in the same frame as the group.
+ */
+function fareLine(gates: { at: P3; heading: number }): { group: THREE.Group; rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> } {
+  const rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> = [];
+  const line = new THREE.Group();
+  line.position.set(...gates.at);
+  line.rotation.z = -gates.heading;
+  // The lane the walk takes runs between the turnstile at 0.155 and the one before it.
+  const pieces: Array<[number, "turnstile" | "high" | "emergency" | "rail"]> = [[-4.1, "rail"], [HIGH_GATE_X, "high"], [-1.75, "turnstile"], [-0.8, "turnstile"], [0.155, "turnstile"], [1.1, "turnstile"], [2.35, "emergency"], [3.6, "rail"]];
+  for (const [x, kind] of pieces) {
+    if (kind === "turnstile") {
+      const t = turnstile();
+      t.group.position.x = x;
+      line.add(t.group);
+      rotors.push({ rotor: t.rotor, at: new THREE.Vector3(x + 0.17, 0, 0) });
+    } else if (kind === "high") {
+      const h = highExitGate(); h.position.x = x; line.add(h);
+    } else if (kind === "emergency") {
+      const e = emergencyGate(); e.position.x = x; line.add(e);
+    } else {
+      const rail = box(1.2, 0.06, 0.06, 0x5b616b); rail.position.set(x, 0, 1.0); line.add(rail);
+      const post = box(0.08, 0.08, 1.0, 0x5b616b); post.position.set(x + Math.sign(x) * 0.6, 0, 0.5); line.add(post);
+    }
+  }
+  line.updateMatrixWorld(true);
+  rotors.forEach((r) => r.at.applyMatrix4(line.matrixWorld));
+  return { group: line, rotors };
+}
+
+/** Where each car's doors are along it, from its middle (metres): four pairs a side, as on an R142. */
+export const DOORS_ALONG_M = [-5.4, -1.8, 1.8, 5.4];
+/** A door leaf's width; a pair opens to twice this. */
+const DOOR_LEAF_M = 0.64;
+
+/**
+ * The 4/5 train: CARS cars of CAR_M along -x from the origin, rails at z 0. With `doors`, each car
+ * gets door pairs on both sides whose leaves slide apart as `open` goes from 0 to 1.
+ */
+export function trainCars(doors: boolean): THREE.Group & { open?: (f: number) => void } {
+  const train: THREE.Group & { open?: (f: number) => void } = new THREE.Group();
+  const leaves: Array<{ leaf: THREE.Object3D; from: number; dir: number }> = [];
+  for (let i = 0; i < CARS; i++) {
+    const car = new THREE.Group();
+    // Not cut: the train's roof sits below the platform's ceiling, and a cut-open car reads as a hole.
+    const shell = box(CAR_M - 0.5, 2.7, 3.2, 0xb8bec6); shell.position.z = 1.9; car.add(shell);
+    const roof = box(CAR_M - 0.9, 2.2, 0.12, 0x8e959e); roof.position.z = 3.56; car.add(roof);
+    const windows = box(CAR_M - 1.2, 2.72, 0.7, 0x2b3038); windows.position.z = 2.5; car.add(windows);
+    const stripe = box(CAR_M - 0.6, 2.74, 0.18, LEX_GREEN); stripe.position.z = 1.7; car.add(stripe);
+    if (doors) {
+      for (const along of DOORS_ALONG_M) for (const side of [-1, 1]) {
+        // A dark doorway, and two steel leaves over it that slide apart.
+        const way = box(DOOR_LEAF_M * 2, 0.02, 1.95, 0x1b1d21); way.position.set(along, side * 1.36, 1.3); car.add(way);
+        for (const half of [-1, 1]) {
+          const leaf = box(DOOR_LEAF_M, 0.04, 1.95, 0x9ea5ae);
+          const from = along + half * DOOR_LEAF_M / 2;
+          leaf.position.set(from, side * 1.38, 1.3);
+          car.add(leaf);
+          leaves.push({ leaf, from, dir: half });
+        }
+      }
+    }
+    car.position.x = -i * CAR_M;
+    train.add(car);
+  }
+  if (doors) train.open = (f: number) => { for (const l of leaves) l.leaf.position.x = l.from + l.dir * DOOR_LEAF_M * 0.95 * Math.min(Math.max(f, 0), 1); };
+  return train;
+}
+
+export function dispose(root: THREE.Object3D) {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     mesh.geometry?.dispose();
@@ -771,44 +841,13 @@ export function dollhouseLayer(model: DollhouseModel, walk: DollhouseWalk, getSt
   // The fare line: turnstiles, the high exit gate and the emergency gate, the walk through the middle turnstile.
   const rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> = [];
   if (places.gates) {
-    const g = places.gates;
-    const line = new THREE.Group();
-    line.position.set(...g.at);
-    line.rotation.z = -g.heading;
-    // The lane the walk takes runs between the turnstile at 0.155 and the one before it.
-    const pieces: Array<[number, "turnstile" | "high" | "emergency" | "rail"]> = [[-4.1, "rail"], [HIGH_GATE_X, "high"], [-1.75, "turnstile"], [-0.8, "turnstile"], [0.155, "turnstile"], [1.1, "turnstile"], [2.35, "emergency"], [3.6, "rail"]];
-    for (const [x, kind] of pieces) {
-      if (kind === "turnstile") {
-        const t = turnstile();
-        t.group.position.x = x;
-        line.add(t.group);
-        rotors.push({ rotor: t.rotor, at: new THREE.Vector3(x + 0.17, 0, 0) });
-      } else if (kind === "high") {
-        const h = highExitGate(); h.position.x = x; line.add(h);
-      } else if (kind === "emergency") {
-        const e = emergencyGate(); e.position.x = x; line.add(e);
-      } else {
-        const rail = box(1.2, 0.06, 0.06, 0x5b616b); rail.position.set(x, 0, 1.0); line.add(rail);
-        const post = box(0.08, 0.08, 1.0, 0x5b616b); post.position.set(x + Math.sign(x) * 0.6, 0, 0.5); line.add(post);
-      }
-    }
-    station.add(line);
-    line.updateMatrixWorld(true);
-    rotors.forEach((r) => r.at.applyMatrix4(line.matrixWorld));
+    const fare = fareLine(places.gates);
+    station.add(fare.group);
+    rotors.push(...fare.rotors);
   }
 
   // The 4/5 train on the downtown track, pulling out while the figure steps off.
-  const train = new THREE.Group();
-  for (let i = 0; i < CARS; i++) {
-    const car = new THREE.Group();
-    // Not cut: the train's roof sits below the platform's ceiling, and a cut-open car reads as a hole.
-    const shell = box(CAR_M - 0.5, 2.7, 3.2, 0xb8bec6); shell.position.z = 1.9; car.add(shell);
-    const roof = box(CAR_M - 0.9, 2.2, 0.12, 0x8e959e); roof.position.z = 3.56; car.add(roof);
-    const windows = box(CAR_M - 1.2, 2.72, 0.7, 0x2b3038); windows.position.z = 2.5; car.add(windows);
-    const stripe = box(CAR_M - 0.6, 2.74, 0.18, LEX_GREEN); stripe.position.z = 1.7; car.add(stripe);
-    car.position.x = -i * CAR_M;
-    train.add(car);
-  }
+  const train = trainCars(false);
   train.position.set(...model.track.at);
   train.rotation.z = model.track.angle;
   scene.add(train);
