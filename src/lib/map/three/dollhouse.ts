@@ -389,10 +389,10 @@ function signLine(g: CanvasRenderingContext2D, line: SignLine, x: number, mid: n
  * A sign as the MTA hangs them: a black panel with a thin white rule along its top, white
  * Helvetica Bold, route bullets in their colours, a big first line and an optional smaller second
  * line. The panel widens to fit its words (up to 4 m; past that the lettering shrinks) and hangs
- * from two thin rods. The group's origin is the panel's middle; it faces -y (turn it with
- * rotation.z = -heading to face someone walking that way).
+ * from two thin rods (none when `rods` is false: a sign fixed flat on a wall). The group's origin is
+ * the panel's middle; it faces -y (turn it with rotation.z = -heading to face someone walking that way).
  */
-export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false): THREE.Group {
+export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[], small = false, rods = true): THREE.Group {
   const PX = 256, pad = 0.12, maxW = 4;
   let big = (small ? 0.15 : 0.24) * PX, little = 0.15 * PX;
   const [, probe] = canvas2d(4, 4);
@@ -421,7 +421,7 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   back.position.y = 0.01;
   group.add(front, back);
   const rodX = w / 2 - Math.min(0.3, w / 4);
-  for (const x of [-rodX, rodX]) {
+  for (const x of rods ? [-rodX, rodX] : []) {
     const rod = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.6), new THREE.MeshBasicMaterial({ color: 0x2a2c30, clippingPlanes: clip }));
     rod.position.set(x, 0.005, h / 2 + 0.3);
     group.add(rod);
