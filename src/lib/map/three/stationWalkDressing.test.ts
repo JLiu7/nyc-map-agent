@@ -104,6 +104,14 @@ describe("Fulton St's dressing for walking inside", () => {
     expect(covered).toEqual([]);
   });
 
+  it("hangs one board for each way at each place, never two saying the same over each other", () => {
+    // Owner, 2026-11-13: "multiple signboards for same exit".
+    const all = signs().map((s) => ({ head: JSON.stringify((JSON.parse((s.userData.sign as { key: string }).key) as unknown[])[0]), p: s.position }));
+    const twice = all.flatMap((a, i) => all.slice(i + 1).filter((b) => b.head === a.head && Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) < 3 && Math.abs(b.p.z - a.p.z) < 1).map(() => a.head));
+    expect(twice).toEqual([]);
+    expect(all.length).toBeLessThan(40);
+  });
+
   it("puts a sign near a wall flat on it, facing out", () => {
     // Without rods: a sign on a wall has only its two faces.
     const flat = signs().filter((s) => s.children.length === 2);

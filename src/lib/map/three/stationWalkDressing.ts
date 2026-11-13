@@ -94,7 +94,8 @@ function pointGrid(pts: P3[]) {
  *   Brooklyn" on the downtown side, "Uptown & The Bronx" on the uptown side. (The downtown train,
  *   standing between, hides the uptown boards from the downtown side.)
  * - Where each walk's first stair leaves the downtown platform's level, a board 3 m out on the
- *   platform side for whoever comes off that stair: "Downtown & Brooklyn" with the platform's lines.
+ *   platform side for whoever comes off that stair: "Downtown & Brooklyn" with the platform's lines,
+ *   unless a platform board hangs within 8 m.
  */
 export function platformBoards(model: DollhouseModel): SignPlan[] {
   const seg = ([x1, y1, x2, y2]: number[]) => ({ a: [x1, y1], b: [x2, y2] }) as ShellWall;
@@ -117,8 +118,10 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
     // The walk's first stair, up or down, is the one off the platform's level; one far from the
     // downtown edge belongs to another part of the station.
     const f = walkPlaces(w.path).signs[0];
-    if (down && f && Math.abs(f.at[2] - w.path[0][2]) < 0.3 && segDist(f.at[0], f.at[1], seg(down)) < 25) {
-      out.push({ at: [f.at[0] - Math.sin(f.heading) * 3, f.at[1] - Math.cos(f.heading) * 3, f.at[2] + 2.5], heading: f.heading + Math.PI, lines: [{ bullets: model.lines, text: "Downtown & Brooklyn" }, null] });
+    const at: P3 | null = f ? [f.at[0] - Math.sin(f.heading) * 3, f.at[1] - Math.cos(f.heading) * 3, f.at[2] + 2.5] : null;
+    // Not where the platform's own board already names the way, within 8 m.
+    if (down && f && at && Math.abs(f.at[2] - w.path[0][2]) < 0.3 && segDist(f.at[0], f.at[1], seg(down)) < 25 && !out.some((o) => Math.hypot(o.at[0] - at[0], o.at[1] - at[1]) < 8)) {
+      out.push({ at, heading: f.heading + Math.PI, lines: [{ bullets: model.lines, text: "Downtown & Brooklyn" }, null] });
     }
   }
   return out;
@@ -129,7 +132,26 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
  * from the platform's edge instead, and the platforms' (platformBoards).
  */
 export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): SignPlan[] {
-  return [...model.walks.flatMap((w) => planSigns(model, w, corner(w.exit)).slice(1)), ...platformBoards(model)];
+  // One board for each way at each decision point (owner, 2026-11-13: "multiple signboards for same
+  // exit"): walks that share a stair share its sign. When their streets differ, it names the street
+  // they have in common ("Broadway"), else only the way.
+  const out: Array<SignPlan & { seconds: string[] }> = [];
+  // Along one walk, a stair climbed in flights with landings between gets its board at the first.
+  const firsts = model.walks.flatMap((w) => planSigns(model, w, corner(w.exit)).slice(1).filter((p, i, all) => {
+    const q = all.slice(0, i).reverse().find((o) => !o.small);
+    return p.small || !q || JSON.stringify(q.lines) !== JSON.stringify(p.lines) || Math.hypot(q.at[0] - p.at[0], q.at[1] - p.at[1]) > 8 || Math.abs(q.at[2] - p.at[2]) > 3.5;
+  }));
+  for (const p of firsts) {
+    const head = JSON.stringify(p.lines[0]);
+    const same = out.find((o) => JSON.stringify(o.lines[0]) === head && Math.hypot(o.at[0] - p.at[0], o.at[1] - p.at[1]) < 3 && Math.abs(o.at[2] - p.at[2]) < 1);
+    if (!same) { out.push({ ...p, seconds: [p.lines[1]?.text ?? ""] }); continue; }
+    const t = p.lines[1]?.text;
+    if (t == null || !same.lines[1]?.text || same.seconds.includes(t)) continue;
+    same.seconds.push(t);
+    const common = same.seconds.map((n) => n.split(/ & | · /)).reduce((a, b) => a.filter((part) => b.includes(part)));
+    same.lines = [same.lines[0], common.length ? { text: common[0] } : null];
+  }
+  return [...out.map(({ seconds: _, ...p }) => p), ...platformBoards(model)];
 }
 
 /** A board as hung: where, which way, and its box at the scale it hangs. */
@@ -151,9 +173,14 @@ export const boardsOverlap = (p: Placed, q: Placed) => boardInWall(p.b, p.at, p.
  * sign's side, at its usual height, facing out; else hung where planned. Every spot is checked
  * against every wall; when none clears, it hangs at the nearest spot that does, smaller if it must. Never dropped.
  */
-function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = []): { at: P3; heading: number; flat: boolean; scale: number } {
+function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = [], over: (x: number, y: number) => number[] = () => []): { at: P3; heading: number; flat: boolean; scale: number } {
   const slabs = placed.filter((q) => Math.hypot(q.at[0] - at[0], q.at[1] - at[1]) < q.b.half + b.half + 8).map(slabOf);
-  const clear = (c: P3, h: number, box: Board) => !boardInWall(box, c, h, slabs);
+  // Clear of every board hung, and under every ceiling, stair and floor overhead: none between the
+  // board's foot and 2 cm over its top, across its width and over both faces.
+  const clear = (c: P3, h: number, box: Board) => !boardInWall(box, c, h, slabs) && [-1, -0.5, 0, 0.5, 1].every((k) => [box.y0, box.y1].every((d) => {
+    const x = c[0] + Math.cos(h) * box.half * k + Math.sin(h) * d, y = c[1] - Math.sin(h) * box.half * k + Math.cos(h) * d;
+    return over(x, y).every((z) => z < c[2] + box.z0 || z > c[2] + box.z1 + 0.02);
+  }));
   const r = b.half + WALL_NEAR_M;
   // Every spot tried lies within this of where the sign was planned: only these walls can reach it.
   const walls = all.filter((w) => segDist(at[0], at[1], w) < r + b.half + 3);
@@ -310,12 +337,13 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
   const placed: Placed[] = [];
+  const overhead = shell ? surfaceFinder(trisOf([...shell.ceiling, ...shell.floors, ...shell.stairs])) : () => [];
   for (const plan of walkSignPlans(model, corner)) {
     const key = JSON.stringify(plan.lines);
     if (!fresh(key, plan.at)) continue;
     const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
     const flatB = boardOf(flat), hungB = boardOf(hung);
-    const spot = placeSign(flatB, hungB, plan.at, plan.heading, walls, walkNear, placed);
+    const spot = placeSign(flatB, hungB, plan.at, plan.heading, walls, walkNear, placed, overhead);
     // On a wall it is fixed flat; hung from the ceiling, on its rods.
     const sign = spot.flat ? flat : hung;
     dispose(spot.flat ? hung : flat);

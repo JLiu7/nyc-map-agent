@@ -455,7 +455,9 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   const row1 = big * 1.45, row2 = lines[1] ? little * 1.5 : 0;
   const w = Math.max(inner / PX + 2 * pad, small ? 0.7 : 1.4), h = (top + row1 + row2) / PX + 0.06;
   const [c, g] = canvas2d(Math.round(w * PX), Math.round(h * PX));
-  g.fillStyle = "#111214"; g.fillRect(0, 0, c.width, c.height);
+  // Exit boards in MTA green, the rest MTA black (owner, 2026-11-13: "exit sign doesnt have mta colors").
+  const bg = lines[0].text?.startsWith("Exit") ? 0x00933c : 0x111214;
+  g.fillStyle = `#${bg.toString(16).padStart(6, "0")}`; g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = "#f4f4f2"; g.fillRect(0, ruleAt, c.width, Math.max(2, 0.012 * PX));
   signLine(g, lines[0], pad * PX, top + row1 / 2, big, true);
   if (lines[1]) signLine(g, lines[1], pad * PX, top + row1 + row2 / 2 - little * 0.05, little, true);
@@ -465,7 +467,7 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   const group = new THREE.Group();
   const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, clippingPlanes: clip }));
   front.rotation.x = Math.PI / 2;
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0x111214, clippingPlanes: clip }));
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: bg, clippingPlanes: clip }));
   back.rotation.x = -Math.PI / 2;
   back.position.y = 0.01;
   group.add(front, back);
