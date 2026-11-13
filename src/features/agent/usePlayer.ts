@@ -198,7 +198,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
   /** A station walked at eye level: the leg, the eye and train it draws each frame, its canvas below the street, and how to take it down. */
   const inside = useRef<{ seg: Segment; eye: StationEye | null; train: number | null; canvas: HTMLCanvasElement | null; stop: () => void } | null>(null);
   /**
-   * Leaving a downtown 4 or 5 at Fulton St (#129): the station model in the map with a figure walking
+   * Leaving a train at a station with a model (#129; Fulton St, Brooklyn Bridge, Atlantic Av): the model in the map with a figure walking
    * it, seen from behind and above, through that leg and on along the street walk after it.
    */
   const doll = useRef<{ seg: Segment; next: Segment | undefined; state: DollhouseState; view: DollhouseView | null; stop: () => void } | null>(null);
@@ -248,14 +248,15 @@ export function usePlayer(onCallout?: (text: string) => void) {
       view.canvas = canvas;
       view.stop = () => { unmount(); canvas.remove(); };
     });
-    // Leaving a downtown 4 or 5 at Fulton St, a figure walks the station model seen from above (#129),
+    // Leaving a train at a station with a model (see stationModels), a figure walks the model seen from above (#129),
     // to the exit the trip chose; with no walk to that exit, the first-person walk plays instead.
-    if (!dollhouseOn.current || !dollhouseLeg(seg, ride)) { firstPerson(); return; }
+    const station = dollhouseOn.current ? dollhouseLeg(seg, ride) : null;
+    if (!station) { firstPerson(); return; }
     const d: NonNullable<typeof doll.current> = { seg, next: segsRef.current[at + 1], state: { walk: null, wait: null, street: null }, view: null, stop: () => {} };
     doll.current = d;
     const exit = seg.coords[seg.coords.length - 1] ?? null;
     void import("@/lib/map/dollhousePreview")
-      .then(({ openDollhouse }) => openDollhouse(map, exit, () => d.state, exitStreet(seg) ?? null))
+      .then(({ openDollhouse }) => openDollhouse(map, exit, () => d.state, exitStreet(seg) ?? null, station))
       .catch(() => null)
       .then((opened) => {
         if (doll.current !== d) { opened?.stop(); return; }
@@ -298,8 +299,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const warmReplay = useCallback((t: Segment[]) => {
     if (!t.some((seg) => seg.station)) return;
     void import("@/lib/map/three/stationScene").catch(() => undefined);
-    const dollhouse = t.some((seg, i) => seg.kind === "ascend" && t.slice(Math.max(0, i - 2), i).some((ride) => dollhouseLeg(seg, ride)));
-    if (dollhouseOn.current && dollhouse) void import("@/lib/map/dollhousePreview").then(({ warmDollhouse }) => warmDollhouse()).catch(() => undefined);
+    const stations = new Set(t.flatMap((seg, i) => (seg.kind === "ascend" ? t.slice(Math.max(0, i - 2), i).map((ride) => dollhouseLeg(seg, ride)) : [])).filter((s) => s != null));
+    if (dollhouseOn.current) for (const s of stations) void import("@/lib/map/dollhousePreview").then(({ warmDollhouse }) => warmDollhouse(s)).catch(() => undefined);
   }, []);
   /** Once the stations are in, send the trip's stairs through the real station (same legs, new paths). */
   const addStairs = useCallback((tripId: string, t: Segment[]) => {

@@ -1,17 +1,23 @@
 import type { Segment } from "./flythrough";
+import { STATION_MODELS, type StationModelId } from "@/lib/map/stationModels";
 
-/** Where the dollhouse walk starts: the downtown 4/5 platform at Fulton St, by the Dey St stair. */
-const FULTON_45: [number, number] = [-74.00957, 40.71042];
+/** How far the ride's last stop may be from the middle of the model's platform. */
 const NEAR_M = 220;
 
 /**
- * Whether a station leg is played in the dollhouse view (#129): leaving a downtown 4 or 5 train at
- * Fulton St, the one walk the station model has a path for. Every other leg stays first person.
+ * Which station model plays a station leg in the dollhouse view (#129), or null: leaving a train
+ * that runs south (downtown, or on to Brooklyn) at a station whose model has walks from that
+ * train's platform. Every other leg stays first person.
  */
-export function dollhouseLeg(seg: Segment, ride: Segment | undefined): boolean {
-  if (seg.kind !== "ascend" || ride?.kind !== "ride" || !/^[45]X?$/.test(ride.route ?? "")) return false;
+export function dollhouseLeg(seg: Segment, ride: Segment | undefined): StationModelId | null {
+  if (seg.kind !== "ascend" || ride?.kind !== "ride") return null;
   const from = ride.coords[0], to = ride.coords[ride.coords.length - 1];
-  if (!from || !to || to[1] >= from[1]) return false; // a downtown train ends south of where it began
-  const dx = (to[0] - FULTON_45[0]) * 111_320 * Math.cos((FULTON_45[1] * Math.PI) / 180), dy = (to[1] - FULTON_45[1]) * 111_320;
-  return Math.hypot(dx, dy) < NEAR_M;
+  if (!from || !to || to[1] >= from[1]) return null; // these trains end south of where they began
+  for (const m of STATION_MODELS) {
+    if (!m.routes.test(ride.route ?? "")) continue;
+    const [lon, lat] = m.platform;
+    const dx = (to[0] - lon) * 111_320 * Math.cos((lat * Math.PI) / 180), dy = (to[1] - lat) * 111_320;
+    if (Math.hypot(dx, dy) < NEAR_M) return m.id;
+  }
+  return null;
 }

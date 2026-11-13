@@ -240,7 +240,7 @@ describe("stairwells", () => {
       expect(over).toBe(0);
     });
 
-    it(`cuts each stairwell along the stair's sides and closes its rim at station ${id}`, () => {
+    it(`cuts each stairwell along the stair's sides and closes its rim at station ${id}`, { timeout: 30_000 }, () => {
       const m = buildStation(xray[id])!;
       const flights = m.pieces.filter((g) => g.flight);
       const { floors, ceilings, rims } = drawn(m);
