@@ -39,6 +39,14 @@ const VIEW = `(() => {
 const AHEAD = 90;
 const pixel = (page: Page, right: number, z: number) => page.evaluate<{ x: number; y: number }>(`${VIEW}.px(${AHEAD}, ${right}, ${z})`);
 async function tap(page: Page, right: number, z: number) {
+  // A card opening or closing eases the map's bottom padding, starting 160 ms later (src/lib/map/mapCover.ts).
+  // Aim only once the camera is still and its padding has held for 400 ms.
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __map: { isMoving(): boolean; getPadding(): object }; __padSeen?: { pad: string; at: number } };
+    const pad = JSON.stringify(w.__map.getPadding()), now = performance.now();
+    if (w.__map.isMoving() || w.__padSeen?.pad !== pad) { w.__padSeen = { pad, at: now }; return false; }
+    return now - w.__padSeen.at >= 400;
+  }, undefined, { timeout: slow(10_000), polling: 100 });
   const p = await pixel(page, right, z);
   await page.mouse.click(p.x, p.y);
   return p;
