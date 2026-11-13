@@ -30,12 +30,52 @@ const DOOR_SILL_M = 0.15;
 const DOOR_HEAD_M = 2.2;
 /** How much of each end of a walk (where it meets the street) is left walled. */
 const DOOR_END_M = 0.6;
+/** Seen from above, how far round a stair's ceiling corner to look for a floor it passes under. */
+const LIFT_AROUND: Array<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
 /** With no floor below, a wall still reaches this far down, past the bottom of any view. */
 const SKIRT_M = 3;
 /** Steeper than this (|normal z| below) a piece of the model is an upright wall, not a floor. */
 const UPRIGHT_NZ = 0.3;
 /** Flatter than this a walkable piece is a floor; between the two it is a stair. */
-const FLAT_NZ = 0.97;
+export const FLAT_NZ = 0.97;
+
+/**
+ * The model's fare gates: upright panels under 2 m long and 1.6 m tall, standing in rows across the
+ * walks (163 of its 169 uprights; the rest are the platform edges' faces). Nine numbers, one triangle.
+ */
+export function isGatePanel(t: ArrayLike<number>): boolean {
+  const xs = [t[0], t[3], t[6]], ys = [t[1], t[4], t[7]], zs = [t[2], t[5], t[8]];
+  const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  return span < 2 && Math.max(...zs) - Math.min(...zs) < 1.6;
+}
+
+/** Each fare-gate panel of the model once: the middle of its foot, and the way it runs (atan2 dx, dy). */
+export function gatePanels(model: DollhouseModel): Array<{ at: P3; heading: number }> {
+  const seen = new Set<string>();
+  const out: Array<{ at: P3; heading: number }> = [];
+  for (let i = 0; i < model.t.length; i += 3) {
+    const t = tri(model.v, model.t, i);
+    const nz = normalZ(t);
+    if (nz == null || nz >= UPRIGHT_NZ) continue;
+    const flat = t.flat();
+    if (!isGatePanel(flat)) continue;
+    // The panel's two bottom corners: the lowest two of its triangle pair share them.
+    const lo = Math.min(t[0][2], t[1][2], t[2][2]);
+    const xs = t.map((p) => p[0]), ys = t.map((p) => p[1]);
+    const ax = Math.min(...xs), bx = Math.max(...xs), ay = Math.min(...ys), by = Math.max(...ys);
+    const key = [ax, bx, ay, by, lo].map((n) => n.toFixed(1)).join();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // The panel runs between the two corners of its triangle that lie furthest apart seen from above.
+    let dx = 0, dy = 0;
+    for (const [a, b] of [[0, 1], [1, 2], [0, 2]]) {
+      const ex = t[b][0] - t[a][0], ey = t[b][1] - t[a][1];
+      if (ex * ex + ey * ey > dx * dx + dy * dy) { dx = ex; dy = ey; }
+    }
+    out.push({ at: [(ax + bx) / 2, (ay + by) / 2, lo], heading: Math.atan2(dx, dy) });
+  }
+  return out;
+}
 
 /** A wall slab: its centre line from a to b, foot and top heights at each end, and its thickness. */
 export type ShellWall = {
@@ -307,6 +347,11 @@ export function stationShell(model: DollhouseModel, onEdge?: (p: P3, q: P3, kind
   for (const t of walkable) {
     const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3, cz = (t[0][2] + t[1][2] + t[2][2]) / 3;
     if (under(cx, cy).some((h) => h > cz + 0.5 && h < cz + SHELL_WALL_M)) continue;
+    // Down a stair that passes under another floor, a ceiling a wall's height over the stair slopes
+    // up through that floor beside the stairwell and shows there as a grey shard (owner, 2026-11-13).
+    // Such a piece is left out: the floor it passes under is the ceiling there.
+    const through = t.some((p) => LIFT_AROUND.some(([dx, dy]) => under(p[0] + dx, p[1] + dy).some((h) => h > p[2] + 0.5 && h < p[2] + SHELL_WALL_M - 0.05)));
+    if (through) continue;
     for (const p of t) ceiling.push(p[0], p[1], p[2] + SHELL_WALL_M);
   }
   return { floors, stairs, uprights, walls, bridges, ceiling };

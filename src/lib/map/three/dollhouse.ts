@@ -21,6 +21,7 @@
 import * as THREE from "three";
 import type { CustomLayerInterface, Map as MaplibreMap } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer } from "./core";
+import { gatePanels } from "./stationShell";
 
 type P3 = [number, number, number];
 type DollhouseWalk = { exit: [number, number]; path: P3[] };
@@ -470,6 +471,166 @@ function emergencyGate(): THREE.Group {
   return group;
 }
 
+/**
+ * The fare line at `gates`: turnstiles, the high exit gate and the emergency gate, the walk going
+ * through the middle turnstile. Each rotor comes with where it turns, in the same frame as the group.
+ */
+function fareLine(gates: { at: P3; heading: number }): { group: THREE.Group; rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> } {
+  const rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> = [];
+  const line = new THREE.Group();
+  line.position.set(...gates.at);
+  line.rotation.z = -gates.heading;
+  // The lane the walk takes runs between the turnstile at 0.155 and the one before it.
+  const pieces: Array<[number, "turnstile" | "high" | "emergency" | "rail"]> = [[-4.1, "rail"], [HIGH_GATE_X, "high"], [-1.75, "turnstile"], [-0.8, "turnstile"], [0.155, "turnstile"], [1.1, "turnstile"], [2.35, "emergency"], [3.6, "rail"]];
+  for (const [x, kind] of pieces) {
+    if (kind === "turnstile") {
+      const t = turnstile();
+      t.group.position.x = x;
+      line.add(t.group);
+      rotors.push({ rotor: t.rotor, at: new THREE.Vector3(x + 0.17, 0, 0) });
+    } else if (kind === "high") {
+      const h = highExitGate(); h.position.x = x; line.add(h);
+    } else if (kind === "emergency") {
+      const e = emergencyGate(); e.position.x = x; line.add(e);
+    } else {
+      const rail = box(1.2, 0.06, 0.06, 0x5b616b); rail.position.set(x, 0, 1.0); line.add(rail);
+      const post = box(0.08, 0.08, 1.0, 0x5b616b); post.position.set(x + Math.sign(x) * 0.6, 0, 0.5); line.add(post);
+    }
+  }
+  line.updateMatrixWorld(true);
+  rotors.forEach((r) => r.at.applyMatrix4(line.matrixWorld));
+  return { group: line, rotors };
+}
+
+/** Where each car's doors are along it, from its middle (metres): four pairs a side, as on an R142. */
+const DOORS_ALONG_M = [-5.4, -1.8, 1.8, 5.4];
+/** A door leaf's width; a pair opens to twice this. */
+const DOOR_LEAF_M = 0.64;
+
+/**
+ * The 4/5 train: CARS cars of CAR_M along -x from the origin, rails at z 0. With `doors`, each car
+ * gets door pairs on both sides whose leaves slide apart as `open` goes from 0 to 1.
+ */
+function trainCars(doors: boolean): THREE.Group & { open?: (f: number) => void } {
+  const train: THREE.Group & { open?: (f: number) => void } = new THREE.Group();
+  const leaves: Array<{ leaf: THREE.Object3D; from: number; dir: number }> = [];
+  for (let i = 0; i < CARS; i++) {
+    const car = new THREE.Group();
+    // Not cut: the train's roof sits below the platform's ceiling, and a cut-open car reads as a hole.
+    const shell = box(CAR_M - 0.5, 2.7, 3.2, 0xb8bec6); shell.position.z = 1.9; car.add(shell);
+    const roof = box(CAR_M - 0.9, 2.2, 0.12, 0x8e959e); roof.position.z = 3.56; car.add(roof);
+    const windows = box(CAR_M - 1.2, 2.72, 0.7, 0x2b3038); windows.position.z = 2.5; car.add(windows);
+    const stripe = box(CAR_M - 0.6, 2.74, 0.18, LEX_GREEN); stripe.position.z = 1.7; car.add(stripe);
+    if (doors) {
+      for (const along of DOORS_ALONG_M) for (const side of [-1, 1]) {
+        // A dark doorway, and two steel leaves over it that slide apart.
+        const way = box(DOOR_LEAF_M * 2, 0.02, 1.95, 0x1b1d21); way.position.set(along, side * 1.36, 1.3); car.add(way);
+        for (const half of [-1, 1]) {
+          const leaf = box(DOOR_LEAF_M, 0.04, 1.95, 0x9ea5ae);
+          const from = along + half * DOOR_LEAF_M / 2;
+          leaf.position.set(from, side * 1.38, 1.3);
+          car.add(leaf);
+          leaves.push({ leaf, from, dir: half });
+        }
+      }
+    }
+    car.position.x = -i * CAR_M;
+    train.add(car);
+  }
+  if (doors) train.open = (f: number) => { for (const l of leaves) l.leaf.position.x = l.from + l.dir * DOOR_LEAF_M * 0.95 * Math.min(Math.max(f, 0), 1); };
+  return train;
+}
+
+/** A sign, a lamp or a fare line already hung this close to another of its kind is the same one. */
+const SAME_PLACE_M = 1.5;
+
+export type WalkDressing = {
+  /** Signs, lamps and fare lines along every walk, and the train; z up, in the model's frame. */
+  group: THREE.Group;
+  /** The train standing at the downtown platform, doors shut; move it along `track`. */
+  train: THREE.Group & { open: (f: number) => void };
+  /** The way the train leaves, a unit vector in the model's x, y. */
+  track: { at: P3; dir: [number, number] };
+  /** The middle of every door on the platform's side: x, y and the platform's floor height. */
+  doors: P3[];
+  /** Turns each turnstile's arms for a walker at (x, y, feet z), the same frame. */
+  turnstiles: (x: number, y: number, z: number) => void;
+  dispose: () => void;
+};
+
+/**
+ * Everything the dollhouse hangs along its one walk, hung along every walk instead, for walking
+ * the whole station: the platform and exit signs (planSigns), ceiling lamps and the fare lines, each
+ * once where walks share it, and the train standing at the downtown platform with its doors.
+ * `corner` names each exit's street corner for its Exit signs.
+ */
+export function walkDressing(model: DollhouseModel, corner: (exit: [number, number]) => string | null): WalkDressing {
+  const group = new THREE.Group();
+  const hung: Array<{ kind: string; at: P3 }> = [];
+  const fresh = (kind: string, at: P3) => {
+    if (hung.some((h) => h.kind === kind && Math.hypot(h.at[0] - at[0], h.at[1] - at[1]) < SAME_PLACE_M && Math.abs(h.at[2] - at[2]) < 1)) return false;
+    hung.push({ kind, at });
+    return true;
+  };
+  const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
+  const rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> = [];
+  for (const walk of model.walks) {
+    for (const plan of planSigns(model, walk, corner(walk.exit))) {
+      if (!fresh(JSON.stringify(plan.lines), plan.at)) continue;
+      const sign = signMesh(plan.lines, [], plan.small);
+      sign.position.set(...plan.at);
+      sign.rotation.z = -plan.heading;
+      group.add(sign);
+    }
+    const total = walkLength(walk.path);
+    for (let d = 2; d < total; d += LIGHT_EVERY_M) {
+      const p = walkAt(walk.path, d / total);
+      const at: P3 = [p.x - Math.cos(p.heading) * LIGHT_ASIDE_M, p.y + Math.sin(p.heading) * LIGHT_ASIDE_M, p.z + LIGHT_UP_M];
+      if (!fresh("lamp", at)) continue;
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.set(...at);
+      lamp.rotation.z = -p.heading;
+      group.add(lamp);
+    }
+  }
+  // A turnstile on each of the model's own fare-gate panels, its cabinet where the panel stands.
+  for (const { at, heading } of gatePanels(model)) {
+    const t = turnstile();
+    t.group.rotation.z = -heading;
+    t.group.position.set(at[0] - Math.cos(heading) * 0.32, at[1] + Math.sin(heading) * 0.32, at[2]);
+    group.add(t.group);
+    t.group.updateMatrixWorld(true);
+    rotors.push({ rotor: t.rotor, at: new THREE.Vector3(0.17, 0, 0).applyMatrix4(t.group.matrixWorld) });
+  }
+  const train = trainCars(true) as THREE.Group & { open: (f: number) => void };
+  train.position.set(...model.track.at);
+  train.rotation.z = model.track.angle;
+  group.add(train);
+  const dir: [number, number] = [Math.cos(model.track.angle), Math.sin(model.track.angle)];
+  // The platform's side of the track: where the walks start.
+  const s0 = model.walks[0].path[0];
+  const side = Math.sign((s0[0] - model.track.at[0]) * -dir[1] + (s0[1] - model.track.at[1]) * dir[0]) || 1;
+  const floor = s0[2];
+  const doors: P3[] = [];
+  for (let i = 0; i < CARS; i++) for (const along of DOORS_ALONG_M) {
+    const a = -i * CAR_M + along;
+    doors.push([model.track.at[0] + dir[0] * a - dir[1] * side * 1.4, model.track.at[1] + dir[1] * a + dir[0] * side * 1.4, floor]);
+  }
+  return {
+    group, train, doors,
+    track: { at: model.track.at, dir },
+    turnstiles: (x, y, z) => {
+      for (const r of rotors) {
+        if (Math.abs(r.at.z - z) > 1.5) continue;
+        const d = Math.hypot(r.at.x - x, r.at.y - y);
+        r.rotor.rotation.y = d < 0.8 ? ((0.8 - d) / 0.8) * (Math.PI / 3) : 0;
+      }
+    },
+    dispose: () => dispose(group),
+  };
+}
+
 function dispose(root: THREE.Object3D) {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -771,44 +932,13 @@ export function dollhouseLayer(model: DollhouseModel, walk: DollhouseWalk, getSt
   // The fare line: turnstiles, the high exit gate and the emergency gate, the walk through the middle turnstile.
   const rotors: Array<{ rotor: THREE.Group; at: THREE.Vector3 }> = [];
   if (places.gates) {
-    const g = places.gates;
-    const line = new THREE.Group();
-    line.position.set(...g.at);
-    line.rotation.z = -g.heading;
-    // The lane the walk takes runs between the turnstile at 0.155 and the one before it.
-    const pieces: Array<[number, "turnstile" | "high" | "emergency" | "rail"]> = [[-4.1, "rail"], [HIGH_GATE_X, "high"], [-1.75, "turnstile"], [-0.8, "turnstile"], [0.155, "turnstile"], [1.1, "turnstile"], [2.35, "emergency"], [3.6, "rail"]];
-    for (const [x, kind] of pieces) {
-      if (kind === "turnstile") {
-        const t = turnstile();
-        t.group.position.x = x;
-        line.add(t.group);
-        rotors.push({ rotor: t.rotor, at: new THREE.Vector3(x + 0.17, 0, 0) });
-      } else if (kind === "high") {
-        const h = highExitGate(); h.position.x = x; line.add(h);
-      } else if (kind === "emergency") {
-        const e = emergencyGate(); e.position.x = x; line.add(e);
-      } else {
-        const rail = box(1.2, 0.06, 0.06, 0x5b616b); rail.position.set(x, 0, 1.0); line.add(rail);
-        const post = box(0.08, 0.08, 1.0, 0x5b616b); post.position.set(x + Math.sign(x) * 0.6, 0, 0.5); line.add(post);
-      }
-    }
-    station.add(line);
-    line.updateMatrixWorld(true);
-    rotors.forEach((r) => r.at.applyMatrix4(line.matrixWorld));
+    const fare = fareLine(places.gates);
+    station.add(fare.group);
+    rotors.push(...fare.rotors);
   }
 
   // The 4/5 train on the downtown track, pulling out while the figure steps off.
-  const train = new THREE.Group();
-  for (let i = 0; i < CARS; i++) {
-    const car = new THREE.Group();
-    // Not cut: the train's roof sits below the platform's ceiling, and a cut-open car reads as a hole.
-    const shell = box(CAR_M - 0.5, 2.7, 3.2, 0xb8bec6); shell.position.z = 1.9; car.add(shell);
-    const roof = box(CAR_M - 0.9, 2.2, 0.12, 0x8e959e); roof.position.z = 3.56; car.add(roof);
-    const windows = box(CAR_M - 1.2, 2.72, 0.7, 0x2b3038); windows.position.z = 2.5; car.add(windows);
-    const stripe = box(CAR_M - 0.6, 2.74, 0.18, LEX_GREEN); stripe.position.z = 1.7; car.add(stripe);
-    car.position.x = -i * CAR_M;
-    train.add(car);
-  }
+  const train = trainCars(false);
   train.position.set(...model.track.at);
   train.rotation.z = model.track.angle;
   scene.add(train);

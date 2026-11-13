@@ -4,7 +4,7 @@
  * y north, z up) into three.js's (y up) so the walk scene and Rapier share one set of triangles.
  */
 import type { DollhouseModel } from "./dollhouse";
-import { cutWall, inWalkWay, stationShell, surfaceFinder, walkPoints, wallTriangles, WALK_CLEAR_M, type Shell, type ShellWall } from "./stationShell";
+import { cutWall, FLAT_NZ, inWalkWay, isGatePanel, stationShell, surfaceFinder, walkPoints, wallTriangles, WALK_CLEAR_M, type Shell, type ShellWall } from "./stationShell";
 
 type P3 = [number, number, number];
 
@@ -78,10 +78,27 @@ function uprightUv(x: number, y: number, z: number, t: number[]): [number, numbe
 export const SMOOTH_SEAMS = 144;
 
 export function walkGeometry(model: DollhouseModel, shell: Shell = stationShell(model)): WalkGeometry {
-  const wallTris: number[] = [...shell.uprights];
+  // Most of the model's uprights are its fare gates' panels. Drawn as wall they read as broken shards
+  // (owner, 2026-11-13), so the walk draws turnstiles there instead and leaves the panels out; they
+  // still stand in the collider.
+  const wallTris: number[] = [];
+  for (let i = 0; i < shell.uprights.length; i += 9) {
+    const t = shell.uprights.slice(i, i + 9);
+    if (!isGatePanel(t)) wallTris.push(...t);
+  }
   for (const w of shell.walls) wallTris.push(...wallTriangles(w));
-  const floors = surface([...shell.floors, ...shell.bridges], (x, y) => [x / FLOOR_TILE_M, y / FLOOR_TILE_M]);
-  const stairs = surface(shell.stairs, (x, y, z) => [(x + y) / 2, z / STEP_RISE_M]);
+  // A bridge that slopes is a ramp laid where the model left out a stair's foot: drawn as treads, not
+  // as a slab of floor lying across the stair (owner, 2026-11-13).
+  const flatBridges: number[] = [], slopedBridges: number[] = [];
+  for (let i = 0; i < shell.bridges.length; i += 9) {
+    const t = shell.bridges.slice(i, i + 9);
+    const u = [t[3] - t[0], t[4] - t[1], t[5] - t[2]], v = [t[6] - t[0], t[7] - t[1], t[8] - t[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const len = Math.hypot(n[0], n[1], n[2]);
+    (len > 0 && Math.abs(n[2]) / len < FLAT_NZ ? slopedBridges : flatBridges).push(...t);
+  }
+  const floors = surface([...shell.floors, ...flatBridges], (x, y) => [x / FLOOR_TILE_M, y / FLOOR_TILE_M]);
+  const stairs = surface([...shell.stairs, ...slopedBridges], (x, y, z) => [(x + y) / 2, z / STEP_RISE_M]);
   const walls = surface(wallTris, uprightUv);
   const ceiling = surface(shell.ceiling, (x, y) => [x / WALL_TILE_M, y / WALL_TILE_M]);
 
