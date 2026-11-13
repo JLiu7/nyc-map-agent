@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8");
 
@@ -13,9 +13,10 @@ const STYLE = JSON.stringify({
 /**
  * Every request leaves through here: our /api from fixtures (trimmed real Octo
  * output), the basemap style from STYLE, everything else outside is refused,
- * so the test is deterministic and never touches an upstream.
+ * so the test is deterministic and never touches an upstream. Pass the browser context instead of the
+ * page when the offline service worker is allowed: only context routes see the worker's own requests.
  */
-export async function mockNetwork(page: Page): Promise<void> {
+export async function mockNetwork(page: Page | BrowserContext): Promise<void> {
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     const local = url.hostname === "localhost";

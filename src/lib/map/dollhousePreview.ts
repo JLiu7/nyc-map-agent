@@ -18,6 +18,17 @@ function loadModel(): Promise<DollhouseModel> {
   return model;
 }
 
+/**
+ * Fetches what the walk needs before it plays (#132): its code and the station model. Called when a
+ * trip that ends with this walk arrives, so Play still works once the signal drops below the street.
+ */
+export function warmDollhouse(): Promise<void> {
+  return Promise.all([import("@/lib/map/three/dollhouse"), import("@/lib/map/three/dollhouseCallouts"), loadModel()]).then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
 export type DollhouseView = {
   /** Where the camera goes this frame. */
   rig: (dt: number) => DollhouseRig | null;

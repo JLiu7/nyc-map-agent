@@ -11,28 +11,8 @@ import { packTileUrls } from "./tiles";
 // Reading streets and places off the loaded map is shared with the trip preview.
 export { meetPoint, readMap } from "@/lib/map/mapRead";
 
-/**
- * Register public/sw.js (production builds only: Vite's dev server serves
- * modules a worker must not pin). Then hand it the JS/CSS this page already
- * loaded, since those requests happened before the worker was in control.
- */
-export function registerOfflineWorker(): void {
-  if (!import.meta.env.PROD || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  navigator.serviceWorker
-    .register("/sw.js")
-    .then(() => navigator.serviceWorker.ready)
-    .then((reg) => {
-      const urls = new Set<string>();
-      for (const e of performance.getEntriesByType("resource")) urls.add(e.name);
-      document.querySelectorAll<HTMLScriptElement>("script[src]").forEach((s) => urls.add(s.src));
-      document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="modulepreload"]').forEach((l) => urls.add(l.href));
-      reg.active?.postMessage({ type: "warm", urls: [...urls] });
-    })
-    .catch(() => {
-      /* no worker (private mode, unsupported): the helper still saves its own copy */
-    });
-}
-
+// Registered for every visit now (#132); kept here too for the helper's own call.
+export { registerOfflineWorker } from "@/lib/offline/worker";
 
 /**
  * A real request, because navigator.onLine is often wrong underground and on

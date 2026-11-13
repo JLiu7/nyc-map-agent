@@ -3,6 +3,8 @@
  * The server streams 16-bit mono PCM; each piece is queued on a Web Audio clock as it arrives, so
  * speech starts at the first sound. Before any sound has played, a failure calls `onFail` and the
  * caller speaks with the browser voice instead; a server that failed is not asked again for a minute.
+ * A `keep` line (the trip preview's steps, #132) is marked for the offline worker (public/sw.js), which
+ * saves its sound and plays it back from the phone when the same line is asked for again.
  */
 
 /** The app's languages Kokoro has a voice for (the server's TTS_LANGS). */
@@ -31,7 +33,7 @@ export function pcm16ToFloat(b: Uint8Array): Float32Array {
 }
 
 /** Speaks `text`; returns cancel. `onEnd` fires once (after the last sound, on cancel, or on a failure after sound began). `onFail` fires instead if nothing played. */
-export function speakKokoro(text: string, lang: string, onEnd: () => void, onFail: () => void): () => void {
+export function speakKokoro(text: string, lang: string, onEnd: () => void, onFail: () => void, keep = false): () => void {
   const ctrl = new AbortController();
   const sources: AudioBufferSourceNode[] = [];
   let ctx: AudioContext | null = null;
@@ -57,7 +59,7 @@ export function speakKokoro(text: string, lang: string, onEnd: () => void, onFai
   void (async () => {
     try {
       const base = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
-      const res = await fetch(`${base}/api/tts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, lang }), signal: ctrl.signal });
+      const res = await fetch(`${base}/api/tts`, { method: "POST", headers: { "content-type": "application/json", ...(keep ? { "x-keep": "1" } : {}) }, body: JSON.stringify({ text, lang }), signal: ctrl.signal });
       // A 415 or 429 says this text can't be read now, not that the server is down: the browser voice takes it.
       if (!res.ok || !res.body) {
         if (res.status === 415 || res.status === 429) { done = true; onFail(); return; }

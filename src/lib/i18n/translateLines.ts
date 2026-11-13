@@ -25,7 +25,8 @@ export async function translateLines(lines: string[], lang: AppLang, signal?: Ab
   for (let i = 0; i < ask.length; i += BATCH) {
     const batch = ask.slice(i, i + BATCH);
     try {
-      const r = await fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang, lines: batch }), signal });
+      // x-keep: the offline worker (public/sw.js) keeps the answer, so a trip replayed underground still reads in the rider's language (#132).
+      const r = await fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json", "x-keep": "1" }, body: JSON.stringify({ lang, lines: batch }), signal });
       if (!r.ok) continue;
       const b = (await r.json()) as { lines?: unknown };
       if (!Array.isArray(b.lines) || b.lines.length !== batch.length) continue;

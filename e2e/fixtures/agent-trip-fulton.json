@@ -1,0 +1,128 @@
+{
+ "id": "fulton-offline-e2e",
+ "mode": "transit",
+ "origin": {
+  "label": "Grand Central Terminal",
+  "at": [
+   -73.9772,
+   40.7527
+  ]
+ },
+ "destination": {
+  "label": "Fulton St and Nassau St",
+  "at": [
+   -74.0081,
+   40.7099
+  ]
+ },
+ "departIso": "2026-11-12T09:00",
+ "arriveIso": "2026-11-12T09:20",
+ "legs": [
+  {
+   "kind": "walk",
+   "label": "Walk to Grand Central-42 St",
+   "coords": [
+    [
+     -73.9772,
+     40.7527
+    ],
+    [
+     -73.97707,
+     40.75167
+    ]
+   ],
+   "durationS": 60,
+   "distanceM": 115,
+   "turns": []
+  },
+  {
+   "kind": "enter",
+   "station": {
+    "id": "631",
+    "name": "Grand Central-42 St",
+    "lon": -73.97685,
+    "lat": 40.75178
+   },
+   "portal": {
+    "lon": -73.97707,
+    "lat": 40.75167,
+    "type": "Easement - Passage",
+    "elevatorOnly": false,
+    "outage": null,
+    "label": "W entrance on Lexington Ave"
+   },
+   "label": "Enter Grand Central-42 St at the W entrance on Lexington Ave"
+  },
+  {
+   "kind": "ride",
+   "route": "4",
+   "label": "4 train Grand Central-42 St → Fulton St",
+   "coords": [
+    [
+     -73.97685,
+     40.75178
+    ],
+    [
+     -74.00951,
+     40.71037
+    ]
+   ],
+   "durationS": 120,
+   "stops": [],
+   "underground": true,
+   "geometrySource": "straight-line"
+  },
+  {
+   "kind": "exit",
+   "station": {
+    "id": "418",
+    "name": "Fulton St",
+    "lon": -74.00951,
+    "lat": 40.71037
+   },
+   "portal": {
+    "lon": -74.00792,
+    "lat": 40.71039,
+    "type": "Stair",
+    "elevatorOnly": false,
+    "outage": null,
+    "label": "E exit on Fulton Street"
+   },
+   "label": "Use the E exit on Fulton Street at Fulton St"
+  },
+  {
+   "kind": "walk",
+   "label": "Walk to Fulton St and Nassau St",
+   "coords": [
+    [
+     -74.00792,
+     40.71039
+    ],
+    [
+     -74.0081,
+     40.7099
+    ]
+   ],
+   "durationS": 20,
+   "distanceM": 25,
+   "turns": []
+  }
+ ],
+ "routes": [
+  "4"
+ ],
+ "alerts": [],
+ "elevators": [],
+ "hazards": [],
+ "weather": {
+  "time": "2026-10-22T09:00",
+  "tempC": 10.5,
+  "precipPct": 0,
+  "summary": "Overcast"
+ },
+ "exitAdvice": "Use the E exit on Fulton Street at Fulton St.",
+ "context": [],
+ "stubbed": [
+  "e2e fixture: Grand Central to Fulton St on the 4, for the offline replay test"
+ ]
+}

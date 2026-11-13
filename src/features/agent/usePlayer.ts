@@ -287,6 +287,16 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setStationXray(station);
     setStreetXray(true);
   }, []);
+  /**
+   * Fetch now what playing this trip's station walks will need (#132): the walk's code and the station
+   * model. Below the street the signal drops, and Play is often pressed there.
+   */
+  const warmReplay = useCallback((t: Segment[]) => {
+    if (!t.some((seg) => seg.station)) return;
+    void import("@/lib/map/three/stationScene").catch(() => undefined);
+    const dollhouse = t.some((seg, i) => seg.kind === "ascend" && t.slice(Math.max(0, i - 2), i).some((ride) => dollhouseLeg(seg, ride)));
+    if (dollhouseOn.current && dollhouse) void import("@/lib/map/dollhousePreview").then(({ warmDollhouse }) => warmDollhouse()).catch(() => undefined);
+  }, []);
   /** Once the stations are in, send the trip's stairs through the real station (same legs, new paths). */
   const addStairs = useCallback((tripId: string, t: Segment[]) => {
     if (!t.some((seg) => seg.station)) return;
@@ -327,7 +337,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
     segsRef.current = t;
     addStairs(trip.id, t);
     translate(trip.id, t);
-  }, [addStairs, translate]);
+    warmReplay(t);
+  }, [addStairs, translate, warmReplay]);
   /** Load and play at once, for the Play button. */
   const start = useCallback((trip: Trip, speed?: Speed) => {
     if (pbRef.current.tripId !== trip.id || !isActive(pbRef.current)) load(trip, speed);
@@ -348,7 +359,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
     segsRef.current = t;
     addStairs(trip.id, t);
     translate(trip.id, t);
-  }, [clearLayers, addStairs, translate]);
+    warmReplay(t);
+  }, [clearLayers, addStairs, translate, warmReplay]);
   /** Drop the preview camera without easing the map home. Follow and Ask use this. */
   const release = useCallback(() => {
     cancelAnimationFrame(rafId.current);
