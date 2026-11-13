@@ -13,7 +13,8 @@ import { Ecctrl, type EcctrlHandle } from "ecctrl";
 import { Joystick, useJoystickStore } from "ecctrl/input";
 import { ArrowLeft } from "lucide-react";
 import type { DollhouseModel } from "@/lib/map/three/dollhouse";
-import { buildFigure, concreteTexture, pickWalk, treadTexture, walkAt, walkDressing, walkLength, wallTexture, type WalkDressing } from "@/lib/map/three/dollhouse";
+import { buildFigure, concreteTexture, pickWalk, treadTexture, walkAt, walkLength, wallTexture } from "@/lib/map/three/dollhouse";
+import { walkDressing, type WalkDressing } from "@/lib/map/three/stationWalkDressing";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { SMOOTH_SEAMS, toYUp, walkGeometry, type Surface, type WalkGeometry } from "@/lib/map/three/stationWalkGeometry";
 import { stationShell } from "@/lib/map/three/stationShell";
@@ -182,7 +183,7 @@ function Walker({ start, heading, lowest, walls, dressing, ride, onNearDoor, onR
       void cam.current.setLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z, true);
     }
     board.current = { t: 0, from: new THREE.Vector3(p.x, p.y + FEET_Y, p.z), door: best, inside };
-  }, [ride, dressing]);
+  }, [ride, dressing, walls]);
 
   useFrame((state, dt) => {
     const b = body.current, c = cam.current;

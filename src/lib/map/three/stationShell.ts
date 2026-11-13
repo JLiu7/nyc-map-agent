@@ -82,6 +82,8 @@ export type ShellWall = {
   a: [number, number]; b: [number, number]; foot: [number, number]; top: [number, number]; thick: number;
   /** The sill below or the lintel above a doorway a walk passes through. */
   door?: "sill" | "lintel";
+  /** Cut short under a floor overhead (a stair passing beneath another walk), so its top stays out of sight. */
+  capped?: true;
 };
 
 export type Shell = {
@@ -371,6 +373,7 @@ export function stationShell(model: DollhouseModel, onEdge?: (p: P3, q: P3, kind
         foot: [Math.min(foot(caps[i].k), caps[i].cap - 0.1), Math.min(foot(caps[i + 1].k), caps[i + 1].cap - 0.1)],
         top: [caps[i].cap, caps[i + 1].cap],
         thick: w.thick,
+        ...(caps[i].cap < caps[i].top - 1e-3 || caps[i + 1].cap < caps[i + 1].top - 1e-3 ? { capped: true as const } : {}),
       });
     }
   }
