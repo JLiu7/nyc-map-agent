@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import {
-  CAR_M, CARS, DOORS_ALONG_M, dispose, LIGHT_ASIDE_M, LIGHT_EVERY_M, LIGHT_UP_M, planSigns, signMesh, trainCars, turnstile, walkAt, walkLength,
+  CAR_M, CARS, DOORS_ALONG_M, dispose, LIGHT_ASIDE_M, LIGHT_EVERY_M, LIGHT_UP_M, planSigns, platformBoards, signMesh, trainCars, turnstile, walkAt, walkLength,
   type DollhouseModel, type P3,
 } from "./dollhouse";
 import { gatePanels, inWalkWay, inWall, surfaceFinder, walkPoints, type Shell, type ShellWall } from "./stationShell";
@@ -55,13 +55,13 @@ export function boardInWall(b: Board, at: P3, heading: number, walls: ShellWall[
 }
 
 /** How far along a wall's centre line (0 to 1) the point nearest (x, y) lies. */
-function along(x: number, y: number, w: ShellWall): number {
+function along(x: number, y: number, w: Pick<ShellWall, "a" | "b">): number {
   const dx = w.b[0] - w.a[0], dy = w.b[1] - w.a[1], L = dx * dx + dy * dy || 1;
   return Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (y - w.a[1]) * dy) / L));
 }
 
 /** Distance from (x, y) to a wall's centre line, seen from above. */
-function segDist(x: number, y: number, w: ShellWall): number {
+function segDist(x: number, y: number, w: Pick<ShellWall, "a" | "b">): number {
   const k = along(x, y, w);
   return Math.hypot(w.a[0] + (w.b[0] - w.a[0]) * k - x, w.a[1] + (w.b[1] - w.a[1]) * k - y);
 }
@@ -90,7 +90,33 @@ function pointGrid(pts: P3[]) {
  * sign's side, at its usual height, facing out; else hung where planned. Every spot is checked
  * against every wall; when none clears, it hangs at the nearest spot that does, smaller if it must. Never dropped.
  */
-function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[]): { at: P3; heading: number; flat: boolean; scale: number } {
+/** A board as hung: where, which way, and its box at the scale it hangs. */
+export type Placed = { at: P3; heading: number; b: Board };
+
+/** The ends of a board's face in plan: its middle line, from one side to the other. */
+function boardEnds({ at, heading, b }: Placed): [number, number, number, number] {
+  const ux = Math.cos(heading), uy = -Math.sin(heading), fx = Math.sin(heading), fy = Math.cos(heading), d = (b.y0 + b.y1) / 2;
+  const cx = at[0] + fx * d, cy = at[1] + fy * d;
+  return [cx - ux * b.half, cy - uy * b.half, cx + ux * b.half, cy + uy * b.half];
+}
+
+/** Whether two boards come within 15 cm of each other in plan at heights they share: one would cover the other. */
+export function boardsOverlap(p: Placed, q: Placed): boolean {
+  if (p.at[2] + p.b.z0 > q.at[2] + q.b.z1 || q.at[2] + q.b.z0 > p.at[2] + p.b.z1) return false;
+  if (Math.hypot(p.at[0] - q.at[0], p.at[1] - q.at[1]) > p.b.half + q.b.half + 1) return false;
+  const [ax, ay, bx, by] = boardEnds(p), [cx, cy, dx, dy] = boardEnds(q);
+  let best = Infinity;
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    best = Math.min(best,
+      segDist(ax + (bx - ax) * t, ay + (by - ay) * t, { a: [cx, cy], b: [dx, dy] }),
+      segDist(cx + (dx - cx) * t, cy + (dy - cy) * t, { a: [ax, ay], b: [bx, by] }));
+  }
+  return best < 0.15;
+}
+
+function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = []): { at: P3; heading: number; flat: boolean; scale: number } {
+  const clear = (c: P3, h: number, box: Board) => !placed.some((q) => boardsOverlap({ at: c, heading: h, b: box }, q));
   const r = b.half + WALL_NEAR_M;
   // Every spot tried lies within this of where the sign was planned: only these walls can reach it.
   const walls = all.filter((w) => segDist(at[0], at[1], w) < r + b.half + 3);
@@ -121,16 +147,16 @@ function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWal
         const span = inWalkWay(w, x, y, pz);
         return span && span[0] < s + b.half && span[1] > s - b.half && z + b.z0 < pz + DOOR_HEAD_M + 0.05;
       });
-      if (!door && !boardInWall(b, c, h, walls)) return { at: c, heading: h, flat: true, scale: 1 };
+      if (!door && !boardInWall(b, c, h, walls) && clear(c, h, b)) return { at: c, heading: h, flat: true, scale: 1 };
     }
   }
   // Hung on its rods where planned, or the nearest spot round it (out to 3 m, up to 0.8 m lower) that
-  // clears every wall; smaller only when none does.
+  // clears every wall and every board already hung; smaller only when none does.
   for (const scale of [1, 0.75, 0.5, 0.3]) {
     const sb = { half: rods.half * scale, y0: rods.y0, y1: rods.y1, z0: rods.z0 * scale, z1: rods.z1 * scale };
     for (let r = 0; r <= 3; r += 0.5) for (let i = 0; i < (r ? 8 : 1); i++) for (const up of [0, -0.4, -0.8]) {
       const c: P3 = [at[0] + r * Math.cos((i * Math.PI) / 4), at[1] + r * Math.sin((i * Math.PI) / 4), at[2] + up];
-      if (!boardInWall(sb, c, heading, walls)) return { at: c, heading, flat: false, scale };
+      if (!boardInWall(sb, c, heading, walls) && clear(c, heading, sb)) return { at: c, heading, flat: false, scale };
     }
   }
   return { at, heading, flat: false, scale: 0.3 };
@@ -225,7 +251,7 @@ export type WalkDressing = {
 
 /**
  * Everything the dollhouse hangs along its one walk, hung along every walk instead, for walking
- * the whole station: the platform and exit signs (planSigns), ceiling lamps and the fare lines, each
+ * the whole station: the platform and exit signs (planSigns, platformBoards), ceiling lamps and the fare lines, each
  * once where walks share it, and the train standing at the downtown platform with its doors.
  * `corner` names each exit's street corner for its Exit signs.
  */
@@ -246,21 +272,26 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   }).map(([x, y, z]): P3 => [x, y, z]));
   const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
+  const placed: Placed[] = [];
+  const plans = [...model.walks.flatMap((walk) => planSigns(model, walk, corner(walk.exit))), ...platformBoards(model)];
+  for (const plan of plans) {
+    const key = JSON.stringify(plan.lines);
+    if (!fresh(key, plan.at)) continue;
+    const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
+    const flatB = boardOf(flat), hungB = boardOf(hung);
+    const spot = placeSign(flatB, hungB, plan.at, plan.heading, walls, walkNear, placed);
+    // On a wall it is fixed flat; hung from the ceiling, on its rods.
+    const sign = spot.flat ? flat : hung;
+    dispose(spot.flat ? hung : flat);
+    sign.position.set(...spot.at);
+    sign.rotation.z = -spot.heading;
+    sign.scale.setScalar(spot.scale);
+    sign.userData.sign = { key, planned: plan.at };
+    const box = spot.flat ? flatB : hungB, k = spot.scale;
+    placed.push({ at: spot.at, heading: spot.heading, b: { half: box.half * k, y0: box.y0, y1: box.y1, z0: box.z0 * k, z1: box.z1 * k } });
+    group.add(sign);
+  }
   for (const walk of model.walks) {
-    for (const plan of planSigns(model, walk, corner(walk.exit))) {
-      const key = JSON.stringify(plan.lines);
-      if (!fresh(key, plan.at)) continue;
-      const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
-      const spot = placeSign(boardOf(flat), boardOf(hung), plan.at, plan.heading, walls, walkNear);
-      // On a wall it is fixed flat; hung from the ceiling, on its rods.
-      const sign = spot.flat ? flat : hung;
-      dispose(spot.flat ? hung : flat);
-      sign.position.set(...spot.at);
-      sign.rotation.z = -spot.heading;
-      sign.scale.setScalar(spot.scale);
-      sign.userData.sign = { key, planned: plan.at };
-      group.add(sign);
-    }
     const total = walkLength(walk.path);
     for (let d = 2; d < total; d += LIGHT_EVERY_M) {
       const p = walkAt(walk.path, d / total);

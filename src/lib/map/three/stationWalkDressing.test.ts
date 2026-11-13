@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
-import { planSigns, type DollhouseModel, type P3 } from "./dollhouse";
+import { planSigns, platformBoards, type DollhouseModel, type P3 } from "./dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { inWall, stationShell, walkPoints, type Shell } from "./stationShell";
-import { fareRows, walkDressing, type Board, type WalkDressing } from "./stationWalkDressing";
+import { boardsOverlap, fareRows, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 
@@ -46,16 +46,18 @@ function boardPoints(b: Board, at: P3, heading: number): P3[] {
 const signs = () => dressing.group.children.filter((c) => c.userData.sign);
 
 describe("Fulton St's dressing for walking inside", () => {
-  it("hangs every sign planned along every walk", () => {
+  it("hangs every sign planned along every walk and on both platforms", () => {
     const hung = signs().map((s) => s.userData.sign as { key: string; planned: P3 });
     const missing: string[] = [];
-    for (const walk of model.walks) for (const plan of planSigns(model, walk, fultonCorner(walk.exit))) {
+    const plans = [...model.walks.flatMap((walk) => planSigns(model, walk, fultonCorner(walk.exit))), ...platformBoards(model)];
+    for (const plan of plans) {
       const key = JSON.stringify(plan.lines);
       // The same sign planned again within 1.5 m by another walk is hung once.
       if (!hung.some((h) => h.key === key && Math.hypot(h.planned[0] - plan.at[0], h.planned[1] - plan.at[1]) < 1.5 && Math.abs(h.planned[2] - plan.at[2]) < 1)) missing.push(key);
     }
     expect(missing).toEqual([]);
     expect(hung.filter((h) => h.key.includes("Downtown & Brooklyn")).length).toBeGreaterThan(1);
+    expect(hung.filter((h) => h.key.includes("Uptown & The Bronx")).length).toBeGreaterThan(1);
   });
 
   it("keeps every sign's board, rods and all, out of every wall", () => {
@@ -73,6 +75,20 @@ describe("Fulton St's dressing for walking inside", () => {
       if (boardPoints(b, [s.position.x, s.position.y, s.position.z], -s.rotation.z).some(([x, y, z]) => near.some((w) => inWall(w, x, y, z, 0)))) stuck.push((s.userData.sign as { key: string }).key);
     }
     expect(stuck).toEqual([]);
+  });
+
+  it("never hangs one board over another", () => {
+    const boxes: Array<Placed & { key: string }> = signs().map((s) => {
+      const { position: at, rotation: { z: turn }, scale: { x: k } } = s;
+      const keep = [at.clone(), turn, k] as const;
+      s.position.set(0, 0, 0); s.rotation.z = 0; s.scale.setScalar(1);
+      const box = new THREE.Box3().setFromObject(s);
+      s.position.copy(keep[0]); s.rotation.z = keep[1]; s.scale.setScalar(keep[2]);
+      s.updateMatrixWorld(true);
+      return { key: (s.userData.sign as { key: string }).key, at: [at.x, at.y, at.z], heading: -turn, b: { half: Math.max(-box.min.x, box.max.x) * k, y0: box.min.y, y1: box.max.y, z0: box.min.z * k, z1: box.max.z * k } };
+    });
+    const covered = boxes.flatMap((p, i) => boxes.slice(i + 1).filter((q) => boardsOverlap(p, q)).map((q) => `${p.key} / ${q.key}`));
+    expect(covered).toEqual([]);
   });
 
   it("puts a sign near a wall flat on it, facing out", () => {
