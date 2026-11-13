@@ -35,6 +35,19 @@ const subIt: OtpItinerary = { ...busIt, end: t("10:20"), numberOfTransfers: 1, l
 ] };
 
 describe("OTP glue", () => {
+  // Live, 2026-11-13: the exit leg named Fulton St by the MTA's number "412", which the app's station
+  // list has as 170 St, so the where-am-I helper thought the rider was 15 km from Fulton St (#143).
+  it("names the exit station by its GTFS stop id, the id the app's station list uses", async () => {
+    const fulton: Station = { id: "412", complexId: "628", gtfsId: "418", name: "Fulton St", routes: ["4", "5"], structure: "Subway", at: [-74.00951, 40.71037] };
+    const src: StationEntrances = { stations: () => Promise.resolve([fulton]), entrances: () => Promise.resolve([]) };
+    const gc = pt("Grand Central-42 St", -73.9768, 40.7518, true), fs = pt("Fulton St", -74.00951, 40.71037, true);
+    const it5: OtpItinerary = { start: t("10:00"), end: t("10:30"), duration: 1800, numberOfTransfers: 0, walkDistance: 0, legs: [
+      ride("5", "SUBWAY", gc, fs, "10:00", "10:20"), walk(fs, pt("Destination", -74.0085, 40.7102), "10:20", "10:25")] };
+    const trip = await itineraryToTrip(it5, { label: "Grand Central", at: [-73.9772, 40.7527] }, { label: "Fulton St station", at: [-74.0085, 40.7102] }, src);
+    const exit = trip.legs.find((l) => l.kind === "exit");
+    expect(exit && exit.kind === "exit" ? exit.station?.id : null).toBe("418");
+  });
+
   it("decodes a Google polyline as [lon, lat]", () => {
     expect(decodePolyline("_p~iF~ps|U_ulLnnqC")).toEqual([[-120.2, 38.5], [-120.95, 40.7]]);
   });
