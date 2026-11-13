@@ -214,7 +214,7 @@ function box(w: number, d: number, h: number, color: number, clip: THREE.Plane[]
 }
 
 /** A simple blocky figure, feet at the group's origin, facing +y. Its limbs swing as it walks. */
-function buildFigure(): { group: THREE.Group; stride: (walkedM: number, moving: boolean) => void } {
+export function buildFigure(): { group: THREE.Group; stride: (walkedM: number, moving: boolean) => void } {
   const group = new THREE.Group();
   const leg = 0.78, torso = 0.62, head = 0.32;
   const limb = (x: number, top: number, len: number, w: number, color: number) => {
@@ -257,7 +257,7 @@ function seeded(seed: number): () => number {
 }
 
 /** Concrete: near white with a faint speckle, multiplied by the floors' greys. */
-function concreteTexture(): THREE.Texture {
+export function concreteTexture(): THREE.Texture {
   const [c, g] = canvas2d(128, 128);
   g.fillStyle = "#ecebe7"; g.fillRect(0, 0, 128, 128);
   const rnd = seeded(7);
@@ -276,7 +276,7 @@ function concreteTexture(): THREE.Texture {
  * One stair step, bottom to top (v = 0 is the foot of the step): a dark riser, the yellow safety
  * nosing on the tread's front edge, then the grey tread.
  */
-function treadTexture(): THREE.Texture {
+export function treadTexture(): THREE.Texture {
   const [c, g] = canvas2d(16, 64);
   // The canvas is drawn top down; v runs bottom up.
   g.fillStyle = "#c4c2bd"; g.fillRect(0, 0, 16, 64);
@@ -294,7 +294,7 @@ function treadTexture(): THREE.Texture {
  * course at the foot, cream glazed 0.15 m tiles with grey grout above it, and a terracotta mosaic
  * band at about 2.3 to 2.5 m.
  */
-function wallTexture(): THREE.Texture {
+export function wallTexture(): THREE.Texture {
   const W = 128, perM = W / 0.6, H = Math.round(WALL_PATTERN_M * perM);
   const [c, g] = canvas2d(W, H);
   const y = (m: number) => H - m * perM; // metres up from the foot to canvas rows

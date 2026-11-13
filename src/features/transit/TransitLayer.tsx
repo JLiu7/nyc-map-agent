@@ -2,7 +2,7 @@ import { formatStreetText } from "@/lib/streetName";
 import { liveProgress } from "./monotonic";
 import { BusEstimator } from "./busEstimate";
 import { labelledStationIds } from "./stationLabels";
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type JSX, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";

@@ -226,6 +226,27 @@ for (const size of SIZES) {
       }
     });
 
+    // Fulton St's card offers Walk inside (#126); the walk fills the screen with its back button and,
+    // on a screen without touch, the keys hint; Back to the map closes it.
+    test("walking inside Fulton St", async ({ page }) => {
+      await open(page);
+      // Open the card the way a map tap does, so it carries the station's details.
+      await page.waitForFunction(() => "__openStation" in window, undefined, { timeout: 20_000 });
+      await page.evaluate(() => (window as unknown as { __openStation: (system: string, id: string, name: string) => void }).__openStation("subway", "418", "Fulton St"));
+      // On a phone the card opens as a short pull sheet; pull it up to reach its buttons.
+      if (size.width < 640) await page.getByTestId("details-sheet").getByTestId("sheet-grip").click();
+      const walkInside = page.getByTestId("walk-inside");
+      await expect(walkInside).toBeVisible({ timeout: 15_000 });
+      await expectLayout(page);
+      await walkInside.click();
+      const walk = page.getByTestId("station-walk");
+      await expect(walk).toBeVisible();
+      await expect(walk.locator("canvas")).toBeVisible({ timeout: 30_000 });
+      await expectLayout(page);
+      await page.getByTestId("station-walk-close").click();
+      await expect(walk).toHaveCount(0);
+    });
+
     // The station model's source is credited in the map's credits at every size.
     test("the map credits the station model's source", async ({ page }) => {
       await open(page);

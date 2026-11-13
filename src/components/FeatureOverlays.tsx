@@ -7,13 +7,21 @@ const LAZY = new Map(
   FEATURES.filter((f) => f.overlay).map((f) => [f.id, lazy(f.overlay!.load)] as const),
 );
 
-/** Mounts each enabled feature's lazy overlay (its own chunk). */
+/**
+ * Mounts each enabled feature's lazy overlay (its own chunk). Each gets its own Suspense boundary:
+ * under one shared boundary React 19 loads lazy siblings one after another, so the chat overlay
+ * waited seconds for the others and swallowed whatever was typed in the meantime.
+ */
 export function FeatureOverlays() {
   const flags = useFlags();
   return (
-    <Suspense fallback={null}>
-      {[...LAZY].map(([id, C]) => (flags[id] ? <ErrorBoundary key={id} name={id} fallback={null}><C /></ErrorBoundary> : null))}
-    </Suspense>
+    <>
+      {[...LAZY].map(([id, C]) => (flags[id] ? (
+        <ErrorBoundary key={id} name={id} fallback={null}>
+          <Suspense fallback={null}><C /></Suspense>
+        </ErrorBoundary>
+      ) : null))}
+    </>
   );
 }
 

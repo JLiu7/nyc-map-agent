@@ -7,7 +7,7 @@
   {
     "name": "app (boot chunk, loaded after the first paint)",
     "path": ".size-build/assets/boot-*.js",
-    "limit": "281 kB"
+    "limit": "294 kB"
   },
   {
     "name": "map library (maplibre-gl, its own chunk so it stays cached across deploys)",
@@ -100,8 +100,16 @@
     "limit": "6.5 kB"
   },
   {
-    "name": "all JS",
-    "path": ".size-build/assets/*.js",
-    "limit": "1181 kB"
+    "name": "feature: station walk (lazy, opens with Walk inside; Rapier physics inlines its WebAssembly)",
+    "path": ".size-build/assets/StationWalkScene-*.js",
+    "limit": "705 kB"
+  },
+  {
+    "name": "all JS except the station walk",
+    "path": [
+      ".size-build/assets/*.js",
+      "!.size-build/assets/StationWalkScene-*.js"
+    ],
+    "limit": "1225 kB"
   }
 ]

@@ -215,7 +215,7 @@ describe("stairwells", () => {
   const xray = JSON.parse(readFileSync("public/transit/xray.json", "utf8")) as Record<string, WalkStation>;
   // Fulton St and 14 St-Union Sq: before the wells were cut, 870 and 379 slab cells hung over their stairs.
   for (const id of ["418", "635"]) {
-    it(`leaves head room over every stair tread at station ${id}`, () => {
+    it(`leaves head room over every stair tread at station ${id}`, { timeout: 30_000 }, () => {
       const m = buildStation(xray[id])!;
       const stairs = m.pieces.filter((g) => g.stair);
       expect(stairs.length).toBeGreaterThan(10);

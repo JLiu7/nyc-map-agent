@@ -7,7 +7,8 @@ import { useT } from "@/lib/i18n/appLang";
 import { formatStreetText } from "@/lib/streetName";
 import { liveProgress } from "./monotonic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Accessibility, ChevronDown, Crosshair, ScanEye, Star } from "lucide-react";
+import { Accessibility, ChevronDown, Crosshair, Footprints, ScanEye, Star } from "lucide-react";
+import { hasWalkInside, openStationWalk } from "./stationWalk/store";
 import { Button } from "@/components/ui/button";
 import { arrivalsAt, directionLabel, estimateTrain, minutesUntil, stationOf, SYSTEM_LABELS, type LiveSystem, type StaticSystem, type SystemId, type Vehicle } from "./model";
 import { useAlerts, useBusRoute, useBusTrip, useNow, useStarred, useTransitData, type Outage, type TransitAlert } from "./hooks";
@@ -89,7 +90,11 @@ export function StationDetails({ system, id }: { system: SystemId; id: string })
   // Leaving the station panel turns x-ray off.
   useEffect(() => () => { if (getXray() === id) setXray(null); }, [id]);
   const st = data[system]?.stat;
-  const routes = [...new Set(String(st?.stations.features.find((f) => f.properties.id === id)?.properties.routes ?? "").split(/[\s,]+/).filter(Boolean))];
+  const feature = st?.stations.features.find((f) => f.properties.id === id);
+  const routes = [...new Set(String(feature?.properties.routes ?? "").split(/[\s,]+/).filter(Boolean))];
+  // Fulton St has a model of its insides to walk through (#126).
+  const at = feature?.geometry.type === "Point" ? (feature.geometry.coordinates as [number, number]) : null;
+  const walkInside = system === "subway" && at != null && hasWalkInside(at[0], at[1]);
   // A line picked here (or on the map) narrows the panel to it; no pick shows every line at the station.
   const picked = useSelectedLine();
   const only = system === "subway" && picked && routes.includes(lineOf(picked.route)) ? lineOf(picked.route) : null;
@@ -197,6 +202,12 @@ export function StationDetails({ system, id }: { system: SystemId; id: string })
           <Button size="sm" variant="outline" aria-pressed={xray === id} onClick={() => setXray(xray === id ? null : id)}>
             <ScanEye className="mr-1.5 h-4 w-4" />
             X-ray
+          </Button>
+        ) : null}
+        {walkInside ? (
+          <Button size="sm" variant="outline" data-testid="walk-inside" onClick={() => openStationWalk(null)}>
+            <Footprints className="mr-1.5 h-4 w-4" />
+            Walk inside
           </Button>
         ) : null}
       </div>

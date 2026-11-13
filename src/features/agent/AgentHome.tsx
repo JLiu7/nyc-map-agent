@@ -193,7 +193,7 @@ function VoiceOrb({ transcript, onStop }: { transcript: string; onStop: () => vo
 }
 
 interface AgentHomeProps {
-  inputRef: RefObject<HTMLInputElement>;
+  inputRef: RefObject<HTMLInputElement | null>;
   input: string;
   setInput: (v: string) => void;
   onSend: (text: string) => void;
