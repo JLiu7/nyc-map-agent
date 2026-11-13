@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
-import { planSigns, type DollhouseModel, type P3 } from "./dollhouse";
+import { type DollhouseModel, type P3 } from "./dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { inWall, stationShell, walkPoints, type Shell } from "./stationShell";
-import { boardsOverlap, fareRows, platformBoards, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
+import { boardsOverlap, fareRows, walkSignPlans, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 
@@ -49,8 +49,7 @@ describe("Fulton St's dressing for walking inside", () => {
   it("hangs every sign planned along every walk and on both platforms", () => {
     const hung = signs().map((s) => s.userData.sign as { key: string; planned: P3 });
     const missing: string[] = [];
-    const plans = [...model.walks.flatMap((walk) => planSigns(model, walk, fultonCorner(walk.exit))), ...platformBoards(model)];
-    for (const plan of plans) {
+    for (const plan of walkSignPlans(model, fultonCorner)) {
       const key = JSON.stringify(plan.lines);
       // The same sign planned again within 1.5 m by another walk is hung once.
       if (!hung.some((h) => h.key === key && Math.hypot(h.planned[0] - plan.at[0], h.planned[1] - plan.at[1]) < 1.5 && Math.abs(h.planned[2] - plan.at[2]) < 1)) missing.push(key);
@@ -58,6 +57,20 @@ describe("Fulton St's dressing for walking inside", () => {
     expect(missing).toEqual([]);
     expect(hung.filter((h) => h.key.includes("Downtown & Brooklyn")).length).toBeGreaterThan(1);
     expect(hung.filter((h) => h.key.includes("Uptown & The Bronx")).length).toBeGreaterThan(1);
+  });
+
+  it("hangs the platform's name over the downtown track, facing whoever steps off and looks at the train", () => {
+    // Where the owner stood on 2026-11-13, looking south-east across the track (compass 120°).
+    const [vx, vy, look] = [-87.7, 35.1, (120 * Math.PI) / 180];
+    const ahead = signs().filter((s) => {
+      const key = (s.userData.sign as { key: string }).key;
+      if (!key.includes("Fulton St") || !key.includes("Downtown & Brooklyn")) return false;
+      const dx = s.position.x - vx, dy = s.position.y - vy, d = Math.hypot(dx, dy);
+      // Within 25° of the way they look, and its face toward them: the front faces -(sin h, cos h).
+      const h = -s.rotation.z, off = Math.acos((dx * Math.sin(look) + dy * Math.cos(look)) / d);
+      return d < 12 && off < (25 * Math.PI) / 180 && Math.sin(h) * dx + Math.cos(h) * dy > 0;
+    });
+    expect(ahead.length).toBeGreaterThan(0);
   });
 
   it("keeps every sign's board, rods and all, out of every wall", () => {

@@ -85,12 +85,14 @@ function pointGrid(pts: P3[]) {
 }
 
 /**
- * The direction boards that belong to the platforms rather than one walk (owner, 2026-11-13:
- * "downtown train sign uptown train sign"). Fulton St's 4/5 has two side platforms across the
- * tracks: the edge nearest the downtown track is the downtown platform's, the other the uptown one's.
- * - On the uptown platform, "Fulton St" and "Uptown & The Bronx" boards across from each downtown
- *   one, 2.5 m in from the edge, facing whoever stands on that platform. (The downtown train,
- *   standing between, hides them from the downtown side.)
+ * The boards that belong to the platforms rather than one walk (owner, 2026-11-13: "downtown train
+ * sign uptown train sign"; the downtown board hangs over the track, naming the train in front of
+ * you). Fulton St's 4/5 has two side platforms across the tracks: the edge nearest the downtown
+ * track is the downtown platform's, the other the uptown one's.
+ * - Level with where each walk starts, a "Fulton St" board on each platform's edge, 0.4 m in from
+ *   it and 2.6 m up, facing whoever stands on that platform looking at the track: "Downtown &
+ *   Brooklyn" on the downtown side, "Uptown & The Bronx" on the uptown side. (The downtown train,
+ *   standing between, hides the uptown boards from the downtown side.)
  * - Where each walk's first stair leaves the downtown platform's level, a board 3 m out on the
  *   platform side for whoever comes off that stair: "Downtown & Brooklyn" with the platform's lines.
  */
@@ -99,15 +101,16 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
   const [tx, ty] = model.track.at;
   const [down, up] = [...model.edges].sort((p, q) => segDist(tx, ty, seg(p)) - segDist(tx, ty, seg(q)));
   const out: SignPlan[] = [];
-  if (up) {
-    const [x1, y1, x2, y2, z] = up, len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
-    // Away from the tracks: off the edge on the side the downtown edge is not.
-    const side = Math.sign((down[0] - x1) * -uy + (down[1] - y1) * ux) || 1, ax = uy * side, ay = -ux * side;
+  // Each edge toward its tracks: the downtown one toward the downtown track, the uptown one toward the downtown edge.
+  for (const [edge, [ox, oy], text] of [[down, [tx, ty], "Downtown & Brooklyn"], [up, down ?? [], "Uptown & The Bronx"]] as const) {
+    if (!edge) continue;
+    const [x1, y1, x2, y2, z] = edge, len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const side = Math.sign((ox - x1) * -uy + (oy - y1) * ux) || 1, nx = -uy * side, ny = ux * side;
     for (const w of model.walks) {
-      const p = planSigns(model, w, null)[0].at, s = (p[0] - x1) * ux + (p[1] - y1) * uy;
-      const at: P3 = [x1 + ux * s + ax * 2.5, y1 + uy * s + ay * 2.5, z + 2.6];
+      const [px, py] = w.path[0], s = (px - x1) * ux + (py - y1) * uy;
+      const at: P3 = [x1 + ux * s - nx * 0.4, y1 + uy * s - ny * 0.4, z + 2.6];
       if (s < 3 || s > len - 3 || out.some((o) => Math.hypot(o.at[0] - at[0], o.at[1] - at[1]) < 3)) continue;
-      out.push({ at, heading: Math.atan2(-ax, -ay), lines: [{ bullets: model.lines, text: "Fulton St" }, { text: "Uptown & The Bronx" }] });
+      out.push({ at, heading: Math.atan2(nx, ny), lines: [{ bullets: model.lines, text: "Fulton St" }, { text }] });
     }
   }
   for (const w of model.walks) {
@@ -119,6 +122,14 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
     }
   }
   return out;
+}
+
+/**
+ * Every sign the walk hangs: each walk's own (planSigns) but its platform-name board, which hangs
+ * from the platform's edge instead, and the platforms' (platformBoards).
+ */
+export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): SignPlan[] {
+  return [...model.walks.flatMap((w) => planSigns(model, w, corner(w.exit)).slice(1)), ...platformBoards(model)];
 }
 
 /** A board as hung: where, which way, and its box at the scale it hangs. */
@@ -277,7 +288,7 @@ export type WalkDressing = {
 
 /**
  * Everything the dollhouse hangs along its one walk, hung along every walk instead, for walking
- * the whole station: the platform and exit signs (planSigns, platformBoards), ceiling lamps and the fare lines, each
+ * the whole station: the platform and exit signs (walkSignPlans), ceiling lamps and the fare lines, each
  * once where walks share it, and the train standing at the downtown platform with its doors.
  * `corner` names each exit's street corner for its Exit signs.
  */
@@ -299,8 +310,7 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
   const placed: Placed[] = [];
-  const plans = [...model.walks.flatMap((walk) => planSigns(model, walk, corner(walk.exit))), ...platformBoards(model)];
-  for (const plan of plans) {
+  for (const plan of walkSignPlans(model, corner)) {
     const key = JSON.stringify(plan.lines);
     if (!fresh(key, plan.at)) continue;
     const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
