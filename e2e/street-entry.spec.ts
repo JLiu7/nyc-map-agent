@@ -19,11 +19,18 @@ for (const size of SIZES) {
     await expect(page.getByTestId("walk-bar")).toBeVisible({ timeout: slow(15_000) });
     const entry = page.getByTestId("street-walk-inside");
     await expect(entry).toHaveCount(0);
-    await page.evaluate((c) => (window as unknown as { __map: { jumpTo(o: object): void } }).__map.jumpTo({ center: c }), BROADWAY_DEY);
-    await expect(entry).toBeVisible({ timeout: slow(10_000) });
+    // Street view may still be settling its camera on the start spot, which can carry the map back
+    // off the stair; jump again until the button shows.
+    await expect(async () => {
+      await page.evaluate((c) => (window as unknown as { __map: { jumpTo(o: object): void } }).__map.jumpTo({ center: c }), BROADWAY_DEY);
+      await expect(entry).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: slow(20_000) });
     // The older desktop street bar and walk pad overlap under the search row, a known overlap left
-    // out here as in minimap.spec.ts.
-    await expectLayout(page, { ignore: ['[data-testid="walk-bar"]', '[aria-label="Street-level camera controls"]'] });
+    // out here as in minimap.spec.ts. On phones the street minimap sits over the view switcher and
+    // "I'm in the station"; that is the minimap's own placement, older than this button, left out too.
+    await expectLayout(page, {
+      ignore: ['[data-testid="walk-bar"]', '[aria-label="Street-level camera controls"]', '[aria-label^="Street map. You are here"]'],
+    });
     await entry.click();
     const walk = page.getByTestId("station-walk");
     await expect(walk).toBeVisible();
