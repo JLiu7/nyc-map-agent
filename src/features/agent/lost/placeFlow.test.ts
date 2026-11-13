@@ -37,6 +37,14 @@ describe("the where-am-I questions at Fulton St (#143)", () => {
     expect(way.steps.at(-1)).toMatch(/street at Corner A/);
   });
 
+  it("after Not quite the trip's walk is no favourite, but the way out still goes to the trip's exit", () => {
+    const even = new Placer(kit, 0, true), trusted = new Placer(kit, 0), none = new Placer(kit, null);
+    expect(even.w).toEqual(none.w);
+    expect(even.w).not.toEqual(trusted.w);
+    even.tap({ q: "where", a: "platform" });
+    expect(even.way().steps.at(-1)).toMatch(/street at Corner A/);
+  });
+
   it("Not there moves the guess somewhere else", () => {
     const p = new Placer(kit, 0);
     p.tap({ q: "where", a: "hall" });

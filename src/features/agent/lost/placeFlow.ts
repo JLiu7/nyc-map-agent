@@ -19,8 +19,12 @@ export class Placer {
   asked = new Set<Question>();
   q: Question | null = null;
 
-  constructor(readonly kit: StationPlaceKit, readonly tripWalk: number | null) {
-    this.w = prior(kit.spots, tripWalk);
+  /**
+   * `doubt`: they said the trip's guess was not quite right, so where they are starts even across the
+   * station; the way out still goes to the trip's exit.
+   */
+  constructor(readonly kit: StationPlaceKit, readonly tripWalk: number | null, doubt = false) {
+    this.w = prior(kit.spots, doubt ? null : tripWalk);
   }
 
   /** The next question, or null once placed or nothing left would tell more. */
