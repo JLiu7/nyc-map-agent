@@ -30,8 +30,8 @@ const DOOR_SILL_M = 0.15;
 const DOOR_HEAD_M = 2.2;
 /** How much of each end of a walk (where it meets the street) is left walled. */
 const DOOR_END_M = 0.6;
-/** Seen from above, how far round a stair's ceiling corner to look for a floor it passes under. */
-const LIFT_AROUND: Array<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
+/** Wall tops and ceilings that pass under another floor are cut into pieces this long to follow it. */
+const CAP_PIECE_M = 0.5;
 /** With no floor below, a wall still reaches this far down, past the bottom of any view. */
 const SKIRT_M = 3;
 /** Steeper than this (|normal z| below) a piece of the model is an upright wall, not a floor. */
@@ -341,18 +341,63 @@ export function stationShell(model: DollhouseModel, onEdge?: (p: P3, q: P3, kind
     walls.push(...cutWall(wall, cuts));
   }
 
+  // A wall's top and a ceiling stand a wall's height over their own floor or stair. Down a stair that
+  // passes under another floor, that height comes up through the floor above and shows there as a
+  // sliver or a slanted shard (owner, 2026-11-13). Wherever a floor lies overhead, the top is capped
+  // just under it; elsewhere (over a stairwell's opening) it stays where it was, so nothing opens.
+  const capAt = (x: number, y: number, own: number) => {
+    const top = own + SHELL_WALL_M;
+    let cap = top;
+    for (const h of under(x, y)) if (h > own + 0.5 && h < top + 0.05) cap = Math.min(cap, h - 0.02);
+    return cap;
+  };
+  for (const w of [...walls]) {
+    if (w.door) continue;
+    const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    const n = Math.max(1, Math.ceil(L / CAP_PIECE_M));
+    const at = (k: number) => [w.a[0] + (w.b[0] - w.a[0]) * k, w.a[1] + (w.b[1] - w.a[1]) * k] as const;
+    const caps = Array.from({ length: n + 1 }, (_, i) => {
+      const k = i / n, [x, y] = at(k), top = w.top[0] + (w.top[1] - w.top[0]) * k;
+      return { k, top, cap: capAt(x, y, top - SHELL_WALL_M) };
+    });
+    if (caps.every((c) => c.cap >= c.top - 1e-3)) continue;
+    walls.splice(walls.indexOf(w), 1);
+    const ux = (w.b[0] - w.a[0]) / (L || 1), uy = (w.b[1] - w.a[1]) / (L || 1);
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = at(caps[i].k), [x1, y1] = at(caps[i + 1].k);
+      const foot = (k: number) => w.foot[0] + (w.foot[1] - w.foot[0]) * k;
+      walls.push({
+        a: [x0 - ux * 0.03, y0 - uy * 0.03], b: [x1 + ux * 0.03, y1 + uy * 0.03],
+        foot: [Math.min(foot(caps[i].k), caps[i].cap - 0.1), Math.min(foot(caps[i + 1].k), caps[i + 1].cap - 0.1)],
+        top: [caps[i].cap, caps[i + 1].cap],
+        thick: w.thick,
+      });
+    }
+  }
+
   // The ceiling: each floor and stair raised a wall's height, except where something else is already
-  // overhead lower than that (a stair or a floor above is the ceiling there).
+  // overhead lower than that (a stair or a floor above is the ceiling there), capped as the walls are.
   const ceiling: number[] = [];
+  const roof = (t: [P3, P3, P3]) => {
+    const caps = t.map((p) => capAt(p[0], p[1], p[2]));
+    const mids: P3[] = [[0, 1], [1, 2], [0, 2]].map(([i, j]) => [(t[i][0] + t[j][0]) / 2, (t[i][1] + t[j][1]) / 2, (t[i][2] + t[j][2]) / 2]);
+    const capped = caps.some((c, i) => c < t[i][2] + SHELL_WALL_M - 1e-3) || mids.some((m) => capAt(m[0], m[1], m[2]) < m[2] + SHELL_WALL_M - 1e-3);
+    const long = Math.max(...[[0, 1], [1, 2], [0, 2]].map(([i, j]) => Math.hypot(t[i][0] - t[j][0], t[i][1] - t[j][1])));
+    if (capped && long > CAP_PIECE_M) {
+      // Split across the longest side and cap each half.
+      const e = [[0, 1], [1, 2], [0, 2]].reduce((b, [i, j]) => (Math.hypot(t[i][0] - t[j][0], t[i][1] - t[j][1]) > Math.hypot(t[b[0]][0] - t[b[1]][0], t[b[0]][1] - t[b[1]][1]) ? [i, j] : b), [0, 1]);
+      const [i, j] = e, k = 3 - i - j;
+      const m: P3 = [(t[i][0] + t[j][0]) / 2, (t[i][1] + t[j][1]) / 2, (t[i][2] + t[j][2]) / 2];
+      roof([t[i], m, t[k]]);
+      roof([m, t[j], t[k]]);
+      return;
+    }
+    for (let q = 0; q < 3; q++) ceiling.push(t[q][0], t[q][1], capped ? caps[q] : t[q][2] + SHELL_WALL_M);
+  };
   for (const t of walkable) {
     const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3, cz = (t[0][2] + t[1][2] + t[2][2]) / 3;
     if (under(cx, cy).some((h) => h > cz + 0.5 && h < cz + SHELL_WALL_M)) continue;
-    // Down a stair that passes under another floor, a ceiling a wall's height over the stair slopes
-    // up through that floor beside the stairwell and shows there as a grey shard (owner, 2026-11-13).
-    // Such a piece is left out: the floor it passes under is the ceiling there.
-    const through = t.some((p) => LIFT_AROUND.some(([dx, dy]) => under(p[0] + dx, p[1] + dy).some((h) => h > p[2] + 0.5 && h < p[2] + SHELL_WALL_M - 0.05)));
-    if (through) continue;
-    for (const p of t) ceiling.push(p[0], p[1], p[2] + SHELL_WALL_M);
+    roof(t);
   }
   return { floors, stairs, uprights, walls, bridges, ceiling };
 }
