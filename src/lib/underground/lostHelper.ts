@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { ActiveTrip } from "@/lib/transit/activeTrip";
 
 /**
  * The where-am-I helper (#131): one focused chat for someone lost in or near a
@@ -22,6 +23,9 @@ export interface NotedTrain { line: string; nextStop: string | null; at: number 
 
 let open: LostContext | null = null;
 let train: NotedTrain | null = null;
+let trip: { trip: ActiveTrip; at: number } | null = null;
+/** A trip looked up longer ago than this no longer says where someone is. */
+const TRIP_KEEP_MS = 3 * 60 * 60 * 1000;
 /** Station id → the part of the train by its exit's stairs ("at the front"), from the station walk. */
 const parts = new Map<string, string>();
 const subs = new Set<() => void>();
@@ -50,6 +54,15 @@ export function noteTrain(t: NotedTrain | null): void {
 
 export function notedTrain(): NotedTrain | null {
   return train;
+}
+
+/** The last trip looked up. Closing the trip card clears the active trip, and Find exit only shows once it is closed. */
+export function noteTrip(t: ActiveTrip, at = Date.now()): void {
+  trip = { trip: t, at };
+}
+
+export function notedTrip(now = Date.now()): ActiveTrip | null {
+  return trip && now - trip.at < TRIP_KEEP_MS ? trip.trip : null;
 }
 
 export function noteTrainPart(stationId: string, part: string): void {

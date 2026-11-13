@@ -12,7 +12,7 @@ import { useSharedLocation } from "@/lib/geo/sharedLocation";
 import { getMapInstance } from "@/lib/map/mapInstance";
 import { useLeftCard } from "@/lib/store/leftColumn";
 import { useActiveTrip } from "@/lib/transit/activeTrip";
-import { closeLostHelper, notedTrain, notedTrainPart, setLostSender, type LostContext } from "@/lib/underground/lostHelper";
+import { closeLostHelper, notedTrain, notedTrainPart, notedTrip, setLostSender, type LostContext } from "@/lib/underground/lostHelper";
 import { useStationHelp } from "@/lib/underground/stationHelp";
 import { useUndergroundNow } from "@/lib/underground/whereNow";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -77,7 +77,7 @@ export function LostHelper({ ctx }: { ctx: LostContext }) {
   const lang = useAppLang();
   const net = useNetwork();
   const shared = useSharedLocation();
-  const trip = useActiveTrip();
+  const trip = useActiveTrip() ?? notedTrip();
   const under = useUndergroundNow();
   const stationHelp = useStationHelp();
   const now = useNow();

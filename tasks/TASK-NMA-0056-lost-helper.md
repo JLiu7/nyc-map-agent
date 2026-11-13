@@ -151,6 +151,29 @@ Blocked/uncertain:
 Next:
 - Let PR 135 merge, then open Find exit on the live site after a trip to Fulton St, offline and in Spanish
 
+### 2026-11-13 03:25:10 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["#135 merged and deployed; the live check found Find exit lost the trip once its card closed; PR 140 keeps the last trip for three hours"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Let PR 140 merge, then repeat the live check: trip to Fulton St, close the card, Find exit, then offline and in Spanish","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T03:25:10Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"1f60a6be88e7eee55b986eda4f1dbb5db80d3e458d231c53684db551dfa1f974","request_id":"0c832866883047fd80de614e4e0af28a","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- #135 merged and deployed; the live check found Find exit lost the trip once its card closed; PR 140 keeps the last trip for three hours
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Let PR 140 merge, then repeat the live check: trip to Fulton St, close the card, Find exit, then offline and in Spanish
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

@@ -76,7 +76,7 @@ import { useVoicePrefs } from "@/lib/voice/voicePrefs";
 import { useFollowed } from "@/lib/transit/follow";
 import { useLinesControl } from "@/lib/transit/linesControl";
 import { useStationHelpVisible } from "@/lib/underground/stationHelp";
-import { openLostHelper, sendToLost, useLostHelper } from "@/lib/underground/lostHelper";
+import { noteTrip, openLostHelper, sendToLost, useLostHelper } from "@/lib/underground/lostHelper";
 import { applyStep, statusLine, type AgentStep } from "./agentSteps";
 import { detectLang, speechTag, statusLang } from "./statusLines";
 import { getAppLang, setAskedLang, tr, useAppLang } from "@/lib/i18n/appLang";
@@ -582,7 +582,7 @@ export default function AgentOverlay() {
   useWakePhrase(wake && speech.sttSupported, speech.listening || busy || speech.speaking, (t) => { voiceTurn.current = true; void send(t); }, speechTag(appLang, lang));
   useEffect(() => () => abort.current?.abort(), []);
   // Other features (underground help) prepare for the trip on screen through core.
-  useEffect(() => publishActiveTrip(trip), [trip]);
+  useEffect(() => { publishActiveTrip(trip); if (trip) noteTrip(trip); }, [trip]);
   // No trip, no trip line: closing the card or stopping a walk used to leave the dotted route on the map.
   useEffect(() => {
     if (trip) return;
