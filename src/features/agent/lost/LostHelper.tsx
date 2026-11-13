@@ -197,13 +197,19 @@ export function LostHelper({ ctx }: { ctx: LostContext }) {
   const yes = () => {
     setAnswered(true);
     add({ role: "user", text: tr(lang, "yes") });
-    if (startPlacing()) return;
-    add({ role: "assistant", text: guess.exit ? lostT(lang, "yesExit", { e: guess.exit }) : lostT(lang, "yesNoExit") });
+    const fallback = guess.exit ? lostT(lang, "yesExit", { e: guess.exit }) : lostT(lang, "yesNoExit");
+    if (startPlacing(false, fallback)) return;
+    add({ role: "assistant", text: fallback });
   };
+  // Not quite at Fulton St: the trip's guess was wrong, so the questions start with no favourite spot,
+  // rather than handing the rest to the agent, which knows the station only by name (#143).
   const notQuite = () => {
     setAnswered(true);
     add({ role: "user", text: lostT(lang, "notQuite") });
-    add({ role: "assistant", text: lostT(lang, "notQuiteReply") });
+    const fallback = lostT(lang, "notQuiteReply");
+    if (!canPlace()) { add({ role: "assistant", text: fallback }); return; }
+    add({ role: "assistant", text: lostT(lang, "notQuitePlace", { s: guess.station ?? "" }) });
+    startPlacing(true, fallback);
   };
   const station = guess.stationId && sys ? sys.stations.features.find((f) => String(f.properties.id) === guess.stationId) : null;
   const showOnMap = () => {
@@ -225,10 +231,11 @@ export function LostHelper({ ctx }: { ctx: LostContext }) {
   // and the nearest sign's words against the station model, then the way out from that spot.
   const atModel = guess.station === "Fulton St" && (!station || metres([station.geometry.coordinates[0], station.geometry.coordinates[1]], FULTON_AT) < FULTON_M);
   const [kit, setKit] = useState<StationPlaceKit | null>(null);
+  const [kitFailed, setKitFailed] = useState(false);
   useEffect(() => {
     if (!atModel) return;
     let live = true;
-    import("@/lib/map/dollhousePreview").then((m) => m.loadStationPlace(getMapInstance())).then((k) => { if (live) setKit(k); }).catch(() => {});
+    import("@/lib/map/dollhousePreview").then((m) => m.loadStationPlace(getMapInstance())).then((k) => { if (live) setKit(k); }).catch(() => { if (live) setKitFailed(true); });
     return () => { live = false; };
   }, [atModel]);
   const tripExit = useMemo((): [number, number] | null => {
@@ -261,13 +268,29 @@ export function LostHelper({ ctx }: { ctx: LostContext }) {
     if (lang !== "en" && navigator.onLine && way.steps.length)
       void translateLines(way.steps, lang).then((t) => { if (t.size) patch(id, { text: say(way.steps.map((x) => t.get(x) ?? x)) }); });
   };
-  const startPlacing = () => {
-    if (!kit) return false;
-    placer.current = new Placer(kit, kit.walkTo(tripExit));
+  /** Placing can start (or will, once the station model has loaded). */
+  const canPlace = () => !!kit || (atModel && !kitFailed);
+  // A tap that comes before the station model has loaded waits for it; if it never loads, the plain reply goes instead.
+  const pending = useRef<{ doubt: boolean; fallback: string } | null>(null);
+  const begin = (k: StationPlaceKit, doubt: boolean) => {
+    placer.current = new Placer(k, k.walkTo(tripExit), doubt);
     setPlacedAt(null);
     askNext();
+  };
+  const startPlacing = (doubt: boolean, fallback: string) => {
+    if (kit) { begin(kit, doubt); return true; }
+    if (!canPlace()) return false;
+    pending.current = { doubt, fallback };
     return true;
   };
+  useEffect(() => {
+    const p = pending.current;
+    if (!p || (!kit && !kitFailed)) return;
+    pending.current = null;
+    if (kit) begin(kit, p.doubt);
+    else add({ role: "assistant", text: p.fallback });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kit, kitFailed]);
   const tap = (a: Exclude<Answer, { q: "sign" }>) => {
     add({ role: "user", text: answerLabel(a, lang) });
     placer.current?.tap(a);

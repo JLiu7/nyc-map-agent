@@ -315,6 +315,28 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    // Not quite at Fulton St asks the same questions, rather than handing a lost rider to the agent (#143).
+    test("Not quite inside Fulton St asks where you are", async ({ page }) => {
+      const legs = (trip.legs as Array<Record<string, unknown>>).map((l) => (l.kind === "exit"
+        ? { ...l, station: { id: "229", name: "Fulton St", lon: -74.00657, lat: 40.70942 }, portal: { lon: -74.00797, lat: 40.71009, type: "Stair", elevatorOnly: false, outage: null, label: "Fulton St & Broadway" }, label: "Use the exit at Fulton St & Broadway" }
+        : l));
+      const fulton = { ...trip, legs };
+      await open(page, [
+        { type: "command", command: { type: "showRoute", trip: fulton } },
+        { type: "command", command: { type: "openPanel", trip: fulton } },
+        { type: "text", text: "Take this route." },
+      ]);
+      await ask(page, "Plan a trip to Fulton St");
+      await page.getByRole("button", { name: "Close trip" }).first().click();
+      await page.getByRole("button", { name: "Find exit", exact: true }).click();
+      await expect(page.getByTestId("lost-thread")).toContainText("Fulton St");
+      await page.getByRole("button", { name: "Not quite", exact: true }).click();
+      await expect(page.getByTestId("lost-thread")).toContainText("find where you are in Fulton St");
+      await expect(page.getByTestId("lost-answers")).toBeVisible({ timeout: 15_000 });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expectLayout(page);
+    });
+
     test("home with the transit layers drawn", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();
