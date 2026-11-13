@@ -65,6 +65,7 @@ import { DailyCard, TaskButtons } from "./HomeTasks";
 
 const SettingsSheet = lazy(() => import("@/components/SettingsSheet"));
 // Only once a trip is previewed: keeps the overlay inside its size budget.
+const LostHelper = lazy(() => import("./lost/LostHelper"));
 const TripPreview = lazy(() => import("./TripPreview").then((m) => ({ default: m.TripPreview })));
 import { rememberCommute, useHomeWork } from "./commute";
 import { memorySummary } from "./memorySummary";
@@ -74,7 +75,8 @@ import { parseLang, useLangPref, type AppLang } from "@/lib/voice/langPref";
 import { useVoicePrefs } from "@/lib/voice/voicePrefs";
 import { useFollowed } from "@/lib/transit/follow";
 import { useLinesControl } from "@/lib/transit/linesControl";
-import { useStationHelp, useStationHelpVisible } from "@/lib/underground/stationHelp";
+import { useStationHelpVisible } from "@/lib/underground/stationHelp";
+import { openLostHelper, sendToLost, useLostHelper } from "@/lib/underground/lostHelper";
 import { applyStep, statusLine, type AgentStep } from "./agentSteps";
 import { detectLang, speechTag, statusLang } from "./statusLines";
 import { getAppLang, setAskedLang, tr, useAppLang } from "@/lib/i18n/appLang";
@@ -153,13 +155,12 @@ export default function AgentOverlay() {
   useLayoutEffect(() => {
     if (!home) removeShell();
   }, [home]);
-  const undergroundOn = useFlag("underground");
   const places = useHomeWork();
   const followed = useFollowed();
   const selectedLine = useSelectedLine();
   const openLines = useLinesControl();
-  const stationHelp = useStationHelp();
   const stationHelpVisible = useStationHelpVisible();
+  const lost = useLostHelper();
   const homeInput = useRef<HTMLInputElement>(null);
   // A stored language wins; otherwise the browser's, read when it changes.
   const storedLang = useLangPref();
@@ -948,14 +949,12 @@ export default function AgentOverlay() {
           el?.setSelectionRange(el.value.length, el.value.length);
         });
       },
-      exit: () => {
-        if (undergroundOn && stationHelp) stationHelp();
-        else void send(tr(appLang, "askExit"));
-      },
+      // Find exit opens the where-am-I helper (#131): its guess first, then a text chat.
+      exit: () => openLostHelper({ from: "home" }),
     };
     const panelUp = panelContent !== null && !panelMinimized;
     const answerOpen = hasAnswer && answerView === "open";
-    const showIdle = !selectedLine && !stationHelpVisible && !followingRoute && !player.state.active && !walking && !streetViewOpen && !answerOpen && !busy && !handsFree && !drawerOpen && !panelUp && followed === null;
+    const showIdle = !lost && !selectedLine && !stationHelpVisible && !followingRoute && !player.state.active && !walking && !streetViewOpen && !answerOpen && !busy && !handsFree && !drawerOpen && !panelUp && followed === null;
     const chip = hasAnswer && answerView === "chip" ? (
       <button type="button" aria-label={tr(appLang, "showAnswer")} data-testid="answer-chip" onClick={() => sendScreen({ type: "SHOW_ANSWER" })}
         className="pointer-events-auto flex h-11 max-w-full items-center gap-2 self-start rounded-full border border-[#263449] bg-[#0b1220]/85 px-4 text-sm font-semibold text-slate-100 shadow-lg backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
@@ -980,7 +979,8 @@ export default function AgentOverlay() {
           inputRef={homeInput}
           input={input}
           setInput={setInput}
-          onSend={(t) => void send(t)}
+          onSend={(t) => { if (sendToLost(t)) setInput(""); else void send(t); }}
+          placeholder={lost ? tr(appLang, "typeWhatYouSee") : undefined}
           busy={busy}
           interim={speech.interim}
           dictation={{ supported: speech.sttSupported, on: dictating && speech.listening, toggle: toggleDictation }}
@@ -997,7 +997,8 @@ export default function AgentOverlay() {
         />
         {settingsUp ? <Suspense fallback={null}><SettingsSheet onClose={() => setSettingsOpen(false)} /></Suspense> : null}
         {/* One card at a time: station help or a station card covers the same spot, so the trip waits under it (owner, 2026-10-27). */}
-        {trip && player.state.active && !answerOpen && !stationHelpVisible && !(panelUp && !panelContent.id.startsWith("agent:trip:")) ? <Suspense fallback={null}><TripPreview
+        {lost ? <Suspense fallback={null}><LostHelper ctx={lost} /></Suspense> : null}
+        {trip && player.state.active && !answerOpen && !stationHelpVisible && !lost && !(panelUp && !panelContent.id.startsWith("agent:trip:")) ? <Suspense fallback={null}><TripPreview
           trip={trip} state={player.state} speed={player.state.speed}
           onToggle={player.toggle} onSpeed={(s) => { setPrefSpeed(s); player.setSpeed(s); }}
           onBack={player.back} onNext={player.skip}

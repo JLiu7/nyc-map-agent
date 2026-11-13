@@ -233,6 +233,34 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    // Find exit opens the where-am-I helper (#131): its guess, then a text chat through the chat bar.
+    test("the where-am-I helper, online and with no network", async ({ page, context }) => {
+      await open(page, [{ type: "text", text: "Look for the station name on the wall by the stairs." }]);
+      await page.getByRole("button", { name: "Find exit", exact: true }).click();
+      const helper = page.getByTestId(size.width < 640 ? "lost-sheet" : "lost-card");
+      await expect(helper).toBeVisible();
+      await expect(page.getByTestId("lost-thread")).toContainText("Which station are you in");
+      await expect(page.getByTestId("home-tasks")).toHaveCount(0);
+      await expectLayout(page);
+
+      await page.getByLabel("Ask the assistant").fill("I see a sign for the A and C");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await expect(page.getByTestId("lost-thread")).toContainText("station name on the wall");
+      // The sheet grows with the thread; its height reaches Center on my location on the next frame.
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expectLayout(page);
+
+      await context.setOffline(true);
+      await expect(page.getByTestId("lost-signal")).toContainText("No network");
+      await page.getByLabel("Ask the assistant").fill("Which way is out?");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await expect(page.getByTestId("lost-thread")).toContainText("No connection here");
+      // The sheet grows with the thread; its height reaches Center on my location on the next frame.
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expectLayout(page);
+      await context.setOffline(false);
+    });
+
     test("home with the transit layers drawn", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();

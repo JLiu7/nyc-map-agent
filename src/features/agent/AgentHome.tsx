@@ -197,6 +197,8 @@ interface AgentHomeProps {
   input: string;
   setInput: (v: string) => void;
   onSend: (text: string) => void;
+  /** The box's hint when a focused helper takes what is typed (the where-am-I helper). */
+  placeholder?: string;
   busy: boolean;
   /** What dictation has heard so far, shown in the text box until it lands there. */
   interim: string;
@@ -364,7 +366,7 @@ export function AgentHome(p: AgentHomeProps) {
         value={shown}
         readOnly={p.dictation.on}
         onChange={(e) => p.setInput(e.target.value)}
-        placeholder={answerOpen ? t("askFollowUp") : t("askAnything")}
+        placeholder={p.placeholder ?? (answerOpen ? t("askFollowUp") : t("askAnything"))}
         aria-label={t("askLabel")}
         enterKeyHint="send"
         className="h-11 min-w-0 flex-1 rounded-full bg-transparent pl-3 text-base text-slate-900 outline-none placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-blue-500/60"

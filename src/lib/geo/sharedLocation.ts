@@ -18,6 +18,8 @@ export interface SharedLocation {
   course?: number | null;
   /** Metres per second while moving, or null. */
   speed?: number | null;
+  /** When `coords` was fixed (ms since 1970): underground the watch stops reporting, so the fix ages. */
+  fixAt?: number | null;
 }
 
 type Geo = Pick<Geolocation, "watchPosition" | "clearWatch">;
@@ -49,7 +51,7 @@ export function startSharing(g: Geo | null = geo()): Promise<SharedLocation["coo
         if (watchId === null) return;
         const coords = { lon: p.coords.longitude, lat: p.coords.latitude };
         const num = (n: number | null | undefined) => (typeof n === "number" && Number.isFinite(n) ? n : null);
-        set({ status: "on", coords, accuracy: num(p.coords.accuracy), course: num(p.coords.heading), speed: num(p.coords.speed) });
+        set({ status: "on", coords, accuracy: num(p.coords.accuracy), course: num(p.coords.heading), speed: num(p.coords.speed), fixAt: num(p.timestamp) ?? Date.now() });
         if (first) { first = false; resolve(coords); }
       },
       () => {

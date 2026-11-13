@@ -90,6 +90,13 @@ describe("underground helper context", () => {
     expect(p).toContain("underground at Mets-Willets Point");
     expect(p).toContain("Roosevelt Av");
   });
+  it("passes the where-am-I helper's guess and signal as a guess, not a position (#131)", () => {
+    const p = systemPrompt("now", null, "transit", undefined, undefined, undefined, { stage: "lost", station: "Fulton St", exit: "Fulton St & Nassau St", guess: "You're probably at Fulton St, just off the 4 train.", signal: "no network" });
+    expect(p).toContain("lost around Fulton St");
+    expect(p).toContain("just off the 4 train");
+    expect(p).toContain("no network");
+    expect(p).toContain("Treat the guess as a guess");
+  });
   it("says nothing about underground otherwise, and trips close with an offer to start", () => {
     const p = systemPrompt("now", null);
     expect(p).not.toContain("underground at");

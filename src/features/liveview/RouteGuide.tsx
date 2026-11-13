@@ -19,6 +19,9 @@ import { setTripStep, useTripStep } from "@/lib/store/tripStep";
 import { useCssHeight } from "@/lib/useCssHeight";
 import { appGeo } from "@/lib/geo/devGeo";
 import { useMapState } from "@/lib/store/MapStateContext";
+import { useActiveTrip } from "@/lib/transit/activeTrip";
+import { useT } from "@/lib/i18n/appLang";
+import { openLostHelper, useLostHelper } from "@/lib/underground/lostHelper";
 import { bearingTo } from "./heading";
 import { installNavLayers, readNavColors, removeNavLayers, roadNameAt, updateNavLayers } from "./layers";
 import { distanceAlong, fetchGuidedRoute, formatMetres, metresLeft, progressAt, type RouteStep } from "./steps";
@@ -55,7 +58,11 @@ interface Fix {
 export default function RouteGuide() {
   const home = useFlag("agentHome");
   const { routeStart, routeEnd, clearRoute, followingRoute } = useDataView();
-  const { walking, stopWalk, seedChat, setChatOpen, chatOpen } = useMapState();
+  const { walking, stopWalk, chatOpen } = useMapState();
+  // Where am I opens the where-am-I helper with this walk's destination and landmark (#131).
+  const walkTo = useActiveTrip()?.destination.label ?? null;
+  const t = useT();
+  const lost = useLostHelper();
   const [landmarks, setLandmarks] = useState<readonly GuideLandmark[]>([]);
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const [showPhoto, setShowPhoto] = useState(false);
@@ -249,7 +256,7 @@ export default function RouteGuide() {
   const left = here ? metresLeft(route, here) : route.steps.reduce((s, x) => s + x.distance, 0);
 
   const checkpoint = here ? nextCheckpoint(here, heading, landmarks, confirmed) : null;
-  if (home && active) return chatOpen ? null : <>
+  if (home && active) return chatOpen || lost ? null : <>
     <section className="task-panel task-top flex items-center gap-3 px-3.5 py-3 min-[380px]:gap-3.5 min-[380px]:px-4 min-[380px]:py-3.5" aria-label="Walking guidance">
       <TurnIcon step={progress?.next ?? null} />
       {/* A few short lines at most, so on a small phone the walk still shows between this and the checkpoint card. */}
@@ -281,16 +288,16 @@ export default function RouteGuide() {
       <div className="grid grid-cols-3 gap-2 text-[13px] min-[380px]:text-sm">
         <button type="button" className="task-action min-h-11 !text-[length:inherit]" onClick={() => { setConfirmed([...confirmed, checkpoint.landmark.id]); setShowPhoto(false); }}>Yes, I see it</button>
         <button type="button" className="task-action task-secondary min-h-11 !text-[length:inherit]" aria-expanded={showPhoto} onClick={() => setShowPhoto(!showPhoto)}>Not yet</button>
-        <button type="button" className="task-action task-secondary min-h-11 !text-[length:inherit]" onClick={() => { seedChat(`I'm lost on my walk. Help me find ${checkpoint.landmark.name} using visible landmarks.`); setChatOpen(true); }}>I'm lost</button>
+        <button type="button" className="task-action task-secondary min-h-11 !text-[length:inherit]" onClick={() => openLostHelper({ from: "walk", walkingTo: walkTo, landmark: checkpoint.landmark.name })}>{t("whereAmI")}</button>
       </div>
       <a href={checkpoint.landmark.picture.page} target="_blank" rel="noreferrer" className="block truncate text-xs text-slate-300">Photo: {checkpoint.landmark.picture.artist} · {checkpoint.landmark.picture.license}</a>
     </section> : tripStep ? <section ref={bottomCard} className="task-panel task-bottom flex flex-col gap-2.5 p-3.5" aria-label="Next on this trip">
       <p className="line-clamp-2 text-[15px] font-semibold leading-snug">{tripStep.then}</p>
       <div className="grid grid-cols-2 gap-2 text-[13px] min-[380px]:text-sm">
         <button type="button" className="task-action min-h-11 !text-[length:inherit]" onClick={() => { stopNav(); stopWalk(); tripStep.go(); }}>{tripStep.action}</button>
-        <button type="button" className="task-action task-secondary min-h-11 !text-[length:inherit]" onClick={() => { seedChat("I'm lost on my walk to the station. Help me find a visible landmark."); setChatOpen(true); }}>I'm lost</button>
+        <button type="button" className="task-action task-secondary min-h-11 !text-[length:inherit]" onClick={() => openLostHelper({ from: "walk", walkingTo: walkTo, landmark: null })}>{t("whereAmI")}</button>
       </div>
-    </section> : <div ref={bottomCard} className="task-panel task-bottom"><button type="button" className="task-action task-secondary w-full" onClick={() => { seedChat("I'm lost on my walking route. Help me find a visible landmark."); setChatOpen(true); }}>I'm lost</button></div>}
+    </section> : <div ref={bottomCard} className="task-panel task-bottom"><button type="button" className="task-action task-secondary w-full" onClick={() => openLostHelper({ from: "walk", walkingTo: walkTo, landmark: null })}>{t("whereAmI")}</button></div>}
   </>;
 
   return (

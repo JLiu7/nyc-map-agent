@@ -188,18 +188,18 @@ for (const width of [390, 1280]) {
   });
 }
 
-// A button that hands a question to the chat ("I'm lost", "Other ways") once re-sent it forever and froze
-// the page: it must ask exactly once and leave the page answering.
-test("I'm lost asks the agent once and the page stays responsive", async ({ page }) => {
+// On a walk, Where am I opens the where-am-I helper (#131) in place of I'm lost, which once re-sent its question
+// forever and froze the page: a question typed there must ask exactly once and leave the page answering.
+test("Where am I on a walk opens the helper, asks the agent once and the page stays responsive", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await mockNetwork(page);
   const coords = [[-73.9875, 40.7557], [-73.986, 40.757], [-73.9851, 40.758]];
   const walk = { ...trip, id: "walk-lost", mode: "walk", origin: { label: "7 Av", at: coords[0] }, destination: { label: "Times Square", at: coords[2] }, routes: [], alternatives: [], legs: [{ kind: "walk", label: "Walk to Times Square", coords, durationS: 360, distanceM: 450, turns: [] }] };
-  const questions: string[] = [];
+  const asks: Array<{ question: string; stage?: string }> = [];
   await page.route("**/api/agent", (r) => {
-    const body = r.request().postDataJSON() as { messages?: Array<{ role: string; content: string }> };
-    questions.push(body.messages?.filter((m) => m.role === "user").at(-1)?.content ?? "");
-    return r.fulfill({ contentType: "application/x-ndjson", body: stream(questions.length === 1 ? [
+    const body = r.request().postDataJSON() as { messages?: Array<{ role: string; content: string }>; underground?: { stage: string } };
+    asks.push({ question: body.messages?.filter((m) => m.role === "user").at(-1)?.content ?? "", stage: body.underground?.stage });
+    return r.fulfill({ contentType: "application/x-ndjson", body: stream(asks.length === 1 ? [
       { type: "command", command: { type: "showRoute", trip: walk } },
       { type: "command", command: { type: "openPanel", trip: walk } }, { type: "done" },
     ] : [{ type: "text", text: "Look for the big red stairs on your left." }, { type: "done" }]) });
@@ -209,12 +209,16 @@ test("I'm lost asks the agent once and the page stays responsive", async ({ page
   await ask(page, "Walk from 7 Av to Times Square");
   await tripDetails(page);
   await page.getByRole("button", { name: "Use this route", exact: true }).click();
-  await page.getByRole("button", { name: "I'm lost", exact: true }).first().click();
-  await expect.poll(() => questions.length).toBe(2);
-  expect(questions[1]).toMatch(/lost/i);
+  await expect(page.getByRole("button", { name: "I'm lost", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Where am I?", exact: true }).first().click();
+  await expect(page.getByTestId("lost-thread")).toContainText("Times Square. Is that right?");
+  await ask(page, "I see a red staircase");
+  await expect(page.getByTestId("lost-thread")).toContainText("big red stairs");
+  expect(asks).toHaveLength(2);
+  expect(asks[1]).toEqual({ question: "I see a red staircase", stage: "lost" });
   // Still exactly two after a pause, and the page answers a script promptly.
   await page.waitForTimeout(1500);
-  expect(questions.length).toBe(2);
+  expect(asks.length).toBe(2);
   const t0 = Date.now();
   await page.evaluate(() => 1);
   expect(Date.now() - t0).toBeLessThan(1000);

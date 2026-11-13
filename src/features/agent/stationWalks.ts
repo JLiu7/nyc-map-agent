@@ -1,3 +1,4 @@
+import { noteTrainPart } from "@/lib/underground/lostHelper";
 import { stationAt } from "@/lib/map/stationNear";
 import { nearestOnLine, routeThrough, type RoutePoint } from "@/lib/map/stationRoute";
 import { floorsAt, toLngLat, toLocal, walkIn, walls, type StationModel } from "@/lib/map/stationWalk";
@@ -117,6 +118,8 @@ async function walkThrough(seg: Segment, ride: Segment | undefined): Promise<Seg
   const walkS = Math.max(30, Math.min(240, metres(route) / STATION_PACE));
   const waitS = down ? WAIT_DOWN_S : WAIT_UP_S;
   const part = down ? null : trainPartAt(m, route[platformFoot(route, track)], track.angle);
+  // The where-am-I helper says it too, if the rider gets lost after stepping off (#131).
+  if (part && seg.station) noteTrainPart(seg.station, part);
   const inside: InsideWalk = { station, guide, board, track, color: lineColor(ride?.route ?? ""), ...(part ? { trainPart: part } : {}) };
   const w = waitShare({ ...seg, realS: walkS + waitS, waitS });
   const name = ride?.route ? `the ${ride.route} train` : "the train";
