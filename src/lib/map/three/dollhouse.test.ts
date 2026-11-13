@@ -117,13 +117,27 @@ describe("the dollhouse walks at Fulton St", () => {
         expect(sliver, `point ${i} of the walk to ${exit.join(",")} is on the platform's edge`).toBe(true);
       }
     });
-    // Where the figure steps off the train, in particular.
+    // Where the figure steps off the train, in particular: on the open platform, well clear of the strip.
     for (const { path } of model.walks) {
       const [x, y] = path[0];
       for (const [x1, y1, x2, y2] of model.edges) {
         const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
         const k = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (L * L)));
-        expect(Math.hypot(x - (x1 + dx * k), y - (y1 + dy * k))).toBeGreaterThanOrEqual(1);
+        expect(Math.hypot(x - (x1 + dx * k), y - (y1 + dy * k))).toBeGreaterThanOrEqual(2.5);
+      }
+    }
+  });
+
+  it("never walks the figure into the train standing at the platform", () => {
+    const { at: [tx, ty, tz], angle } = model.track;
+    const nx = -Math.sin(angle), ny = Math.cos(angle);
+    // The car body is 2.7 m wide on the track's line; the figure is about 0.6 m across.
+    for (const { path, exit } of model.walks) {
+      const n = Math.ceil(walkLength(path) * 4);
+      for (let i = 0; i <= n; i++) {
+        const p = walkAt(path, i / n);
+        if (Math.abs(p.z - tz) > 2) continue;
+        expect(Math.abs((p.x - tx) * nx + (p.y - ty) * ny), `the walk to ${exit.join(",")} runs into the train at ${Math.round((i / n) * 100)}%`).toBeGreaterThan(1.35 + 0.3);
       }
     }
   });
