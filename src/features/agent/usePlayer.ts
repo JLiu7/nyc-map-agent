@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { LngLat, type Map as MapLibreMap } from "maplibre-gl";
 import { getMapInstance } from "@/lib/map/mapInstance";
 import { keepInView } from "@/lib/map/keepInView";
 import { framePadding } from "@/lib/map/mapCover";
-import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewEye, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
+import { ZoomKeeper, bindPreviewRelease, followMode, followRig, publishFollowPos, setFollowMode, setPreviewEye, setPreviewMini, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { readMap } from "@/lib/map/mapRead";
 import { getAppLang } from "@/lib/i18n/appLang";
@@ -17,6 +17,7 @@ import type { PlaybackSpeed, Trip } from "./schema";
 import { setMarker, setPreviewDim, setXray } from "./tripLayer";
 import { walkLine, walkPlace } from "./walkPlace";
 import { dollhouseLeg } from "./dollhouseLeg";
+import { nextStopAt, tripMiniLine } from "./tripMini";
 import type { DollhouseView } from "@/lib/map/dollhousePreview";
 import type { DollhouseState } from "@/lib/map/three/dollhouse";
 import { useFlag } from "@/lib/flags";
@@ -148,6 +149,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const dest = useRef("");
   const segsRef = useRef(segs);
   segsRef.current = segs;
+  /** The trip's parts for the mini map, drawn again only when the legs change. */
+  const miniLine = useRef<GeoJSON.FeatureCollection | null>(null);
+  miniLine.current = useMemo(() => tripMiniLine(segs), [segs]);
   /** Seconds into the current leg, and the speed they were counted at. */
   const elapsed = useRef(0);
   const playedSpeed = useRef<Speed>(pb.speed);
@@ -321,6 +325,8 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setXray(map, false);
     setPreviewDim(map, false);
     setMarker(map, null);
+    publishFollowPos(null);
+    setPreviewMini(null);
     leaveEye(map);
     showStairs(null);
     hideInside();
@@ -561,6 +567,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
         const all = segsRef.current.map((x) => (reduced ? 3 : wallSeconds(x, s.speed)));
         const sum = all.reduce((a, b) => a + b, 0) || 1;
         setProgress((all.slice(0, s.seg).reduce((a, b) => a + b, 0) + f * total) / sum);
+        // The mini map follows the rider, as it follows a train, at the same calm pace as the bar.
+        publishFollowPos({ lon: mark[0], lat: mark[1], bearing: pose.bearing });
+        const next = nextStopAt(segsRef.current, s.seg, f, dest.current || null);
+        if (s.tripId && miniLine.current) setPreviewMini({ key: s.tripId, line: miniLine.current, next: next && inLang(next) });
       }
       if (settling) {
         if (now < settleUntil) rafId.current = requestAnimationFrame(tick);

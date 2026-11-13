@@ -155,3 +155,9 @@
   .corner-locate { bottom: calc(var(--pull-sheet-h, 0px) + 44px); }
   .corner-view { bottom: calc(var(--pull-sheet-h, 0px) + 98px); }
 }
+/* The follow mini map (a followed train, or a trip preview's rider): bottom right on a phone, where the
+   cube button stands alone; from 640px, left of the Map · 3D · Street stack, so it never sits on it. */
+.corner-mini { right: 16px; bottom: calc(var(--chat-bar-h, 0px) + var(--pull-sheet-h, 0px) + 68px); }
+@media (min-width: 640px) { .corner-mini { right: 76px; } }
+/* One thing open at a time: while Change view is open, the mini map steps aside instead of lying under it. */
+body:has([data-testid="follow-view-menu"]) .corner-mini { display: none; }

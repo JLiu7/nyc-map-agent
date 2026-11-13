@@ -151,11 +151,24 @@ for (const size of SIZES) {
         // The bar and the chat under it leave most of the screen to the map.
         expect(box.height).toBeLessThan(size.height * 0.3);
       }
+      // A small north-up map of the trip stays in the corner the whole way, as it does for a followed train (2026-11-13).
+      const mini = page.getByRole("button", { name: /^Map of the trip/ });
+      await expect(mini).toBeVisible();
       await page.waitForTimeout(900);
       await expectLayout(page);
       // Change view names the preview's own view for what it is: a walk through your eyes, not a flat map.
       await page.getByRole("button", { name: "Change view", exact: true }).first().click();
       await expect(page.getByRole("menuitemradio", { name: /Walkthrough/ })).toHaveAttribute("aria-checked", "true");
+      await expectLayout(page);
+      // The mini map steps aside while Change view is open, and is back once a view is picked.
+      await expect(mini).toBeHidden();
+      await page.getByRole("menuitemradio", { name: /Chase/ }).click();
+      await expect(mini).toBeVisible();
+      await expectLayout(page);
+      // Tapping it goes to the flat map, as it does when following a train; it stays in the corner.
+      await mini.click();
+      await expect(page.getByRole("button", { name: "Change view", exact: true }).first()).toBeVisible();
+      await expect(mini).toBeVisible();
       await expectLayout(page);
     });
 

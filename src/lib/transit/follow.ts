@@ -171,3 +171,19 @@ export function publishFollowPos(next: FollowPos | null) {
 export function useFollowPos(): FollowPos | null {
   return useSyncExternalStore((f) => (posSubs.add(f), () => posSubs.delete(f)), () => pos);
 }
+
+/**
+ * The trip preview's mini map (owner, 2026-11-13: a mini map the whole way, like a followed train's):
+ * the trip's route, with each part in its own colour, and the next stop. Null while no preview plays.
+ */
+export type PreviewMini = { key: string; line: GeoJSON.FeatureCollection; next: string | null };
+let mini: PreviewMini | null = null;
+const miniSubs = new Set<() => void>();
+export function setPreviewMini(next: PreviewMini | null) {
+  if (mini === next || (mini && next && mini.key === next.key && mini.line === next.line && mini.next === next.next)) return;
+  mini = next;
+  miniSubs.forEach((f) => f());
+}
+export function usePreviewMini(): PreviewMini | null {
+  return useSyncExternalStore((f) => (miniSubs.add(f), () => miniSubs.delete(f)), () => mini);
+}
