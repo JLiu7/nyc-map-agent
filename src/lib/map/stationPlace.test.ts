@@ -67,6 +67,14 @@ describe("placing someone in Fulton St from their answers", () => {
     expect(near).toBeGreaterThan(0.85);
   });
 
+  it("a passage stays a passage when the flight count disagrees", () => {
+    // Live on 2026-11-13: passage, one flight up, then no flights down (every passage here is one down
+    // from the 4/5 platform). The count was wrong, the place was not; it guessed a stairway.
+    let w = prior(spots, null);
+    for (const a of [{ q: "where", a: "hall" }, { q: "up", a: 1 }, { q: "down", a: 0 }] as const) w = answer(spots, w, a, signs).w;
+    expect(best(spots, w).spot.kind).toBe("hall");
+  });
+
   it("an Exit sign's corner pins the stair it hangs by", () => {
     const w = answer(spots, prior(spots, null), { q: "sign", text: "Exit Fulton St & William St" }, signs);
     expect(w.matched).toBe(true);

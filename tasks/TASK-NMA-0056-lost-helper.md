@@ -289,6 +289,29 @@ Blocked/uncertain:
 Next:
 - Let CI pass and auto-merge #149, then ask for the 4 train trip to Fulton St on the live site, close the card, tap Find exit and read the guess
 
+### 2026-11-13 09:13:39 UTC — agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/397c2044-1060-40b6-b357-708ed173fd84","blocked":[],"changed":["none"],"completed":["#144 and #149 merged and deployed. Live check at Fulton St found two faults, fixed on fix/lost-place-live-answers: a passage answer lost to a miscounted flight, and typed Exit sign words matched nothing when the map had no Fulton St street names"],"decisions":["no new decisions"],"evidence":["Replay of the live answers (passage, one up, none down) now ends in a passage; 'Exit Fulton St & Nassau St' matches with no tiles; placement replays still 65% and 90%"],"next_action":"Let CI pass and auto-merge the fix, then repeat the live steps and post the receipt on #143","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T09:13:39Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b9bffdd532cafa4455a005792d62292d203185e37315e1617694cff044e36dbc","request_id":"f9741f9c655d42fe9bb7b7207909544b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- #144 and #149 merged and deployed. Live check at Fulton St found two faults, fixed on fix/lost-place-live-answers: a passage answer lost to a miscounted flight, and typed Exit sign words matched nothing when the map had no Fulton St street names
+
+Evidence:
+- Replay of the live answers (passage, one up, none down) now ends in a passage; 'Exit Fulton St & Nassau St' matches with no tiles; placement replays still 65% and 90%
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Let CI pass and auto-merge the fix, then repeat the live steps and post the receipt on #143
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

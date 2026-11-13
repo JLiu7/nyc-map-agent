@@ -8,6 +8,7 @@ import type { WalkCallout } from "@/lib/map/three/dollhouseCallouts";
 import type { PlaceSign, PlaceWalk, Spot } from "@/lib/map/stationPlace";
 import { readMap } from "@/lib/map/mapRead";
 import { cornerLine } from "@/lib/map/cornerLine";
+import { fultonCorner } from "@/lib/map/fultonCorners";
 
 let model: Promise<DollhouseModel> | null = null;
 function loadModel(): Promise<DollhouseModel> {
@@ -128,7 +129,10 @@ export async function loadStationPlace(map: MaplibreMap | null): Promise<Station
     import("@/lib/map/three/dollhouse"), import("@/lib/map/three/dollhouseCallouts"), import("@/lib/map/stationPlace"), loadModel(),
   ]);
   const corners = m.walks.map((w) => {
-    try { return map ? cornerLine(readMap(map).placeAt(w.exit)) : null; } catch { return null; }
+    let line: string | null = null;
+    try { line = map ? cornerLine(readMap(map).placeAt(w.exit)) : null; } catch { /* no tiles */ }
+    // The map may be far from Fulton St with its streets not loaded: fall back to the corners kept for it.
+    return line ?? fultonCorner(w.exit);
   });
   const signs = place.signsFromPlans(m.walks.flatMap((w, i) => planSigns(m, w, corners[i])));
   const gates = m.walks.flatMap((w, i) => { const g = walkPlaces(w.path).gates; return g ? [{ walk: i, at: g.at }] : []; });

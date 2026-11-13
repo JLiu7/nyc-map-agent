@@ -55,8 +55,13 @@ const SIGN_UP_M = 2.4;
 const SEEN_DZ = 2.2;
 /** At the fare line within this distance. */
 const GATES_M = 6;
-/** An answer that does not fit a spot keeps this share of its weight: people misjudge where they are. */
+/**
+ * An answer that does not fit a spot keeps this share of its weight: people misjudge where they are.
+ * Someone knows whether they stand on a stair or in a passage far better than they count flights, so a
+ * miscounted flight weighs less than a wrong place, and a passage stays a passage when the counts disagree.
+ */
 const MISFIT = 0.02;
+const MISFIT_BY: Record<Exclude<Question, "sign">, number> = { where: 0.005, down: 0.08, up: 0.08, paid: MISFIT };
 /** Placed: this share of the weight in one stretch. */
 const PLACED = 0.75;
 
@@ -209,7 +214,7 @@ export function answer(spots: Spot[], w: number[], a: Answer, signs: PlaceSign[]
     const set = new Set(hit);
     return { w: norm(w.map((x, i) => x * (spots[i].signs.some((s) => set.has(s)) ? 1 : MISFIT))), matched: true };
   }
-  return { w: norm(w.map((x, i) => { const f = fits(spots[i], a); return f === null ? x : x * (f ? 1 : MISFIT); })), matched: true };
+  return { w: norm(w.map((x, i) => { const f = fits(spots[i], a); return f === null ? x : x * (f ? 1 : MISFIT_BY[a.q]); })), matched: true };
 }
 
 /** The heaviest stretch, its share of the weight, and its heaviest spot. */
