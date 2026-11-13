@@ -339,6 +339,16 @@ export function usePlayer(onCallout?: (text: string) => void) {
     translate(trip.id, t);
     warmReplay(t);
   }, [addStairs, translate, warmReplay]);
+  /**
+   * Fetch what a trip's replay needs as soon as its card shows, before anyone presses Play (#132):
+   * the rider may already be below the street with no signal by then. Loads nothing into the player.
+   */
+  const warm = useCallback((trip: Trip) => {
+    const t = buildTimeline(trip);
+    if (!t.some((seg) => seg.station)) return;
+    warmReplay(t);
+    void import("./stationWalks").then(({ withStationWalks }) => withStationWalks(t)).catch(() => undefined);
+  }, [warmReplay]);
   /** Load and play at once, for the Play button. */
   const start = useCallback((trip: Trip, speed?: Speed) => {
     if (pbRef.current.tripId !== trip.id || !isActive(pbRef.current)) load(trip, speed);
@@ -580,5 +590,5 @@ export function usePlayer(onCallout?: (text: string) => void) {
   }, [pb.status, leaveEye, reduced, hideDoll]);
 
   const state: PlayerState = { ...pb, active: isActive(pb), playing: pb.status === "playing", segs, callout, where, progress: pb.status === "ended" ? 1 : progress };
-  return { state, load, start, select, stop, release, toggle, setSpeed, skip, back, seek };
+  return { state, load, warm, start, select, stop, release, toggle, setSpeed, skip, back, seek };
 }

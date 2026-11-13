@@ -20,7 +20,8 @@ test("the Fulton St walk replays with the network off after the trip has loaded"
   await context.route("**/api/agent", (route) =>
     route.fulfill({
       contentType: "application/x-ndjson",
-      body: nd([{ type: "command", command: { type: "playFlythrough", trip, speed: 30 } }, { type: "done", model: "mock", usage: { inputTokens: 0, outputTokens: 0 } }]),
+      // Like the live agent: the trip comes as a route card, and nothing loads into the player until Play.
+      body: nd([{ type: "command", command: { type: "showRoute", trip } }, { type: "done", model: "mock", usage: { inputTokens: 0, outputTokens: 0 } }]),
     }),
   );
   const errors: string[] = [];
@@ -36,7 +37,7 @@ test("the Fulton St walk replays with the network off after the trip has loaded"
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("button", { name: "Play trip preview" })).toBeVisible({ timeout: slow(20_000) });
 
-  // The trip's arrival fetched the station model and x-ray data, and the worker saved them.
+  // The trip card's arrival fetched the station model and x-ray data, and the worker saved them.
   const saved = (path: string) => page.evaluate(async (p) => !!(await caches.match(p)), path);
   await expect.poll(() => saved("/transit/fulton-model.json"), { timeout: slow(30_000) }).toBe(true);
   await expect.poll(() => saved("/transit/xray.json"), { timeout: slow(30_000) }).toBe(true);
@@ -44,6 +45,7 @@ test("the Fulton St walk replays with the network off after the trip has loaded"
   await context.setOffline(true);
   expect(await page.evaluate(() => fetch("/robots.txt", { cache: "no-store" }).then(() => "online", () => "offline"))).toBe("offline");
 
+  await page.getByRole("group", { name: "Preview speed" }).getByRole("button", { name: "30x" }).click();
   await page.getByRole("button", { name: "Play trip preview" }).click();
   // At 30x the preview soon reaches the exit leg at Fulton St; the figure walks the model there.
   const dollhouse = () => page.evaluate(() => !!(window as unknown as { __map?: { getLayer: (id: string) => unknown } }).__map?.getLayer("dollhouse"));
