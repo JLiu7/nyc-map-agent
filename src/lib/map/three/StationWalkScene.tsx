@@ -16,6 +16,7 @@ import type { DollhouseModel } from "@/lib/map/three/dollhouse";
 import { buildFigure, concreteTexture, pickWalk, treadTexture, walkAt, walkDressing, walkLength, wallTexture, type WalkDressing } from "@/lib/map/three/dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { SMOOTH_SEAMS, toYUp, walkGeometry, type Surface, type WalkGeometry } from "@/lib/map/three/stationWalkGeometry";
+import { stationShell } from "@/lib/map/three/stationShell";
 import { loadModel } from "@/lib/map/dollhousePreview";
 
 /** The figure's body: a capsule 1.6 m tall floating 0.25 m over the floor, so it climbs stairs. */
@@ -169,13 +170,23 @@ function Walker({ start, heading, lowest, walls, dressing, ride, onNearDoor, onR
     const track = new THREE.Vector3(...toYUp(...dressing.track.at));
     const across = new THREE.Vector3(...toYUp(-dy, dx, 0));
     if (across.dot(track.clone().sub(best)) < 0) across.negate();
-    const inside = best.clone().add(across.multiplyScalar(1.6));
+    const inside = best.clone().add(across.clone().multiplyScalar(1.6));
+    // The camera stands back on the platform, a little along it, and watches the walker step in and
+    // the train pull out; following into the car it would see only the car's grey insides.
+    const along = new THREE.Vector3(...toYUp(dx, dy, 0));
+    const eye = best.clone().addScaledVector(across, -3.2).addScaledVector(along, -3.5).add(new THREE.Vector3(0, 1.7, 0));
+    const look = best.clone().add(new THREE.Vector3(0, 1.1, 0));
+    if (cam.current) {
+      // The walker steps into the car out of the camera's sight line, so only walls hold it back now.
+      cam.current.colliderMeshes = walls.current;
+      void cam.current.setLookAt(eye.x, eye.y, eye.z, look.x, look.y, look.z, true);
+    }
     board.current = { t: 0, from: new THREE.Vector3(p.x, p.y + FEET_Y, p.z), door: best, inside };
   }, [ride, dressing]);
 
   useFrame((state, dt) => {
     const b = body.current, c = cam.current;
-    if (!b) return;
+    if (!b?.body) return;
     const p = b.currPos;
     const feet = p.y + FEET_Y;
     // The model's frame (z up) for the dressing: x, -z, y.
@@ -203,7 +214,6 @@ function Walker({ start, heading, lowest, walls, dressing, ride, onNearDoor, onR
       b.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       walked.current += dt * 1.4;
       figure.stride(walked.current, k.t < walkS + 1);
-      if (c && k.t < leaveT) void c.moveTo(at.x, at.y + LOOK_UP_M + 0.6, at.z, true);
       if (ride !== "riding" && k.t > leaveT + 4.5) onRide("riding");
       return;
     }
@@ -237,7 +247,8 @@ function Walker({ start, heading, lowest, walls, dressing, ride, onNearDoor, onR
     if (isNear !== near.current) { near.current = isNear; onNearDoor(isNear); }
 
     if (c) {
-      c.colliderMeshes = walls.current;
+      // The train counts as a wall for the camera, so it never swings into a car.
+      if (c.colliderMeshes.length !== walls.current.length + 1) c.colliderMeshes = [...walls.current, dressing.train];
       void c.moveTo(p.x, p.y + LOOK_UP_M, p.z, true);
       // A chase camera: it eases round behind the way the figure walks, unless someone just dragged
       // it, or the figure is walking back toward it (S), which would spin the view round.
@@ -289,12 +300,13 @@ export function StationWalk({ exit, onClose }: { exit: [number, number] | null; 
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
-  const geo = useMemo(() => (model ? walkGeometry(model) : null), [model]);
+  const shell = useMemo(() => (model ? stationShell(model) : null), [model]);
+  const geo = useMemo(() => (model && shell ? walkGeometry(model, shell) : null), [model, shell]);
   const [ride, setRide] = useState<Ride>("walking");
   const [nearDoor, setNearDoor] = useState(false);
   // Walk again starts a fresh round: a new scene, the train back at the platform.
   const [round, setRound] = useState(0);
-  const dressing = useMemo(() => (model ? walkDressing(model, fultonCorner) : null), [model, round]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dressing = useMemo(() => (model && shell ? walkDressing(model, fultonCorner, shell) : null), [model, shell, round]); // eslint-disable-line react-hooks/exhaustive-deps
   const boardTrain = () => { if (ride === "walking") setRide("boarding"); };
   // E or Enter at a door boards, as the button does.
   useEffect(() => {

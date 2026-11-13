@@ -43,7 +43,7 @@ export function StreetEntry() {
   }, [walking]);
   if (!walking || !exit || open) return null;
   return (
-    <div className="pointer-events-none absolute right-3 top-[calc(env(safe-area-inset-top)+72px)] z-30 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+    <div className="pointer-events-none absolute right-3 top-[calc(env(safe-area-inset-top)+156px)] z-30 sm:left-1/2 sm:right-auto sm:top-[calc(env(safe-area-inset-top)+72px)] sm:-translate-x-1/2">
       <button
         type="button"
         data-testid="street-walk-inside"

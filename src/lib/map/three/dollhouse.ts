@@ -21,7 +21,7 @@
 import * as THREE from "three";
 import type { CustomLayerInterface, Map as MaplibreMap } from "maplibre-gl";
 import { LEGACY_LIGHT, MercatorCoordinate, sharedRenderer } from "./core";
-import { gatePanels } from "./stationShell";
+import { gatePanels, type Shell, type ShellWall } from "./stationShell";
 
 type P3 = [number, number, number];
 type DollhouseWalk = { exit: [number, number]; path: P3[] };
@@ -541,6 +541,55 @@ function trainCars(doors: boolean): THREE.Group & { open?: (f: number) => void }
   return train;
 }
 
+/** From the platform's edge to the middle of the track beside it. */
+const TRAIN_OFF_EDGE_M = 1.55;
+
+/** How far a hung sign may move, sideways along its board or along the walk, to clear the walls. */
+const SIGN_NUDGES_M: Array<[number, number]> = [[0, 0], [0.4, 0], [-0.4, 0], [0.8, 0], [-0.8, 0], [0, 1], [0, -1], [1.2, 0], [-1.2, 0], [0, 2], [0, -2], [0.8, 1], [-0.8, 1], [0.8, -1], [-0.8, -1]];
+
+/**
+ * Where near `at` a sign facing `heading` can hang with its board clear of every wall (owner,
+ * 2026-11-13: signs stuck through the walls), or null if nowhere near is.
+ */
+function clearOfWalls(sign: THREE.Object3D, at: P3, heading: number, walls: ShellWall[]): P3 | null {
+  const bounds = new THREE.Box3().setFromObject(sign);
+  const half = (bounds.max.x - bounds.min.x) / 2 + 0.05;
+  const lo = bounds.min.z, hi = bounds.max.z;
+  const ux = Math.cos(heading), uy = -Math.sin(heading); // along the board
+  const fx = Math.sin(heading), fy = Math.cos(heading); // the way it faces, along the walk
+  const near = walls.filter((w) => Math.min(Math.hypot(w.a[0] - at[0], w.a[1] - at[1]), Math.hypot(w.b[0] - at[0], w.b[1] - at[1]), segDist(at[0], at[1], w)) < half + 3);
+  const hits = (c: P3) => {
+    for (let s = -half; s <= half + 1e-6; s += 0.2) {
+      const x = c[0] + ux * s, y = c[1] + uy * s;
+      for (const w of near) {
+        if (segDist(x, y, w) > w.thick / 2 + 0.06) continue;
+        const k = along(x, y, w);
+        const foot = w.foot[0] + (w.foot[1] - w.foot[0]) * k, top = w.top[0] + (w.top[1] - w.top[0]) * k;
+        if (c[2] + hi > foot && c[2] + lo < top) return true;
+      }
+    }
+    return false;
+  };
+  for (const [side, ahead] of SIGN_NUDGES_M) {
+    const c: P3 = [at[0] + ux * side + fx * ahead, at[1] + uy * side + fy * ahead, at[2]];
+    if (!hits(c)) return c;
+  }
+  return null;
+}
+
+/** How far along a wall's centre line (0 to 1) the point nearest (x, y) lies. */
+function along(x: number, y: number, w: ShellWall): number {
+  const dx = w.b[0] - w.a[0], dy = w.b[1] - w.a[1], L = dx * dx + dy * dy || 1;
+  return Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (y - w.a[1]) * dy) / L));
+}
+
+/** Distance from (x, y) to a wall's centre line, seen from above. */
+function segDist(x: number, y: number, w: ShellWall): number {
+  const k = along(x, y, w);
+  return Math.hypot(w.a[0] + (w.b[0] - w.a[0]) * k - x, w.a[1] + (w.b[1] - w.a[1]) * k - y);
+}
+
+
 /** A sign, a lamp or a fare line already hung this close to another of its kind is the same one. */
 const SAME_PLACE_M = 1.5;
 
@@ -564,7 +613,7 @@ export type WalkDressing = {
  * once where walks share it, and the train standing at the downtown platform with its doors.
  * `corner` names each exit's street corner for its Exit signs.
  */
-export function walkDressing(model: DollhouseModel, corner: (exit: [number, number]) => string | null): WalkDressing {
+export function walkDressing(model: DollhouseModel, corner: (exit: [number, number]) => string | null, shell?: Shell): WalkDressing {
   const group = new THREE.Group();
   const hung: Array<{ kind: string; at: P3 }> = [];
   const fresh = (kind: string, at: P3) => {
@@ -579,7 +628,10 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     for (const plan of planSigns(model, walk, corner(walk.exit))) {
       if (!fresh(JSON.stringify(plan.lines), plan.at)) continue;
       const sign = signMesh(plan.lines, [], plan.small);
-      sign.position.set(...plan.at);
+      const at = shell ? clearOfWalls(sign, plan.at, plan.heading, shell.walls) : plan.at;
+      // No spot near its own clears every wall: better no sign than one sticking out of a wall.
+      if (!at) { dispose(sign); continue; }
+      sign.position.set(...at);
       sign.rotation.z = -plan.heading;
       group.add(sign);
     }
@@ -603,23 +655,39 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     t.group.updateMatrixWorld(true);
     rotors.push({ rotor: t.rotor, at: new THREE.Vector3(0.17, 0, 0).applyMatrix4(t.group.matrixWorld) });
   }
-  const train = trainCars(true) as THREE.Group & { open: (f: number) => void };
-  train.position.set(...model.track.at);
-  train.rotation.z = model.track.angle;
-  group.add(train);
-  const dir: [number, number] = [Math.cos(model.track.angle), Math.sin(model.track.angle)];
-  // The platform's side of the track: where the walks start.
+  // The train's cars run back from its front along local -x. The model's track angle points them
+  // away from the platform, so the walk turns the train round: its ten cars line the platform from
+  // track.at, and it pulls out the way its front faces.
+  const angle = model.track.angle + Math.PI;
+  const dir: [number, number] = [Math.cos(angle), Math.sin(angle)];
+  // Across the track (+ to the left of dir), and the platform's side of it: where the walks start.
+  const across = (x: number, y: number) => (x - model.track.at[0]) * -dir[1] + (y - model.track.at[1]) * dir[0];
   const s0 = model.walks[0].path[0];
-  const side = Math.sign((s0[0] - model.track.at[0]) * -dir[1] + (s0[1] - model.track.at[1]) * dir[0]) || 1;
+  const side = Math.sign(across(s0[0], s0[1])) || 1;
+  // The train runs TRAIN_OFF_EDGE_M out from the platform's edge over the track (the model's edges)
+  // on the walks' side.
+  let edge: number | null = null;
+  for (const [x1, y1, x2, y2] of model.edges) {
+    const c = across((x1 + x2) / 2, (y1 + y2) / 2) * side;
+    if (c < across(s0[0], s0[1]) * side && (edge == null || c > edge)) edge = c;
+  }
+  const mid = edge == null ? 0 : (edge - TRAIN_OFF_EDGE_M) * side;
+  const at: P3 = [model.track.at[0] - dir[1] * mid, model.track.at[1] + dir[0] * mid, model.track.at[2]];
+  const train = trainCars(true) as THREE.Group & { open: (f: number) => void };
+  train.position.set(...at);
+  train.rotation.z = angle;
+  group.add(train);
+  // Each door's spot on the platform, just in from the edge.
   const floor = s0[2];
+  const doorAt = edge == null ? 1.4 : TRAIN_OFF_EDGE_M + 0.3;
   const doors: P3[] = [];
   for (let i = 0; i < CARS; i++) for (const along of DOORS_ALONG_M) {
     const a = -i * CAR_M + along;
-    doors.push([model.track.at[0] + dir[0] * a - dir[1] * side * 1.4, model.track.at[1] + dir[1] * a + dir[0] * side * 1.4, floor]);
+    doors.push([at[0] + dir[0] * a - dir[1] * side * doorAt, at[1] + dir[1] * a + dir[0] * side * doorAt, floor]);
   }
   return {
     group, train, doors,
-    track: { at: model.track.at, dir },
+    track: { at, dir },
     turnstiles: (x, y, z) => {
       for (const r of rotors) {
         if (Math.abs(r.at.z - z) > 1.5) continue;
