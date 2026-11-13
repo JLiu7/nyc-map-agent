@@ -115,6 +115,11 @@ function lookPitch(seg: Segment, f: number): number {
   return Math.max(62, Math.min(96, 80 + (Math.atan2(dz, 0.01 * len) * 180) / Math.PI));
 }
 
+/** What is said or shown as a trip's steps: each scene's label and its spoken callouts. Stop names stay as the signs read. */
+function stepLines(t: Segment[]): string[] {
+  return t.flatMap((seg) => [seg.label, ...seg.callouts.filter((c) => !c.quiet).map((c) => c.text)]);
+}
+
 /** The street a trip's exit comes up on, from its step ("Use the E exit on Fulton Street at Fulton St"), for the Exit signs on the way. */
 /** The dollhouse walk's pace: seconds on the platform (the overview, the train pulling out, where you got off), then metres a second. */
 const DOLL_WAIT_S = 12;
@@ -165,8 +170,7 @@ export function usePlayer(onCallout?: (text: string) => void) {
     // `more`: the same trip with steps added (the walk through the station), so what is translated already stays.
     if (!more) words.current = new Map();
     if (lang === "en") return;
-    // What is said or shown as a step: each scene's label and its spoken callouts. Stop names stay as the signs read.
-    const lines = t.flatMap((seg) => [seg.label, ...seg.callouts.filter((c) => !c.quiet).map((c) => c.text)]);
+    const lines = stepLines(t);
     // Loaded only for another language, so English previews carry none of it.
     void import("@/lib/i18n/translateLines").then(({ translateLines }) => translateLines(lines, lang)).then((got) => {
       if (pbRef.current.tripId !== tripId || !got.size) return;
@@ -347,7 +351,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
     const t = buildTimeline(trip);
     if (!t.some((seg) => seg.station)) return;
     warmReplay(t);
-    void import("./stationWalks").then(({ withStationWalks }) => withStationWalks(t)).catch(() => undefined);
+    // The steps in the rider's language too: translateLines remembers them for the page, so Play finds them offline.
+    const lang = getAppLang();
+    const say = (steps: Segment[]) => lang === "en" ? undefined : import("@/lib/i18n/translateLines").then(({ translateLines }) => translateLines(stepLines(steps), lang));
+    void say(t)?.catch(() => undefined);
+    void import("./stationWalks").then(({ withStationWalks }) => withStationWalks(t)).then((next) => say(next)).catch(() => undefined);
   }, [warmReplay]);
   /** Load and play at once, for the Play button. */
   const start = useCallback((trip: Trip, speed?: Speed) => {
