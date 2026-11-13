@@ -131,11 +131,11 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
  * Every sign the walk hangs: each walk's own (planSigns) but its platform-name board, which hangs
  * from the platform's edge instead, and the platforms' (platformBoards).
  */
-export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): SignPlan[] {
+export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): Array<SignPlan & { stair?: boolean }> {
   // One board for each way at each decision point (owner, 2026-11-13: "multiple signboards for same
   // exit"): walks that share a stair share its sign. When their streets differ, it names the street
   // they have in common ("Broadway"), else only the way.
-  const out: Array<SignPlan & { seconds: string[] }> = [];
+  const out: Array<SignPlan & { seconds: string[]; stair?: boolean }> = [];
   // Along one walk, a stair climbed in flights with landings between gets its board at the first.
   const firsts = model.walks.flatMap((w) => planSigns(model, w, corner(w.exit)).slice(1).filter((p, i, all) => {
     const q = all.slice(0, i).reverse().find((o) => !o.small);
@@ -144,14 +144,14 @@ export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, num
   for (const p of firsts) {
     const head = JSON.stringify(p.lines[0]);
     const same = out.find((o) => JSON.stringify(o.lines[0]) === head && Math.hypot(o.at[0] - p.at[0], o.at[1] - p.at[1]) < 3 && Math.abs(o.at[2] - p.at[2]) < 1);
-    if (!same) { out.push({ ...p, seconds: [p.lines[1]?.text ?? ""] }); continue; }
+    if (!same) { out.push({ ...p, stair: !p.small, seconds: [p.lines[1]?.text ?? ""] }); continue; }
     const t = p.lines[1]?.text;
     if (t == null || !same.lines[1]?.text || same.seconds.includes(t)) continue;
     same.seconds.push(t);
     const common = same.seconds.map((n) => n.split(/ & | · /)).reduce((a, b) => a.filter((part) => b.includes(part)));
     same.lines = [same.lines[0], common.length ? { text: common[0] } : null];
   }
-  return [...out.map(({ seconds: _, ...p }) => p), ...platformBoards(model)];
+  return [...out.map(({ at, heading, lines, small, stair }) => ({ at, heading, lines, small, stair })), ...platformBoards(model)];
 }
 
 /** A board as hung: where, which way, and its box at the scale it hangs. */
@@ -173,11 +173,15 @@ export const boardsOverlap = (p: Placed, q: Placed) => boardInWall(p.b, p.at, p.
  * sign's side, at its usual height, facing out; else hung where planned. Every spot is checked
  * against every wall; when none clears, it hangs at the nearest spot that does, smaller if it must. Never dropped.
  */
-function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = [], over: (x: number, y: number) => number[] = () => []): { at: P3; heading: number; flat: boolean; scale: number } {
-  const slabs = placed.filter((q) => Math.hypot(q.at[0] - at[0], q.at[1] - at[1]) < q.b.half + b.half + 8).map(slabOf);
+/** Moved from a stair board's planned spot by (dx, dy): no more than a metre aside, and never on toward the stair. */
+export const inFront = (dx: number, dy: number, heading: number) =>
+  Math.abs(dx * Math.cos(heading) - dy * Math.sin(heading)) <= 1 && dx * Math.sin(heading) + dy * Math.cos(heading) < 0.3;
+
+function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = [], over: (x: number, y: number) => number[] = () => [], stair = false): { at: P3; heading: number; flat: boolean; scale: number } {
+  const near0 = placed.filter((q) => Math.hypot(q.at[0] - at[0], q.at[1] - at[1]) < q.b.half + b.half + 8), slabs = near0.map(slabOf);
   // Clear of every board hung, and under every ceiling, stair and floor overhead: none between the
   // board's foot and 2 cm over its top, across its width and over both faces.
-  const clear = (c: P3, h: number, box: Board) => !boardInWall(box, c, h, slabs) && [-1, -0.5, 0, 0.5, 1].every((k) => [box.y0, box.y1].every((d) => {
+  const clear = (c: P3, h: number, box: Board) => !boardInWall(box, c, h, slabs) && !near0.some((q) => boardsOverlap(q, { at: c, heading: h, b: box })) && [-1, -0.5, 0, 0.5, 1].every((k) => [box.y0, box.y1].every((d) => {
     const x = c[0] + Math.cos(h) * box.half * k + Math.sin(h) * d, y = c[1] - Math.sin(h) * box.half * k + Math.cos(h) * d;
     return over(x, y).every((z) => z < c[2] + box.z0 || z > c[2] + box.z1 + 0.02);
   }));
@@ -211,15 +215,26 @@ function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWal
         const span = inWalkWay(w, x, y, pz);
         return span && span[0] < s + b.half && span[1] > s - b.half && z + b.z0 < pz + DOOR_HEAD_M + 0.05;
       });
-      if (!door && !boardInWall(b, c, h, walls) && clear(c, h, b)) return { at: c, heading: h, flat: true, scale: 1 };
+      // A stair's board goes flat only on a wall facing whoever walks up to the stair, beside its mouth
+      // (owner, 2026-11-13: "right at the stair, facing them"), never along a side wall.
+      const facing = !stair || (Math.cos(h - heading) > Math.cos(Math.PI / 6) && inFront(c[0] - at[0], c[1] - at[1], heading));
+      if (facing && !door && !boardInWall(b, c, h, walls) && clear(c, h, b)) return { at: c, heading: h, flat: true, scale: 1 };
     }
   }
   // Hung on its rods where planned, or the nearest spot round it (out to 3 m, up to 0.8 m lower) that
   // clears every wall and every board already hung; smaller only when none does.
   for (const scale of [1, 0.75, 0.5, 0.3]) {
     const sb = { half: rods.half * scale, y0: rods.y0, y1: rods.y1, z0: rods.z0 * scale, z1: rods.z1 * scale };
-    for (let r = 0; r <= 3; r += 0.5) for (let i = 0; i < (r ? 8 : 1); i++) for (const up of [0, -0.4, -0.8]) {
-      const c: P3 = [at[0] + r * Math.cos((i * Math.PI) / 4), at[1] + r * Math.sin((i * Math.PI) / 4), at[2] + up];
+    // Lower only when no spot at its height fits: above a head first. A stair's board moves back along
+    // the walk, still in front of the stair, before it moves aside, and never on toward the stair.
+    const back = stair ? [0.5, 1].map((d): [number, number] => [-Math.sin(heading) * d, -Math.cos(heading) * d]) : [];
+    const round = [0, 0.5, 1, 1.5, 2, 2.5, 3].flatMap((r) => Array.from({ length: r ? 8 : 1 }, (_, i): [number, number] => [r * Math.cos((i * Math.PI) / 4), r * Math.sin((i * Math.PI) / 4)]));
+    // A ceiling lower than planned takes the rods' tops just under it.
+    const roof = (x: number, y: number) => Math.min(...[-1, -0.5, 0, 0.5, 1].flatMap((k) => over(x + Math.cos(heading) * sb.half * k, y - Math.sin(heading) * sb.half * k)).filter((z) => z > at[2] + sb.z0 - 0.8)) - sb.z1 - 0.02 - at[2];
+    for (const up of [0, NaN, -0.4, -0.8]) for (const [dx, dy] of [...round.slice(0, 1), ...back, ...round.slice(1).filter(([x, y]) => !stair || inFront(x, y, heading))]) {
+      const lift = Number.isNaN(up) ? roof(at[0] + dx, at[1] + dy) : up;
+      if (!(lift <= 0 && lift >= -0.8)) continue;
+      const c: P3 = [at[0] + dx, at[1] + dy, at[2] + lift];
       if (!boardInWall(sb, c, heading, walls) && clear(c, heading, sb)) return { at: c, heading, flat: false, scale };
     }
   }
@@ -337,20 +352,38 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   const lampGeo = new THREE.BoxGeometry(0.12, 1.2, 0.04);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbea });
   const placed: Placed[] = [];
+  // A stair's board hangs over the middle of the stair, not over the walk, which may climb at one side
+  // (owner, 2026-11-13: the Broadway & John St board hung off to the left of its stair).
+  const steps = shell ? surfaceFinder(trisOf(shell.stairs)) : null;
+  const stairMiddle = (at: P3, h: number): P3 => {
+    if (!steps) return at;
+    const fx = Math.sin(h), fy = Math.cos(h), ux = Math.cos(h), uy = -Math.sin(h), foot = at[2] - 2.4;
+    for (let d = 1; d <= 6; d += 0.25) {
+      const on = (o: number) => steps(at[0] + fx * d + ux * o, at[1] + fy * d + uy * o).some((z) => Math.abs(z - foot) < 1.5);
+      if (!on(0)) continue;
+      let a = 0, b = 0;
+      while (a > -4 && on(a - 0.1)) a -= 0.1;
+      while (b < 4 && on(b + 0.1)) b += 0.1;
+      const m = (a + b) / 2;
+      return [at[0] + ux * m, at[1] + uy * m, at[2]];
+    }
+    return at;
+  };
   const overhead = shell ? surfaceFinder(trisOf([...shell.ceiling, ...shell.floors, ...shell.stairs])) : () => [];
   for (const plan of walkSignPlans(model, corner)) {
     const key = JSON.stringify(plan.lines);
     if (!fresh(key, plan.at)) continue;
     const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
     const flatB = boardOf(flat), hungB = boardOf(hung);
-    const spot = placeSign(flatB, hungB, plan.at, plan.heading, walls, walkNear, placed, overhead);
+    const aim = plan.stair ? stairMiddle(plan.at, plan.heading) : plan.at;
+    const spot = placeSign(flatB, hungB, aim, plan.heading, walls, walkNear, placed, overhead, plan.stair);
     // On a wall it is fixed flat; hung from the ceiling, on its rods.
     const sign = spot.flat ? flat : hung;
     dispose(spot.flat ? hung : flat);
     sign.position.set(...spot.at);
     sign.rotation.z = -spot.heading;
     sign.scale.setScalar(spot.scale);
-    sign.userData.sign = { key, planned: plan.at };
+    sign.userData.sign = { key, planned: plan.at, aim };
     const box = spot.flat ? flatB : hungB, k = spot.scale;
     placed.push({ at: spot.at, heading: spot.heading, b: { half: box.half * k, y0: box.y0, y1: box.y1, z0: box.z0 * k, z1: box.z1 * k } });
     group.add(sign);

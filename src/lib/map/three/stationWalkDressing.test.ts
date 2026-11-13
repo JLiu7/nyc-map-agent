@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { type DollhouseModel, type P3 } from "./dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { inWall, stationShell, walkPoints, type Shell } from "./stationShell";
-import { boardsOverlap, fareRows, walkSignPlans, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
+import { boardsOverlap, fareRows, inFront, walkSignPlans, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 
@@ -112,10 +112,27 @@ describe("Fulton St's dressing for walking inside", () => {
     expect(all.length).toBeLessThan(40);
   });
 
+  it("hangs each stair's board at the stair's foot, facing whoever walks up to it", () => {
+    // Owner, 2026-11-13: the Broadway & John St board hung off to the left of its stair.
+    const off: string[] = [];
+    for (const plan of walkSignPlans(model, fultonCorner).filter((p) => p.stair)) {
+      const key = JSON.stringify(plan.lines);
+      const s = signs().find((o) => { const u = o.userData.sign as { key: string; planned: P3 }; return u.key === key && u.planned.every((v, i) => Math.abs(v - plan.at[i]) < 0.01); });
+      if (!s) continue;
+      const turn = Math.abs(Math.atan2(Math.sin(-s.rotation.z - plan.heading), Math.cos(-s.rotation.z - plan.heading)));
+      // Moved back along the walk is fine; aside, no more than a metre.
+      // Over the stair's middle (`aim`), or moved back from it along the walk.
+      const aim = (s.userData.sign as { aim: P3 }).aim;
+      if (turn > Math.PI / 6 + 1e-6 || !inFront(s.position.x - aim[0], s.position.y - aim[1], plan.heading)) off.push(`${key} at ${s.position.x.toFixed(1)},${s.position.y.toFixed(1)}`);
+    }
+    expect(off).toEqual([]);
+  });
+
   it("puts a sign near a wall flat on it, facing out", () => {
-    // Without rods: a sign on a wall has only its two faces.
+    // Without rods: a sign on a wall has only its two faces. A stair's board goes flat only on a wall
+    // facing whoever walks up to it, so most of those hang.
     const flat = signs().filter((s) => s.children.length === 2);
-    expect(flat.length).toBeGreaterThan(signs().length / 4);
+    expect(flat.length).toBeGreaterThan(5);
   });
 
   it("sends each walk through a turnstile where it crosses a fare line, its arms turning a third of a turn", () => {
