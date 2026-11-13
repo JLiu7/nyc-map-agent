@@ -8,7 +8,7 @@ import { lastWalkLabel } from "./arrivalWalk";
 import { z } from "zod";
 import type { Leg, LngLatTuple, TripCore } from "../../../src/features/agent/schema";
 import { elevatorStatus, serviceAlerts } from "./services";
-import { distM, openDataEntrances, type Station, type StationEntrances } from "./transit";
+import { distM, legStation, openDataEntrances, type Station, type StationEntrances } from "./transit";
 import { nyLocalToDate, portalFor, safe, toNyLocal } from "./trip";
 import { decodePolyline } from "./polyline";
 import { OTP_CONTAINER, waker } from "./sablier";
@@ -180,7 +180,7 @@ export async function itineraryToTrip(
       const st = await safe(nearestStation(ll(l.to), src), null);
       if (st) {
         const exit = await portalFor(st, await safe(src.entrances(st.complexId), []), destination.at, "exit", elevators);
-        legs.push({ kind: "exit", station: { id: st.id, name: st.name, lon: st.at[0], lat: st.at[1] }, portal: exit, label: `Use the ${exit.label} at ${st.name}` });
+        legs.push({ kind: "exit", station: legStation(st), portal: exit, label: `Use the ${exit.label} at ${st.name}` });
         exitAdvice = `Use the ${exit.label} at ${st.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}`;
       }
     }

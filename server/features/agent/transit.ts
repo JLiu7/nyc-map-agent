@@ -18,6 +18,11 @@ export interface Station {
   /** M, Bk, Q, Bx or SI, as the MTA's station list writes it. */
   borough?: string;
 }
+/**
+ * A station as a trip leg names it. The app's station list keys stations by GTFS stop id ("418" for
+ * Fulton St on the 4/5); the MTA's station number ("412") is a different station there (170 St).
+ */
+export const legStation = (s: Station) => ({ id: s.gtfsId || s.id, name: s.name, lon: s.at[0], lat: s.at[1] });
 export interface Entrance { complexId: string; at: LngLatTuple; type: string; entry: boolean; exit: boolean }
 
 /** What the transit worker's entrances module must expose. */
