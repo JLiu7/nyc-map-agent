@@ -30,4 +30,11 @@ describe("root app", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
   });
+
+  it("has the offline worker asked for again every time, so a new one reaches phones at once (#132)", async () => {
+    if (!existsSync("dist/sw.js")) return;
+    const res = await createRoot().fetch(new Request("http://x/sw.js"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+  });
 });

@@ -19,6 +19,12 @@ export function createRoot(): Hono {
     await next();
     if (c.res.status === 200) c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
   });
+  // The offline worker must reach phones as soon as it changes (#132): no copy kept by the browser or Cloudflare's edge
+  // without asking again. Without this header Cloudflare kept it four hours.
+  root.use("/sw.js", async (c, next) => {
+    await next();
+    if (c.res.status === 200) c.res.headers.set("cache-control", "no-cache");
+  });
   root.use("/*", serveStatic({ root: "./dist" }));
   // A build file that is not there (an older build's chunk) is a 404, not the SPA shell served as script.
   root.get("/assets/*", (c) => c.notFound());
