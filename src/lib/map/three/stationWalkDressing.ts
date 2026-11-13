@@ -7,8 +7,8 @@
  */
 import * as THREE from "three";
 import {
-  CAR_M, CARS, DOORS_ALONG_M, dispose, LIGHT_ASIDE_M, LIGHT_EVERY_M, LIGHT_UP_M, planSigns, platformBoards, signMesh, trainCars, turnstile, walkAt, walkLength,
-  type DollhouseModel, type P3,
+  CAR_M, CARS, DOORS_ALONG_M, dispose, LIGHT_ASIDE_M, LIGHT_EVERY_M, LIGHT_UP_M, planSigns, signMesh, trainCars, turnstile, walkAt, walkLength, walkPlaces,
+  type DollhouseModel, type P3, type SignPlan,
 } from "./dollhouse";
 import { gatePanels, inWalkWay, inWall, surfaceFinder, walkPoints, type Shell, type ShellWall } from "./stationShell";
 /** From the platform's edge to the middle of the track beside it. */
@@ -55,13 +55,13 @@ export function boardInWall(b: Board, at: P3, heading: number, walls: ShellWall[
 }
 
 /** How far along a wall's centre line (0 to 1) the point nearest (x, y) lies. */
-function along(x: number, y: number, w: Pick<ShellWall, "a" | "b">): number {
+function along(x: number, y: number, w: ShellWall): number {
   const dx = w.b[0] - w.a[0], dy = w.b[1] - w.a[1], L = dx * dx + dy * dy || 1;
   return Math.max(0, Math.min(1, ((x - w.a[0]) * dx + (y - w.a[1]) * dy) / L));
 }
 
 /** Distance from (x, y) to a wall's centre line, seen from above. */
-function segDist(x: number, y: number, w: Pick<ShellWall, "a" | "b">): number {
+function segDist(x: number, y: number, w: ShellWall): number {
   const k = along(x, y, w);
   return Math.hypot(w.a[0] + (w.b[0] - w.a[0]) * k - x, w.a[1] + (w.b[1] - w.a[1]) * k - y);
 }
@@ -85,38 +85,64 @@ function pointGrid(pts: P3[]) {
 }
 
 /**
+ * The direction boards that belong to the platforms rather than one walk (owner, 2026-11-13:
+ * "downtown train sign uptown train sign"). Fulton St's 4/5 has two side platforms across the
+ * tracks: the edge nearest the downtown track is the downtown platform's, the other the uptown one's.
+ * - On the uptown platform, "Fulton St" and "Uptown & The Bronx" boards across from each downtown
+ *   one, 2.5 m in from the edge, facing whoever stands on that platform. (The downtown train,
+ *   standing between, hides them from the downtown side.)
+ * - Where each walk's first stair leaves the downtown platform's level, a board 3 m out on the
+ *   platform side for whoever comes off that stair: "Downtown & Brooklyn" with the platform's lines.
+ */
+export function platformBoards(model: DollhouseModel): SignPlan[] {
+  const seg = ([x1, y1, x2, y2]: number[]) => ({ a: [x1, y1], b: [x2, y2] }) as ShellWall;
+  const [tx, ty] = model.track.at;
+  const [down, up] = [...model.edges].sort((p, q) => segDist(tx, ty, seg(p)) - segDist(tx, ty, seg(q)));
+  const out: SignPlan[] = [];
+  if (up) {
+    const [x1, y1, x2, y2, z] = up, len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    // Away from the tracks: off the edge on the side the downtown edge is not.
+    const side = Math.sign((down[0] - x1) * -uy + (down[1] - y1) * ux) || 1, ax = uy * side, ay = -ux * side;
+    for (const w of model.walks) {
+      const p = planSigns(model, w, null)[0].at, s = (p[0] - x1) * ux + (p[1] - y1) * uy;
+      const at: P3 = [x1 + ux * s + ax * 2.5, y1 + uy * s + ay * 2.5, z + 2.6];
+      if (s < 3 || s > len - 3 || out.some((o) => Math.hypot(o.at[0] - at[0], o.at[1] - at[1]) < 3)) continue;
+      out.push({ at, heading: Math.atan2(-ax, -ay), lines: [{ bullets: model.lines, text: "Fulton St" }, { text: "Uptown & The Bronx" }] });
+    }
+  }
+  for (const w of model.walks) {
+    // The walk's first stair, up or down, is the one off the platform's level; one far from the
+    // downtown edge belongs to another part of the station.
+    const f = walkPlaces(w.path).signs[0];
+    if (down && f && Math.abs(f.at[2] - w.path[0][2]) < 0.3 && segDist(f.at[0], f.at[1], seg(down)) < 25) {
+      out.push({ at: [f.at[0] - Math.sin(f.heading) * 3, f.at[1] - Math.cos(f.heading) * 3, f.at[2] + 2.5], heading: f.heading + Math.PI, lines: [{ bullets: model.lines, text: "Downtown & Brooklyn" }, null] });
+    }
+  }
+  return out;
+}
+
+/** A board as hung: where, which way, and its box at the scale it hangs. */
+export type Placed = { at: P3; heading: number; b: Board };
+
+/** A board hung, as a slab a new board must keep out of: 15 cm thicker each side, so none covers another. */
+function slabOf({ at, heading, b }: Placed): ShellWall {
+  const ux = Math.cos(heading) * b.half, uy = -Math.sin(heading) * b.half, d = (b.y0 + b.y1) / 2;
+  const cx = at[0] + Math.sin(heading) * d, cy = at[1] + Math.cos(heading) * d;
+  return { a: [cx - ux, cy - uy], b: [cx + ux, cy + uy], foot: [at[2] + b.z0, at[2] + b.z0], top: [at[2] + b.z1, at[2] + b.z1], thick: b.y1 - b.y0 + 0.3 };
+}
+
+/** Whether one board would cover another. */
+export const boardsOverlap = (p: Placed, q: Placed) => boardInWall(p.b, p.at, p.heading, [slabOf(q)]);
+
+/**
  * Where a sign planned at `at` facing `heading` goes (owner, 2026-11-13: signs went through walls, and
  * then went missing). With a wall within WALL_NEAR_M of its board, flat on that wall's face on the
  * sign's side, at its usual height, facing out; else hung where planned. Every spot is checked
  * against every wall; when none clears, it hangs at the nearest spot that does, smaller if it must. Never dropped.
  */
-/** A board as hung: where, which way, and its box at the scale it hangs. */
-export type Placed = { at: P3; heading: number; b: Board };
-
-/** The ends of a board's face in plan: its middle line, from one side to the other. */
-function boardEnds({ at, heading, b }: Placed): [number, number, number, number] {
-  const ux = Math.cos(heading), uy = -Math.sin(heading), fx = Math.sin(heading), fy = Math.cos(heading), d = (b.y0 + b.y1) / 2;
-  const cx = at[0] + fx * d, cy = at[1] + fy * d;
-  return [cx - ux * b.half, cy - uy * b.half, cx + ux * b.half, cy + uy * b.half];
-}
-
-/** Whether two boards come within 15 cm of each other in plan at heights they share: one would cover the other. */
-export function boardsOverlap(p: Placed, q: Placed): boolean {
-  if (p.at[2] + p.b.z0 > q.at[2] + q.b.z1 || q.at[2] + q.b.z0 > p.at[2] + p.b.z1) return false;
-  if (Math.hypot(p.at[0] - q.at[0], p.at[1] - q.at[1]) > p.b.half + q.b.half + 1) return false;
-  const [ax, ay, bx, by] = boardEnds(p), [cx, cy, dx, dy] = boardEnds(q);
-  let best = Infinity;
-  for (let i = 0; i <= 8; i++) {
-    const t = i / 8;
-    best = Math.min(best,
-      segDist(ax + (bx - ax) * t, ay + (by - ay) * t, { a: [cx, cy], b: [dx, dy] }),
-      segDist(cx + (dx - cx) * t, cy + (dy - cy) * t, { a: [ax, ay], b: [bx, by] }));
-  }
-  return best < 0.15;
-}
-
 function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = []): { at: P3; heading: number; flat: boolean; scale: number } {
-  const clear = (c: P3, h: number, box: Board) => !placed.some((q) => boardsOverlap({ at: c, heading: h, b: box }, q));
+  const slabs = placed.filter((q) => Math.hypot(q.at[0] - at[0], q.at[1] - at[1]) < q.b.half + b.half + 8).map(slabOf);
+  const clear = (c: P3, h: number, box: Board) => !boardInWall(box, c, h, slabs);
   const r = b.half + WALL_NEAR_M;
   // Every spot tried lies within this of where the sign was planned: only these walls can reach it.
   const walls = all.filter((w) => segDist(at[0], at[1], w) < r + b.half + 3);

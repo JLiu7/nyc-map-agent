@@ -209,56 +209,6 @@ export function planSigns(model: DollhouseModel, walk: DollhouseWalk, corner: st
   return out;
 }
 
-/**
- * The direction boards that belong to the platforms rather than one walk (owner, 2026-11-13:
- * "downtown train sign uptown train sign"). Fulton St's 4/5 has two side platforms across the
- * tracks: the edge nearest the downtown track is the downtown platform's, the other the uptown one's.
- * - On the uptown platform, "Fulton St" and "Uptown & The Bronx" boards across from each downtown
- *   one, 2.5 m in from the edge, facing whoever stands on that platform. (The downtown train,
- *   standing between, hides them from the downtown side.)
- * - Where each walk's first stair leaves the downtown platform's level, a board 3 m out on the
- *   platform side for whoever comes off that stair: "Downtown & Brooklyn" with the platform's lines.
- */
-export function platformBoards(model: DollhouseModel): SignPlan[] {
-  const [tx, ty] = model.track.at;
-  const toEdge = ([x1, y1, x2, y2]: (typeof model.edges)[number], px = tx, py = ty) => {
-    const len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
-    const s = Math.max(0, Math.min(len, (px - x1) * ux + (py - y1) * uy));
-    return Math.hypot(px - x1 - ux * s, py - y1 - uy * s);
-  };
-  const edges = [...model.edges].sort((a, b) => toEdge(a) - toEdge(b));
-  if (!edges.length) return [];
-  const out: SignPlan[] = [];
-  const near = (at: P3) => out.some((o) => Math.hypot(o.at[0] - at[0], o.at[1] - at[1]) < 3 && Math.abs(o.at[2] - at[2]) < 1);
-  const walkPlans = model.walks.map((w) => planSigns(model, w, null));
-  const down = walkPlans.map((plans) => plans[0].at);
-  const up = edges[1];
-  if (up) {
-    const [x1, y1, x2, y2, z] = up, len = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / len, uy = (y2 - y1) / len;
-    // Away from the tracks: the side of the edge the downtown edge is not on.
-    const [dx1, dy1, dx2, dy2] = edges[0];
-    const side = Math.sign(((dx1 + dx2) / 2 - x1) * -uy + ((dy1 + dy2) / 2 - y1) * ux) || 1;
-    const ax = uy * side, ay = -ux * side;
-    for (const p of down) {
-      const s = (p[0] - x1) * ux + (p[1] - y1) * uy;
-      if (s < 3 || s > len - 3) continue;
-      const at: P3 = [x1 + ux * s + ax * 2.5, y1 + uy * s + ay * 2.5, z + 2.6];
-      if (near(at)) continue;
-      out.push({ at, heading: Math.atan2(-ax, -ay), lines: [{ bullets: model.lines, text: "Fulton St" }, { text: "Uptown & The Bronx" }] });
-    }
-  }
-  for (const w of model.walks) {
-    // The walk's first stair, up or down, is the one off the platform's level; one far from the
-    // downtown edge belongs to another part of the station.
-    const foot = walkPlaces(w.path).signs[0];
-    if (!foot || Math.abs(foot.at[2] - w.path[0][2]) > 0.3 || toEdge(edges[0], foot.at[0], foot.at[1]) > 25) continue;
-    const at: P3 = [foot.at[0] - Math.sin(foot.heading) * 3, foot.at[1] - Math.cos(foot.heading) * 3, foot.at[2] + 2.5];
-    if (near(at)) continue;
-    out.push({ at, heading: foot.heading + Math.PI, lines: [{ bullets: model.lines, text: "Downtown & Brooklyn" }, null] });
-  }
-  return out;
-}
-
 function box(w: number, d: number, h: number, color: number, clip: THREE.Plane[] = []): THREE.Mesh {
   return new THREE.Mesh(new THREE.BoxGeometry(w, d, h), new THREE.MeshLambertMaterial({ color, clippingPlanes: clip }));
 }
@@ -383,7 +333,7 @@ export function wallTexture(): THREE.Texture {
 /** One line of a sign: an arrow, route bullets, then words, left to right. */
 type SignLine = { arrow?: "up" | "down"; bullets?: Array<[string, string]>; text?: string };
 /** A sign to hang: where (the panel's middle), the way the walker faces when reading it, and its big and small lines. */
-type SignPlan = { at: P3; heading: number; lines: [SignLine, SignLine | null]; small?: boolean };
+export type SignPlan = { at: P3; heading: number; lines: [SignLine, SignLine | null]; small?: boolean };
 
 const SIGN_FONT = (px: number) => `bold ${px}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
 

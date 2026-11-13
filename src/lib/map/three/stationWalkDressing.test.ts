@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
-import { planSigns, platformBoards, type DollhouseModel, type P3 } from "./dollhouse";
+import { planSigns, type DollhouseModel, type P3 } from "./dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { inWall, stationShell, walkPoints, type Shell } from "./stationShell";
-import { boardsOverlap, fareRows, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
+import { boardsOverlap, fareRows, platformBoards, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 
