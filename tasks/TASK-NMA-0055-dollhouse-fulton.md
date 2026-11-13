@@ -557,6 +557,29 @@ Blocked/uncertain:
 Next:
 - After #165 deploys, open Street view at Broadway and Dey on the live site, press Walk inside Fulton St, walk to the downtown platform and board; then show the owner before the live comment on #126
 
+### 2026-11-13 15:34:50 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T15:34:50Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"6032a45631aeed242add80623ab008ea436931b019c746e805ad8f1491c291d6","request_id":"31512711a9844912a87019a1521d71e4","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Once the PR for feat/126-walk-signs-gates deploys, walk inside Fulton St on the live site: an Exit sign by a wall lies flat on it, the turnstile arms turn at the fare line, the blue accessible gate stands at a row's end, and the uptown platform has Uptown & The Bronx boards
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
