@@ -1,5 +1,5 @@
 import "@/components/task-screens.css";
-import { ArrowLeft, ArrowRight, Navigation, Pause, Play, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Film, Navigation, Pause, Play, Search, X } from "lucide-react";
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PullSheet } from "@/components/PullSheet";
@@ -16,6 +16,8 @@ const LAYERS = ["walk-guide-ahead", "walk-guide-done", "walk-guide-stops", "walk
 /** A simulated trip walks this many steps a second, a few times a real pace, and waits this long at an elevator. */
 const SIM_TICK_MS = 160;
 const SIM_HOLD_MS = 1400;
+/** The filmed trip, served with the app (about 9 MB; loaded only when asked for). */
+const TRIP_FILM = "/walks/trip.mp4";
 /** How far ahead of the dot the facing beam reaches, metres. */
 const BEAM_M = 10;
 const LEVEL: Record<Checkpoint["level"], string> = { street: "Street", concourse: "Concourse", mezzanine: "Mezzanine", platform: "Platform" };
@@ -77,6 +79,8 @@ export default function WalkGuide() {
   const [started, setStarted] = useState(false);
   const [lost, setLost] = useState(false);
   const [wrong, setWrong] = useState<string | null>(null);
+  // The two-minute film of this same trip, cut from our own recordings with faces blurred.
+  const [film, setFilm] = useState(false);
   const mapRef = useRef<MapLibreMap | null>(null);
   // Set once the map exists, so the line is drawn and the camera goes to the walk without waiting for a tap.
   const [mapReady, setMapReady] = useState(false);
@@ -265,6 +269,18 @@ export default function WalkGuide() {
               <span className="inline-flex items-center gap-1.5">{sim ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}{sim ? "Pause" : "Simulate the trip"}</span>
             </button>
           </div>
+          <div className="flex gap-2">
+            <button type="button" className="task-action min-h-11 flex-1 px-3" aria-expanded={film} onClick={() => setFilm((f) => !f)} data-testid="walk-film-toggle">
+              <span className="inline-flex items-center gap-1.5"><Film size={16} aria-hidden />{film ? "Hide the film" : "Watch the filmed trip"}</span>
+            </button>
+            <a className="task-action inline-flex min-h-11 items-center gap-1.5 px-3" href={TRIP_FILM} download="step-free-cortlandt-st-to-union-sq.mp4" aria-label="Download the film">
+              <Download size={16} aria-hidden />Download
+            </a>
+          </div>
+          {/* Kept short so the map above the sheet stays in view; the film is upright, like the phone that shot it. */}
+          {film ? <video src={TRIP_FILM} controls playsInline preload="metadata" className="max-h-[38dvh] w-full rounded-xl bg-black object-contain" data-testid="walk-film">
+            <track kind="captions" src="/walks/trip.vtt" srcLang="en" label="English" />
+          </video> : null}
           <div className="flex gap-2">
             <button type="button" aria-label="Previous sign" className="task-action min-h-11 px-3" disabled={place.i === 0} onClick={() => { setWrong(null); go({ i: place.i - 1, walked: 0 }); }}><ArrowLeft size={18} /></button>
             <button type="button" className="task-action min-h-11 flex-1 px-3" disabled={!next} onClick={() => { setWrong(null); setStarted(true); go({ i: place.i + 1, walked: 0 }); }}>

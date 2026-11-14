@@ -49,6 +49,12 @@ describe("which sign a photo shows (#88)", () => {
     expect(pick("Exit 14 St & 4 Av", [UNION[6], UNION[3]])).toBe("us-exit-arrow");
   });
 
+  it("does not take a sign whose street numbers were not read", () => {
+    // What the live route read off a blurred frame of the 14 Street & 4 Avenue wall sign on 2026-11-14.
+    expect(pick("Exit M 40th Street & 9th Avenue")).toBeNull();
+    expect(pick("Exit 16 Street & 4 Avenue")).toBeNull();
+  });
+
   it("matches nothing when no sign was read or the words are not on the list", () => {
     expect(pick("NONE")).toBeNull();
     expect(pick("")).toBeNull();

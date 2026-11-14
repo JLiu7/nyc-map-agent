@@ -235,6 +235,75 @@ Blocked/uncertain:
 Next:
 - When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map
 
+### 2026-11-14 06:20:45 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["server/features/agent/seeSign.ts, seeSign.test.ts"],"completed":["The camera scan is live and was run against the real server; a sign is now taken only when its street numbers were read"],"decisions":["no new decisions"],"evidence":["Live /api/agent/see-sign: 7 of 8 sign frames right, 9 of 10 held-out frames matched nothing and the tenth matched the sign it showed, 2 to 12 s each; the one wrong answer is now a test case"],"next_action":"Add the face-blurred film as public/walks/trip.mp4, run the checks and layout case, open the pull request; then the 3D levels view with a follow camera","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T06:20:45Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b5ec6acdcd874a50cccb19bfe8c117e550bec75d24e6c519f645bb9f016bf540","request_id":"a22645e44df741aa9a5a6f43a3e97b0c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The camera scan is live and was run against the real server; a sign is now taken only when its street numbers were read
+
+Evidence:
+- Live /api/agent/see-sign: 7 of 8 sign frames right, 9 of 10 held-out frames matched nothing and the tenth matched the sign it showed, 2 to 12 s each; the one wrong answer is now a test case
+
+Decisions:
+- no new decisions
+
+Changed:
+- server/features/agent/seeSign.ts, seeSign.test.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- Add the face-blurred film as public/walks/trip.mp4, run the checks and layout case, open the pull request; then the 3D levels view with a follow camera
+
+### 2026-11-14 06:40:31 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["public/walks/trip.mp4, trip.vtt, src/features/walkguide/WalkGuide.tsx, e2e/walk-guide.spec.ts, checkpoints/CURRENT.md"],"completed":["The walk guide can play or download the film of the trip, faces blurred, with captions (pull request 179)"],"decisions":["no new decisions"],"evidence":["On the Pro: 30 unit tests, type check, lint on changed files, four layout cases and the size budgets pass; a frame every 5.5 s of the blurred film was looked at"],"next_action":"After 179 merges and deploys, play and download the film on the live site; then build the 3D levels view with a follow camera","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T06:40:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"d06ff610b2f64ad8957c57d645ee8516e88239e9504480ff7fb41310175ade73","request_id":"7323eb252e404bde8c897de19b2043d6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The walk guide can play or download the film of the trip, faces blurred, with captions (pull request 179)
+
+Evidence:
+- On the Pro: 30 unit tests, type check, lint on changed files, four layout cases and the size budgets pass; a frame every 5.5 s of the blurred film was looked at
+
+Decisions:
+- no new decisions
+
+Changed:
+- public/walks/trip.mp4, trip.vtt, src/features/walkguide/WalkGuide.tsx, e2e/walk-guide.spec.ts, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After 179 merges and deploys, play and download the film on the live site; then build the 3D levels view with a follow camera
+
+### 2026-11-14 15:12:11 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["checkpoints/CURRENT.md"],"completed":["Main is merged into the film branch, so pull request 179 can merge again"],"decisions":["no new decisions"],"evidence":["One conflict, in checkpoints/CURRENT.md, resolved by keeping main's paragraph and adding this branch's sentences"],"next_action":"Finish the 1920x1080 big-screen film with the three-level view for the 2026-11-14 demo and send it to the owner; after 179 deploys, play and download the film on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T15:12:11Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"de85b47e0d4d204b7893cc13f41c091aee5816fbd8c3f698c04c295b45fbdf88","request_id":"fbdb30d4a17041aca5373401e3c6a6f9","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Main is merged into the film branch, so pull request 179 can merge again
+
+Evidence:
+- One conflict, in checkpoints/CURRENT.md, resolved by keeping main's paragraph and adding this branch's sentences
+
+Decisions:
+- no new decisions
+
+Changed:
+- checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Finish the 1920x1080 big-screen film with the three-level view for the 2026-11-14 demo and send it to the owner; after 179 deploys, play and download the film on the live site
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
