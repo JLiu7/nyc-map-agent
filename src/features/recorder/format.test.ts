@@ -29,8 +29,10 @@ describe("parseRecording", () => {
   });
 
   it("accepts empty lists and no station or video (a phone browser has no barometer)", () => {
-    const { station: _s, video: _v, ...rest } = good();
-    expect(parseRecording({ ...rest, baro: [], gps: [], marks: [] }).ok).toBe(true);
+    const rec: Partial<Recording> = { ...good(), baro: [], gps: [], marks: [] };
+    delete rec.station;
+    delete rec.video;
+    expect(parseRecording(rec).ok).toBe(true);
   });
 
   it("rejects something that is not an object", () => {
@@ -43,8 +45,9 @@ describe("parseRecording", () => {
   });
 
   it("names a missing list", () => {
-    const { baro: _b, ...rest } = good();
-    expect(errorsOf(rest)).toEqual([expect.stringContaining('"baro" must be a list')]);
+    const rec: Partial<Recording> = good();
+    delete rec.baro;
+    expect(errorsOf(rec)).toEqual([expect.stringContaining('"baro" must be a list')]);
   });
 
   it("points at the first bad row by number", () => {
