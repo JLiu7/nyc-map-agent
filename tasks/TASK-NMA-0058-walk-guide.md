@@ -304,6 +304,29 @@ Blocked/uncertain:
 Next:
 - Finish the 1920x1080 big-screen film with the three-level view for the 2026-11-14 demo and send it to the owner; after 179 deploys, play and download the film on the live site
 
+### 2026-11-14 16:04:08 UTC — agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235","blocked":[],"changed":["src/features/recorder/clean, src/features/recorder/replay, e2e/station-replay.spec.ts, scripts/derive-union-sq-walk.ts"],"completed":["Friday's Union Sq walk can now be replayed beside Google Maps' No GPS signal, behind ?flags=+stationReplay, with the barometer's three levels and a cleaned path on the map"],"decisions":["no new decisions"],"evidence":["tsc, lint, the boundary check and knip pass; 24 recorder unit tests and the station replay layout spec at five sizes pass"],"next_action":"After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check it plays","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T16:04:08Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"429b0f1472cd8a33a10fa006cfae5bfb229dbce9b84a65268ad222878c00ea03","request_id":"4440067ea6ab4282917a48699bf76933","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Friday's Union Sq walk can now be replayed beside Google Maps' No GPS signal, behind ?flags=+stationReplay, with the barometer's three levels and a cleaned path on the map
+
+Evidence:
+- tsc, lint, the boundary check and knip pass; 24 recorder unit tests and the station replay layout spec at five sizes pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder/clean, src/features/recorder/replay, e2e/station-replay.spec.ts, scripts/derive-union-sq-walk.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check it plays
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
