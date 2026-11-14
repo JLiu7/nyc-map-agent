@@ -3,7 +3,8 @@
  * the film of it (public/walks/trip.mp4): where the rider is at each second of
  * the film. The film is the clock. Each of its 17 steps opens at one of the
  * Walk Guide's 17 checkpoints, so the dot is at a checkpoint when its step
- * starts and moves to the next one while the step plays.
+ * starts and moves to the next one while the step plays. The film does not
+ * show the ride: the dot waits on the platform, then is at the next station.
  */
 import baked from "./trip-stops.json";
 
@@ -69,7 +70,8 @@ export function tripAt(t: number): TripPlace {
   while (i < last - 1 && TIMES[i + 1] <= t) i++;
   const a = STOPS[i], b = STOPS[i + 1];
   const k = (t - TIMES[i]) / (TIMES[i + 1] - TIMES[i]);
-  if (a.by === "train") return { at: along([pt(a.at), pt(b.at)], k), level: "Train", place: "R or W train", part: 1 };
+  // The film stays on the platform while its "board the train" step plays, then cuts to the next station: so does the dot.
+  if (a.by === "train") return here(a);
   // An elevator: the two ends are a step apart on the map, and the level changes half-way up or down.
   if (a.by === "elevator") return { ...here(k < 0.5 ? a : b), at: along([pt(a.at), pt(b.at)], k), part: partOf(a) };
   return { ...here(a), at: along([pt(a.at), ...(a.via ?? []).map(pt), pt(b.at)], k) };

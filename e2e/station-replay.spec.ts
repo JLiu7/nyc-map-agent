@@ -44,6 +44,12 @@ for (const size of sizes) {
     await expect(film).toBeVisible();
     await expect(card.getByRole("button", { name: "Play" })).toBeVisible();
     await expect(page.getByTestId("replay-scrubber")).toBeVisible();
+    // The film plays with its sound, with a button to turn it off; the home screen's task row is away.
+    expect(await film.evaluate((v: HTMLVideoElement) => v.muted)).toBe(false);
+    await card.getByRole("button", { name: "Turn sound off" }).click();
+    expect(await film.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+    await card.getByRole("button", { name: "Turn sound on" }).click();
+    await expect(page.getByTestId("home-tasks")).toHaveCount(0);
 
     // The film and the map, and nothing from the old page.
     for (const gone of ["replay-graph", "replay-google", "replay-sign", "replay-speed", "replay-now", "replay-gaps"]) await expect(page.getByTestId(gone)).toHaveCount(0);
@@ -72,10 +78,10 @@ for (const size of sizes) {
     await expect(level).toHaveText("Concourse");
     await expect(place).toHaveText("Cortlandt St");
 
-    // On the train between the two stations: the map shows both.
+    // Boarding the train: the film is still on the Cortlandt St platform, and so is the dot.
     await r.seek(52);
-    await expect(level).toHaveText("Train");
-    await expect(place).toHaveText("R or W train");
+    await expect(level).toHaveText("Platform");
+    await expect(place).toHaveText("Cortlandt St");
     await page.waitForTimeout(1500);
     await expectLayout(page, { focus: await r.dot() });
 

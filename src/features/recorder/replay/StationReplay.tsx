@@ -1,5 +1,5 @@
 import "@/components/task-screens.css";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { Marker, type Map as MapLibreMap } from "maplibre-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -65,6 +65,7 @@ function clearOfChatBar(map: MapLibreMap): number {
 export default function StationReplay() {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
   const filmRef = useRef<HTMLVideoElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -188,10 +189,12 @@ export default function StationReplay() {
 
   const ended = t >= FILM_S - 0.05;
   const film = (
-    // The film has its words on screen, so it plays without sound.
-    <video ref={filmRef} src={FILM} muted playsInline preload="auto" data-testid="replay-film" aria-label="The film of the trip"
+    // The film plays with its narration. Play is the tap a browser wants before it lets sound out.
+    <video ref={filmRef} src={FILM} muted={muted} playsInline preload="auto" data-testid="replay-film" aria-label="The film of the trip"
       onEnded={() => setPlaying(false)}
-      className={desktop ? "aspect-[9/16] min-h-0 w-full shrink rounded-xl bg-black object-contain" : "mx-auto aspect-[9/16] h-[min(44dvh,calc(100dvh-420px))] shrink-0 rounded-xl bg-black object-contain"} />
+      className={desktop ? "aspect-[9/16] min-h-0 w-full shrink rounded-xl bg-black object-contain" : "mx-auto aspect-[9/16] h-[min(44dvh,calc(100dvh-420px))] shrink-0 rounded-xl bg-black object-contain"}>
+      <track kind="captions" src="/walks/trip.vtt" srcLang="en" label="English" />
+    </video>
   );
   const controls = (
     <div className="flex shrink-0 items-center gap-2.5">
@@ -203,6 +206,9 @@ export default function StationReplay() {
         <input type="range" min={0} max={FILM_S} step={0.1} value={t} aria-label="Time in the trip" className="h-7 w-full accent-amber-300" data-testid="replay-scrubber"
           onChange={(e) => seek(Number(e.target.value))} />
       </div>
+      <button type="button" className="task-action min-h-11 min-w-11 shrink-0 px-3" aria-label={muted ? "Turn sound on" : "Turn sound off"} aria-pressed={muted} onClick={() => setMuted((m) => !m)} data-testid="replay-sound">
+        {muted ? <VolumeX size={18} aria-hidden /> : <Volume2 size={18} aria-hidden />}
+      </button>
     </div>
   );
 
