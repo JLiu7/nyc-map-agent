@@ -42,7 +42,9 @@ export function signTokens(text: string): string[] {
 /**
  * Which listed sign the words read off a photo belong to, or null. A sign is a
  * candidate when at least two of its words were read and at least 60% of them;
- * a cut-off word counts ("Co" for "Corner"). The one with most words read
+ * a cut-off word counts ("Co" for "Corner"), but every number on the sign
+ * must have been read, since "Exit M 40th Street & 9th Avenue", a misreading
+ * of a blurred frame, is not the 14 St & 4 Av exit. The one with most words read
  * wins, so "Exit 14 St & 4 Av SW Co" is the SW corner sign and not the plainer
  * exit sign beside it. Equal candidates go to the earliest in the list, which
  * the caller orders nearest the rider's last place first. Pure, for tests.
@@ -56,6 +58,8 @@ export function matchRead(read: string, signs: readonly SignChoice[]): number | 
     const want = [...new Set(signTokens(s.sign))];
     const hit = want.filter(has).length;
     const share = want.length ? hit / want.length : 0;
+    // A street number is what tells one exit sign from another: every number on the sign has to have been read.
+    if (want.some((w) => /^\d+$/.test(w) && !got.includes(w))) return;
     if (hit < Math.min(2, want.length) || share < 0.6) return;
     if (!best || hit > best.hit || (hit === best.hit && share > best.share + 0.05)) best = { i, hit, share };
   });

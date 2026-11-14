@@ -55,6 +55,14 @@ for (const size of SIZES) {
     await page.getByTestId("walk-signs").getByRole("button", { name: /Red Exit sign/ }).click();
     await expect(page.getByTestId("walk-togo")).toHaveText("Elevator");
 
+    // The film of the trip opens in the sheet, with a way to keep it.
+    await page.getByTestId("walk-film-toggle").click();
+    await expect(page.getByTestId("walk-film")).toBeVisible();
+    await expect(sheet.getByRole("link", { name: "Download the film" })).toHaveAttribute("href", "/walks/trip.mp4");
+    await expectLayout(page);
+    await page.getByTestId("walk-film-toggle").click();
+    await expect(page.getByTestId("walk-film")).toHaveCount(0);
+
     // The simulated trip walks on by itself and says it is a simulation.
     await hook(page, "pick", "us-downtown-sign");
     await sheet.getByRole("button", { name: "Simulate the trip" }).click();
