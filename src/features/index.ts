@@ -17,6 +17,7 @@ import underground from "./underground";
 import streetWeather from "./street-weather";
 import signCamera from "./signcam";
 import walkGuide from "./walkguide";
+import stationReplay from "./recorder/replay";
 
 /** Every feature module. Core reads features only through this list. */
-export const FEATURES: FeatureModule[] = [restrooms, agent, transit, daylight, weather, hazards, traffic, parking, schools, storefronts, liveview, events, placeToilets, ferry, underground, streetWeather, signCamera, walkGuide];
+export const FEATURES: FeatureModule[] = [restrooms, agent, transit, daylight, weather, hazards, traffic, parking, schools, storefronts, liveview, events, placeToilets, ferry, underground, streetWeather, signCamera, walkGuide, stationReplay];

@@ -19,6 +19,7 @@
     "load:areas": "tsx scripts/load-areas.ts",
     "build:aggregates": "tsx scripts/build-aggregates.ts",
     "start": "tsx server/node.ts",
+    "walk:from-sensor-logger": "tsx scripts/sensor-logger-to-walk.ts",
     "build:sign-tiles": "tsx scripts/build-sign-tiles.ts",
     "build:skyline-tiles": "tsx scripts/build-skyline-tiles.ts",
     "publish:city-tiles": "tsx scripts/publish-city-tiles.ts",
