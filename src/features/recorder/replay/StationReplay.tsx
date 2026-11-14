@@ -13,12 +13,12 @@ import { keepInView } from "@/lib/map/keepInView";
 import { useLeftCard } from "@/lib/store/leftColumn";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { LEVEL_NAME, LevelGraph } from "./LevelGraph";
-import { END_S, GOOGLE_NO_GPS, LEVELS, LINE, LINE_LEVELS, loadWalk, RIDE_AT, START_S, stillAt, T0 } from "./unionSq";
+import { END_S, filmAt, GOOGLE_NO_GPS, LEVELS, LINE, LINE_LEVELS, loadWalk, RIDE_AT, SIGNS, signAt, signTimes, START_S, stillAt, T0 } from "./unionSq";
 
 const SRC = "station-replay";
-const LAYERS = ["station-replay-raw", "station-replay-clean", "station-replay-raw-now", "station-replay-now"] as const;
-/** Replay seconds per real second: the 13-minute walk plays in about 80 s. */
-const SPEED = 10;
+const LAYERS = ["station-replay-raw", "station-replay-clean", "station-replay-signs", "station-replay-raw-now", "station-replay-now"] as const;
+/** Replay seconds per real second: real time first, then faster, as the trip preview offers. */
+const SPEEDS = [1, 2, 5, 10, 30] as const;
 const TICK_MS = 100;
 
 const clock = (s: number) => new Date(T0 + s * 1000).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", second: "2-digit" }).toLowerCase();
@@ -30,6 +30,7 @@ function features(c: Cleaned, s: number): GeoJSON.FeatureCollection {
     type: "FeatureCollection",
     features: [
       ...c.raw.filter((_, i) => i % 2 === 0).map((p) => pt("raw", p.at)),
+      ...SIGNS.map((x) => pt("sign", x.at)),
       { type: "Feature", properties: { kind: "clean" }, geometry: { type: "LineString", coordinates: c.clean.map((p) => p.at) } },
       ...(c.raw.length ? [pt("raw-now", pathAt(c.raw, t))] : []),
       ...(c.clean.length ? [pt("now", pathAt(c.clean, t))] : []),
@@ -42,6 +43,7 @@ function ensure(map: MapLibreMap): void {
   map.addSource(SRC, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "station-replay-raw", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "raw"], paint: { "circle-radius": 2.6, "circle-color": "#9ca3af", "circle-opacity": 0.8 } });
   map.addLayer({ id: "station-replay-clean", type: "line", source: SRC, filter: ["==", ["get", "kind"], "clean"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#22c55e", "line-width": 5 } });
+  map.addLayer({ id: "station-replay-signs", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "sign"], paint: { "circle-radius": 5, "circle-color": "#ffffff", "circle-stroke-color": "#0f172a", "circle-stroke-width": 2 } });
   map.addLayer({ id: "station-replay-raw-now", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "raw-now"], paint: { "circle-radius": 6, "circle-color": "#9ca3af", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
   map.addLayer({ id: "station-replay-now", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "now"], paint: { "circle-radius": 9, "circle-color": "#2563eb", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
 }
@@ -60,6 +62,8 @@ export default function StationReplay() {
   const [failed, setFailed] = useState<string | null>(null);
   const [s, setS] = useState(START_S);
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<number>(1);
+  const filmRef = useRef<HTMLVideoElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const desktop = useMediaQuery("(min-width: 1024px)");
@@ -76,6 +80,26 @@ export default function StationReplay() {
   }, []);
 
   const cleaned = useMemo(() => (rec ? cleanWalk(rec, { levels: LEVELS, rideAt: RIDE_AT, line: LINE, lineLevels: LINE_LEVELS, snapFrom: T0, snapTo: T0 + GOOGLE_NO_GPS.to * 1000 }) : null), [rec]);
+
+  const times = useMemo(() => (rec && cleaned ? signTimes(rec.steps, cleaned.rides) : null), [rec, cleaned]);
+
+  // The film of the trip follows the replay clock: played at the matching rate where it can be, stepped frame by frame where it runs too slow.
+  useEffect(() => {
+    const v = filmRef.current;
+    if (!v || !times) return;
+    const { at, rate } = filmAt(times, s);
+    const want = rate * speed;
+    try {
+      if (playing && want >= 0.25 && want <= 16) {
+        v.playbackRate = want;
+        if (Math.abs(v.currentTime - at) > 0.6) v.currentTime = at;
+        if (v.paused) void v.play().catch(() => {});
+      } else {
+        if (!v.paused) v.pause();
+        if (Math.abs(v.currentTime - at) > 0.15) v.currentTime = at;
+      }
+    } catch { /* the film is not loaded yet */ }
+  }, [s, playing, speed, times]);
 
   useEffect(() => onMapInstance((map) => { mapRef.current = map; setMapReady(!!map); }), []);
   useEffect(() => {
@@ -131,10 +155,12 @@ export default function StationReplay() {
     } catch { /* the map has gone */ }
   }, []);
 
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => setS((v) => {
-      const next = v + (SPEED * TICK_MS) / 1000;
+      const next = v + (speedRef.current * TICK_MS) / 1000;
       if (next >= END_S) { setPlaying(false); return END_S; }
       return next;
     }), TICK_MS);
@@ -158,6 +184,7 @@ export default function StationReplay() {
   const where = lv === "ride" ? "Elevator" : lv ? LEVEL_NAME[lv] ?? lv : "";
   const still = stillAt(s);
   const noGps = s >= GOOGLE_NO_GPS.from && s <= GOOGLE_NO_GPS.to;
+  const sign = times ? SIGNS[signAt(times, s)] : null;
   const play = () => { if (s >= END_S) setS(START_S); setPlaying((p) => !p); };
 
   const header = (
@@ -169,6 +196,10 @@ export default function StationReplay() {
         <span className="task-caption block truncate">Fri · 14 St-Union Sq</span>
         <span className="block truncate text-[15px] font-bold" data-testid="replay-now">{clock(s)}{where ? ` · ${where}` : ""}</span>
       </button>
+      <label className="sr-only" htmlFor="replay-speed">Speed</label>
+      <select id="replay-speed" value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="task-action min-h-11 rounded-xl px-2 text-sm font-bold" data-testid="replay-speed">
+        {SPEEDS.map((x) => <option key={x} value={x}>{x}×</option>)}
+      </select>
       <button type="button" aria-label="Close" className="task-action task-close" onClick={close}><X size={18} /></button>
     </div>
   );
@@ -180,22 +211,36 @@ export default function StationReplay() {
       {failed ? <p className="text-sm text-amber-200" role="status">{failed}</p> : null}
       {cleaned?.gaps.length ? <p className="text-xs text-amber-200" role="status" data-testid="replay-gaps">{cleaned.gaps.join(" ")}</p> : null}
       {cleaned?.spans ? <LevelGraph baro={rec!.baro} spans={cleaned.spans} rides={cleaned.rides} rideNames={RIDE_AT.map((r) => r.name)} from={START_S} to={END_S} now={s} noGps={GOOGLE_NO_GPS} t0={T0} /> : null}
+      {sign ? (
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl bg-black/30 p-2" data-testid="replay-sign" aria-live="polite">
+          <img src={`/walks/${sign.photo}.jpg`} alt={sign.sign} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+          <div className="min-w-0 text-[13px] leading-snug">
+            <p className="truncate font-bold">{sign.sign}</p>
+            <p className="text-slate-200">{sign.say}</p>
+          </div>
+        </div>
+      ) : null}
+      <div className="flex shrink-0 gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="task-caption">Our walk</span>
+          <figure className="relative flex h-[min(340px,38vh)] w-full items-center justify-center overflow-hidden rounded-xl bg-black" data-testid="replay-film">
+            <video ref={filmRef} src="/walks/trip.mp4" muted playsInline preload="auto" className="max-h-full max-w-full object-contain" aria-label="The film of the walk at this moment" />
+          </figure>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="task-caption">Google Maps</span>
+          <figure className="relative flex h-[min(340px,38vh)] w-full items-center justify-center overflow-hidden rounded-xl bg-black" data-testid="replay-google">
+            <img src={still.src} alt="Google Maps on the same phone at this moment" className="max-h-full max-w-full object-contain" />
+            {noGps ? <figcaption className="absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-red-600/90 px-2 py-0.5 text-center text-xs font-bold">No GPS signal</figcaption> : null}
+          </figure>
+        </div>
+      </div>
       <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
-        <span className="task-caption">Ours</span>
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 shrink-0 rounded-full border-2 border-white bg-blue-600" aria-hidden />Now</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-6 shrink-0 rounded bg-green-500" aria-hidden />Cleaned</span>
-        <span className="flex items-center gap-1.5"><span className="flex w-6 shrink-0 justify-between" aria-hidden>{[0, 1, 2].map((k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-gray-400" />)}</span>Steps + turns only</span>
+        <span className="flex items-center gap-1.5"><span className="flex w-6 shrink-0 justify-between" aria-hidden>{[0, 1, 2].map((k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-gray-400" />)}</span>Steps + turns</span>
+        <span className="flex items-center gap-1.5"><span className="h-3 w-3 shrink-0 rounded-full border-2 border-slate-900 bg-white" aria-hidden />Sign</span>
       </div>
-      <span className="task-caption shrink-0">Google Maps, same phone</span>
-      <figure className="relative flex h-[min(340px,38vh)] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black" data-testid="replay-google">
-        <img src={still.src} alt="Google Maps on the same phone at this moment" className="max-h-full max-w-full object-contain" />
-        {noGps ? <figcaption className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-red-600/90 px-2 py-0.5 text-center text-xs font-bold">No GPS signal</figcaption> : null}
-      </figure>
-      <details className="shrink-0 text-xs text-slate-300">
-        <summary className="min-h-6 cursor-pointer font-semibold">More</summary>
-        <p className="mt-1">Measured: barometer, step count, the phone&apos;s own location fixes (17–40 m underground), Google&apos;s screen.</p>
-        <p className="mt-1">Estimated: the path between fixes. The phone was held sideways, so its compass is off by 50–100°: the grey dots keep the turns and are turned once to fit.</p>
-      </details>
     </div>
   );
 

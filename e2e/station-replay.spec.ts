@@ -33,6 +33,8 @@ for (const size of sizes) {
     await expect(page.getByTestId("replay-now")).toContainText("5:04:37 pm · Platform", { timeout: slow(15_000) });
     await expect(page.getByTestId("replay-graph")).toBeVisible();
     await expect(page.getByTestId("replay-google")).toContainText("No GPS signal");
+    await expect(page.getByTestId("replay-film").locator("video")).toBeAttached();
+    await expect(page.getByTestId("replay-sign")).toContainText("14 Street");
     const r = await replay(page);
     // Let the camera frame the walk before the layout is measured.
     await page.waitForTimeout(3500);
@@ -41,6 +43,7 @@ for (const size of sizes) {
     // On the mezzanine, between the two elevators.
     await r.seek(400);
     await expect(page.getByTestId("replay-now")).toContainText("5:11:07 pm · Mezzanine");
+    await expect(page.getByTestId("replay-sign")).not.toContainText("14 Street, with");
     await expectLayout(page, { focus: (await r.dot())! });
 
     // Out on 14th St: Google has its GPS back.
@@ -48,8 +51,9 @@ for (const size of sizes) {
     await expect(page.getByTestId("replay-now")).toContainText("Street");
     await expect(page.getByTestId("replay-google")).not.toContainText("No GPS signal");
 
-    // Play moves the clock on by itself.
+    // Play moves the clock on by itself, faster at 30×.
     await r.seek(100);
+    await page.getByTestId("replay-speed").selectOption("30");
     await card.getByRole("button", { name: "Play" }).click();
     await expect(page.getByTestId("replay-now")).not.toContainText("5:06:07 pm", { timeout: slow(5_000) });
     await card.getByRole("button", { name: "Pause" }).click();

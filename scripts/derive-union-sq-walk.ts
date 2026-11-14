@@ -4,9 +4,9 @@
  * elevators, out at 14 St & 4 Av, and along 14th St to University Hall).
  *
  *   pnpm walk:from-sensor-logger "<leg 2 sensor logger export.zip>" leg2.json --station "14 St-Union Sq"
- *   tsx scripts/derive-union-sq-walk.ts leg2.json src/features/recorder/replay/union-sq-walk.json
+ *   tsx scripts/derive-union-sq-walk.ts leg2.json public/replay/union-sq-walk.json
  *
- * It also writes union-sq-line.json beside it: the Walk Guide's line through the
+ * It also writes src/features/recorder/replay/union-sq-line.json: the Walk Guide's line through the
  * station with each point's level, and the two elevators, so the replay does not
  * reach into the walk guide feature at run time.
  *
@@ -16,7 +16,6 @@
  * were tapped on the walk (Annotation.csv has no rows).
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { parseRecording, type Recording } from "../src/features/recorder/format";
 import { legPath } from "../src/features/walkguide/progress";
 import { WALK } from "../src/features/walkguide/walks";
@@ -41,6 +40,8 @@ export function deriveLine() {
     line: legs.flatMap((l) => l.pts.map(r6)),
     lineLevels: legs.flatMap((l) => l.pts.map(() => l.level)),
     // EL219 (platform to mezzanine) and EL217 (mezzanine to 14 St & 4 Av).
+    // Each sign the rider meets, in order, as the Walk Guide shows it.
+    signs: ids.map(({ c }) => ({ id: c.id, sign: c.sign, say: c.say, photo: c.photo, steps: c.steps, at: r6(c.at) })),
     rides: [
       { from: at("us-to-mezzanine"), to: at("us-to-mezzanine"), name: "EL219" },
       { from: at("us-mural-elevator"), to: at("us-climate-clock"), name: "EL217" },
@@ -87,6 +88,6 @@ if (process.argv[1]?.endsWith("derive-union-sq-walk.ts")) {
   if (!parsed.ok) throw new Error(parsed.errors.join("\n"));
   const d = derive(parsed.recording);
   writeFileSync(out, JSON.stringify(d) + "\n");
-  writeFileSync(join(dirname(out), "union-sq-line.json"), JSON.stringify(deriveLine()) + "\n");
+  writeFileSync("src/features/recorder/replay/union-sq-line.json", JSON.stringify(deriveLine()) + "\n");
   console.log(`heading ${d.heading.length}, gps ${d.gps.length}, baro ${d.baro.length}, steps ${d.steps.length}`);
 }

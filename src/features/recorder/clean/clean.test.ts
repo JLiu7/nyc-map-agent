@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { BaroRow, HeadingRow, StepRow } from "../format";
 import { parseRecording } from "../format";
-import { LEVELS, LINE, LINE_LEVELS, RIDE_AT, T0 } from "@/features/recorder/replay/unionSq";
+import { END_S, filmAt, LEVELS, LINE, LINE_LEVELS, RIDE_AT, SIGNS, signTimes, T0 } from "@/features/recorder/replay/unionSq";
 import { chooseFixes, cleanWalk, deadReckon, distM, findRides, headingAt, levelAt, levelSpans, pathAt, pinPath, placeRaw, snapToLine, toXY, type Fix, type LonLat } from "./index";
 
 const O: LonLat = [-73.99, 40.735];
@@ -111,7 +111,7 @@ describe("snapping to the walk line", () => {
 });
 
 describe("Friday's walk at 14 St-Union Sq (real recording)", () => {
-  const parsed = parseRecording(JSON.parse(readFileSync("src/features/recorder/replay/union-sq-walk.json", "utf8")));
+  const parsed = parseRecording(JSON.parse(readFileSync("public/replay/union-sq-walk.json", "utf8")));
   if (!parsed.ok) throw new Error(parsed.errors.join("\n"));
   const rec = parsed.recording;
   const c = cleanWalk(rec, { levels: LEVELS, rideAt: RIDE_AT, line: LINE, lineLevels: LINE_LEVELS, snapFrom: T0, snapTo: T0 + 600_000 });
@@ -135,5 +135,20 @@ describe("Friday's walk at 14 St-Union Sq (real recording)", () => {
     const worst = Math.max(...c.raw.map((p) => distM(p.at, pathAt(c.clean, p.t))));
     expect(worst).toBeGreaterThan(30);
     expect(toXY(O, O)).toEqual([0, 0]);
+  });
+
+  it("meets every Walk Guide sign in order, and keeps the film moving forward with it", () => {
+    const times = signTimes(rec.steps, c.rides);
+    expect(times).toHaveLength(SIGNS.length);
+    for (let k = 1; k < times.length; k++) expect(times[k]).toBeGreaterThanOrEqual(times[k - 1]);
+    expect(times[SIGNS.findIndex((x) => x.id === "us-mural-elevator")]).toBeCloseTo(s(c.rides[1].t0), 0);
+    let last = -1;
+    for (let x = 10; x <= END_S; x += 5) {
+      const f = filmAt(times, x).at;
+      expect(f).toBeGreaterThanOrEqual(last);
+      expect(f).toBeGreaterThanOrEqual(55);
+      expect(f).toBeLessThanOrEqual(114.2);
+      last = f;
+    }
   });
 });
