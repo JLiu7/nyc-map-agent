@@ -105,11 +105,16 @@
     "limit": "708 kB"
   },
   {
+    "name": "feature: recorder page (lazy, loaded only at /record)",
+    "path": ".size-build/assets/RecordPage-*.js",
+    "limit": "5 kB"
+  },
+  {
     "name": "all JS except the station walk",
     "path": [
       ".size-build/assets/*.js",
       "!.size-build/assets/StationWalkScene-*.js"
     ],
-    "limit": "1245 kB"
+    "limit": "1250 kB"
   }
 ]

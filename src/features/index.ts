@@ -21,3 +21,6 @@ import stationReplay from "./recorder/replay";
 
 /** Every feature module. Core reads features only through this list. */
 export const FEATURES: FeatureModule[] = [restrooms, agent, transit, daylight, weather, hazards, traffic, parking, schools, storefronts, liveview, events, placeToilets, ferry, underground, streetWeather, signCamera, walkGuide, stationReplay];
+
+/** The recorder page at /record (#185), its own chunk; App routes to it by address. */
+export const loadRecordPage = () => import("./recorder/record/RecordPage");
