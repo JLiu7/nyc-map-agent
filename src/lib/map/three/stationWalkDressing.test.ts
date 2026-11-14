@@ -111,7 +111,8 @@ describe("Fulton St's dressing for walking inside", () => {
     const all = signs().map((s) => ({ head: JSON.stringify((JSON.parse((s.userData.sign as { key: string }).key) as unknown[])[0]), p: s.position }));
     const twice = all.flatMap((a, i) => all.slice(i + 1).filter((b) => b.head === a.head && Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) < 3 && Math.abs(b.p.z - a.p.z) < 1).map(() => a.head));
     expect(twice).toEqual([]);
-    expect(all.length).toBeLessThan(40);
+    // The A/C level's walks add their own stairs' boards (42 with them, 2026-11-13).
+    expect(all.length).toBeLessThan(48);
   });
 
   it("hangs each stair's board at the stair's foot, facing whoever walks up to it", () => {

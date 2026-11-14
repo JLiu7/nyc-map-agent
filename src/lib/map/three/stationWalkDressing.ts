@@ -100,7 +100,8 @@ function pointGrid(pts: P3[]) {
 export function platformBoards(model: DollhouseModel): SignPlan[] {
   const seg = ([x1, y1, x2, y2]: number[]) => ({ a: [x1, y1], b: [x2, y2] }) as ShellWall;
   const [tx, ty] = model.track.at;
-  const [down, up] = [...model.edges].sort((p, q) => segDist(tx, ty, seg(p)) - segDist(tx, ty, seg(q)));
+  // The 4/5 platform's edges only (1.1 m over its track): the A/C platform's lie a level below.
+  const [down, up] = model.edges.filter((e) => Math.abs(e[4] - model.track.at[2] - 1.1) < 0.5).sort((p, q) => segDist(tx, ty, seg(p)) - segDist(tx, ty, seg(q)));
   const out: SignPlan[] = [];
   // Each edge toward its tracks: the downtown one toward the downtown track, the uptown one toward the downtown edge.
   for (const [edge, [ox, oy], text] of [[down, [tx, ty], "Downtown & Brooklyn"], [up, down ?? [], "Uptown & The Bronx"]] as const) {
@@ -574,7 +575,8 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   // The train runs TRAIN_OFF_EDGE_M out from the platform's edge over the track (the model's edges)
   // on the walks' side.
   let edge: number | null = null;
-  for (const [x1, y1, x2, y2] of model.edges) {
+  for (const [x1, y1, x2, y2, ez] of model.edges) {
+    if (Math.abs(ez - s0[2]) > 0.5) continue;
     const c = across((x1 + x2) / 2, (y1 + y2) / 2) * side;
     if (c < across(s0[0], s0[1]) * side && (edge == null || c > edge)) edge = c;
   }

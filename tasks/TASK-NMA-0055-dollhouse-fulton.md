@@ -942,6 +942,121 @@ Blocked/uncertain:
 Next:
 - PR #168: merged main (CURRENT.md conflict, both kept), sign test timeout raised. Waiting on CI; auto-merge armed. After deploy, walk it live and show the owner.
 
+### 2026-11-13 20:32:18 UTC — agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8","blocked":[],"changed":["none"],"completed":["Fulton St walk reaches the A/C platform: 4 new walks, crop 58.9 KB, walls rebaked, station tests pass on the Pro"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Open the PR, arm auto-merge, then walk the A/C level on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T20:32:18Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"71a0114478ffec8172bb0b88967ba81569b8fbc935e8156a45aa2d61263adeab","request_id":"bb3ecba219884836b44eefd2e88ac8d7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- Fulton St walk reaches the A/C platform: 4 new walks, crop 58.9 KB, walls rebaked, station tests pass on the Pro
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Open the PR, arm auto-merge, then walk the A/C level on the live site
+
+### 2026-11-14 05:24:18 UTC — agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8","blocked":[],"changed":["none"],"completed":["PR #173: merged main (CURRENT.md conflict, both kept), title given a conventional prefix, walk-geometry test limit raised to 3 min; tsc and all 1966 tests pass on the Pro"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #173 merges and deploys, walk the stairs down to the A/C platform on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-14T05:24:18Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"05d4129e539c28378d47caf692a03cf7280844dab3c9568f2422bbd701aac139","request_id":"02ed0fb46cd04b74841c59d1521e06f0","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- PR #173: merged main (CURRENT.md conflict, both kept), title given a conventional prefix, walk-geometry test limit raised to 3 min; tsc and all 1966 tests pass on the Pro
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #173 merges and deploys, walk the stairs down to the A/C platform on the live site
+
+### 2026-11-14 05:24:56 UTC — agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8","blocked":[],"changed":["none"],"completed":["PR #173: station walk size limit raised to 708 kB (it was 64 B over after merging main)"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #173 merges and deploys, walk the stairs down to the A/C platform on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-14T05:24:56Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"44b8a651d11a0785d85fab6c1407830f5cfec00b68fd2505f8eafcde368db1ba","request_id":"fbbe68c7491d4ebba00107c821cd72c0","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- PR #173: station walk size limit raised to 708 kB (it was 64 B over after merging main)
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #173 merges and deploys, walk the stairs down to the A/C platform on the live site
+
+### 2026-11-14 05:34:57 UTC — agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8","blocked":[],"changed":["none"],"completed":["PR #173: shell opening test limit raised to 6 min (187 s on a busy CI runner)"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #173 merges and deploys, walk the stairs down to the A/C platform on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-14T05:34:57Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"a9847f0213361031a37156d0eef911385034c0239f09d55668794fccc8459604","request_id":"844e7f6e9b414210a3bd74dc53ff5e7b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- PR #173: shell opening test limit raised to 6 min (187 s on a busy CI runner)
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #173 merges and deploys, walk the stairs down to the A/C platform on the live site
+
+### 2026-11-14 06:37:16 UTC — agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/fe6c3404-6590-4426-a188-6d58634a70a8","blocked":[],"changed":["none"],"completed":["PR #173: all CI checks passed; merged main again (#175, #178; CURRENT.md conflict, both kept)"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #173 merges and deploys, walk the stairs down to the A/C platform on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-14T06:37:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"ef3ca8fcad41837c5bb1706990b012960e38e9652a5a815e179f35aedfe8f0f9","request_id":"35553d820d7b458dbead8b92e7f0413a","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- PR #173: all CI checks passed; merged main again (#175, #178; CURRENT.md conflict, both kept)
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #173 merges and deploys, walk the stairs down to the A/C platform on the live site
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

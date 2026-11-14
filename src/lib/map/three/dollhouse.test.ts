@@ -87,7 +87,9 @@ describe.each(MODELS)("the dollhouse walks in the $name model", ({ name, model }
   it("has a walk for each exit it reaches, each from the platform to the street", () => {
     expect(model.walks.length).toBeGreaterThanOrEqual(2);
     for (const { path } of model.walks) {
-      expect(walkAt(path, 0).z).toBeCloseTo(model.edges[0][4], 1);
+      // On a platform: the height of one of its edges (Fulton St has the 4/5 and the A/C platforms).
+      const z0 = walkAt(path, 0).z;
+      expect(Math.min(...model.edges.map((e) => Math.abs(e[4] - z0)))).toBeLessThan(0.05);
       expect(walkAt(path, 1).z).toBeGreaterThan(-0.5);
     }
   });
