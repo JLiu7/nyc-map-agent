@@ -350,6 +350,29 @@ Blocked/uncertain:
 Next:
 - After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check the film plays
 
+### 2026-11-14 17:59:31 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["docs/HACKATHON_GEOAI_2026.md"],"completed":["The hackathon had no submission write-up for the GeoAI 2026 judges; docs/HACKATHON_GEOAI_2026.md now covers the problem, personas, what works today, data and method, and credits (pull request 188, Job 3 of issue 186)."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After pull request 187 (the recorder page) and the cut-down replay page merge, re-read the two lines of the write-up that call them unmerged, then merge pull request 188","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T17:59:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"5d60f6df18005faefb2e0a61d5f9c87e6dae5f0e6405f4919cbcc5d61bbe5082","request_id":"b1cd4821a0624cf0b9976d8c5f2e9768","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The hackathon had no submission write-up for the GeoAI 2026 judges; docs/HACKATHON_GEOAI_2026.md now covers the problem, personas, what works today, data and method, and credits (pull request 188, Job 3 of issue 186).
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- docs/HACKATHON_GEOAI_2026.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 187 (the recorder page) and the cut-down replay page merge, re-read the two lines of the write-up that call them unmerged, then merge pull request 188
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
