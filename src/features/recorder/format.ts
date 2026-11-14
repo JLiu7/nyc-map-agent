@@ -53,7 +53,7 @@ function checkRows(errors: string[], root: Record<string, unknown>, key: string,
     return;
   }
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row: unknown = rows[i];
     if (!Array.isArray(row) || row.length !== width || !row.every(isNum)) {
       errors.push(`"${key}" row ${i + 1} should be ${width} numbers (${what}).`);
       return; // one bad row is enough to report per list
