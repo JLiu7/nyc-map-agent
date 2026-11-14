@@ -8,7 +8,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { apiRateLimit } from "./lib/apiRateLimit";
-import { AGENT_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
+import { AGENT_ROUTE, SEE_SIGN_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
 import * as aggregate from "../api/aggregate";
 import * as area from "../api/area/[block]";
 import * as areas from "../api/areas";
@@ -28,6 +28,7 @@ import * as agent from "./features/agent/routes";
 import { transcribe } from "./features/agent/stt";
 import { speak, startVoiceKeeper } from "./features/agent/tts";
 import { translate } from "./features/agent/translate";
+import { seeSign } from "./features/agent/seeSign";
 import * as transit from "./features/transit/routes";
 import * as transitSegments from "./features/transit/segments";
 import * as transitLive from "./features/transit/live";
@@ -134,6 +135,12 @@ const translateHandler = async (c: Context) => {
 };
 app.openapi(toV1Route(TRANSLATE_ROUTE), translateHandler as never);
 app.openapi(legacyAlias(TRANSLATE_ROUTE), translateHandler as never);
+const seeSignHandler = async (c: Context) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  return seeSign(new Request(c.req.url, { method: "POST", headers: c.req.raw.headers, body: JSON.stringify(body), signal: c.req.raw.signal }));
+};
+app.openapi(toV1Route(SEE_SIGN_ROUTE), seeSignHandler as never);
+app.openapi(legacyAlias(SEE_SIGN_ROUTE), seeSignHandler as never);
 // Keep the speech server on our stack so the first spoken answer is not the one that waits for a model swap.
 startVoiceKeeper();
 

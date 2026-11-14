@@ -48,6 +48,8 @@ for (const size of SIZES) {
 
     // Lost: the signs to choose from, the nearest first.
     await sheet.getByRole("button", { name: "Lost" }).click();
+    // The camera scan sits above the photos; the test browser has no camera, so it only has to fit.
+    await expect(page.getByTestId("walk-scan").getByRole("button", { name: "Point the camera at a sign" })).toBeVisible();
     await expect(page.getByTestId("walk-signs").getByRole("button").first()).toContainText("Elevator to L");
     await expectLayout(page);
     await page.getByTestId("walk-signs").getByRole("button", { name: /Red Exit sign/ }).click();

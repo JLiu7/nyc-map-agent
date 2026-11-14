@@ -106,6 +106,26 @@ export const TRANSLATE_ROUTE = createRoute({
   },
 });
 
+/** POST /api/agent/see-sign: which of a walk's signs a rider's photo shows (#88). */
+export const SEE_SIGN_ROUTE = createRoute({
+  method: "post",
+  path: "/api/agent/see-sign",
+  summary: "Which one of a short list of station signs a photo shows, by the words read off it; the photo is passed to a vision model and not kept",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ image: z.string().max(800_100), signs: z.array(z.object({ id: z.string().max(60), sign: z.string().max(160) })).min(1).max(30) }) } },
+    },
+  },
+  responses: {
+    200: { description: "The id of the sign whose words were read in the photo, or null, and the words read", content: { "application/json": { schema: z.object({ id: z.string().nullable(), read: z.string() }) } } },
+    400: { description: "Not a JPEG, too big, or no signs to choose from", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
+    502: { description: "The model failed", content: { "application/json": { schema: ApiError } } },
+    503: { description: "No model that can look at a photo is set up", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
 /** POST /api/agent: the smart-mode trip agent. Body mirrors src/features/agent/schema.ts `requestBody`. */
 export const AGENT_ROUTE = createRoute({
   method: "post",

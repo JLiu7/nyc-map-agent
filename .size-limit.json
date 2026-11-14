@@ -102,7 +102,7 @@
   {
     "name": "feature: station walk (lazy, opens with Walk inside; Rapier physics inlines its WebAssembly)",
     "path": ".size-build/assets/StationWalkScene-*.js",
-    "limit": "707 kB"
+    "limit": "708 kB"
   },
   {
     "name": "all JS except the station walk",
@@ -110,6 +110,6 @@
       ".size-build/assets/*.js",
       "!.size-build/assets/StationWalkScene-*.js"
     ],
-    "limit": "1235 kB"
+    "limit": "1237 kB"
   }
 ]

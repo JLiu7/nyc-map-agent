@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { countStep, dueAtNext, facingAt, initialSteps, legPath, nearbyFirst, nextStop, placeAt, placeForSign, simTick, stepsToNextStop, type Place } from "./progress";
+import { SIGN_WORDS } from "./signWords";
 import { WALK, WRONG_WAYS } from "./walks";
 
 const at = (id: string) => WALK.findIndex((c) => c.id === id);
@@ -18,6 +19,11 @@ describe("a filmed walk", () => {
       if (a.station !== b.station) expect(a.by).toBe("train");
       else if (a.level !== b.level) expect(a.by).toBe("elevator");
     }
+  });
+
+  it("lists words only for signs that exist", () => {
+    const ids = new Set([...WALK, ...WRONG_WAYS].map((c) => c.id));
+    for (const id of Object.keys(SIGN_WORDS)) expect(ids.has(id), id).toBe(true);
   });
 
   it("has one photo and one id for every sign", () => {

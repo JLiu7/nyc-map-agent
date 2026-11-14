@@ -69,6 +69,7 @@ export const WALK: Checkpoint[] = [
 
 export const WRONG_WAYS: WrongWay[] = [
   { id: "downtown-brooklyn-rw", sign: "Elevator to Downtown & Brooklyn R W", say: "Wrong elevator: this one is for downtown. Yours is signed Uptown & Queens, a few steps away.", near: "uptown-queens", photo: "downtown-brooklyn-rw" },
+  { id: "us-downtown-elevator", sign: "Elevator to Downtown & Brooklyn N Q R W (glass)", say: "This elevator goes down to the downtown platform. For the street, look for the Elevator to L sign.", near: "us-to-l", photo: "us-downtown-elevator" },
   { id: "us-west-exit", sign: "Exit · 16 Street & Union Square West", say: "This is the west side. Turn back to the elevators and look for the Elevator to L sign.", near: "us-to-l", photo: "us-west-exit" },
 ];
 

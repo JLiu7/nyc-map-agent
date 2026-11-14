@@ -7,6 +7,8 @@ import type { SheetLevel } from "@/components/sheetSwipe";
 import { onMapInstance } from "@/lib/map/mapInstance";
 import { say } from "@/lib/voice/say";
 import { countStep, dueAtNext, facingAt, initialSteps, legPath, nearbyFirst, nextStop, placeAt, placeForSign, simTick, stepsToNextStop, type Place } from "./progress";
+import { SignScan } from "./SignScan";
+import { SIGN_WORDS } from "./signWords";
 import { photoUrl, WALK, WRONG_WAYS, type Checkpoint } from "./walks";
 
 const SRC = "walk-guide";
@@ -211,6 +213,9 @@ export default function WalkGuide() {
   if (!open) return null;
 
   const signs = nearbyFirst(WALK, [...WALK, ...WRONG_WAYS], place.i);
+  // The camera is offered the words on this station's signs only, nearest first: a sign at the other station cannot be the one in view.
+  const stationOf = (s: (typeof signs)[number]) => ("station" in s ? s.station : WALK.find((c) => c.id === s.near)?.station);
+  const scanSigns = signs.filter((s) => SIGN_WORDS[s.id] && stationOf(s) === here.station).map((s) => ({ id: s.id, sign: SIGN_WORDS[s.id] }));
   const togo = here.by === "elevator" ? "Elevator" : here.by === "train" ? "Train" : left > 0 ? `About ${Math.max(5, Math.round(left / 5) * 5)} steps to ${stop.by === "train" ? "the train" : stop.by === "elevator" ? "the elevator" : "the way out"}` : "You are here";
 
   return (
@@ -227,7 +232,8 @@ export default function WalkGuide() {
       </div>}>
       <section className="pull-sheet-body mt-1 flex flex-col gap-2" aria-label="Walk guide">
         {lost ? <>
-          <p className="text-sm font-bold">Which of these can you see?</p>
+          {scanSigns.length ? <SignScan signs={scanSigns} onFound={pick} /> : null}
+          <p className="text-sm font-bold">Or tap the one you can see</p>
           <div className="grid shrink-0 auto-rows-max grid-cols-2 gap-2" data-testid="walk-signs">
             {signs.map((s) => (
               <button key={s.id} type="button" className="min-h-28 overflow-hidden rounded-xl bg-slate-900/70 text-left" onClick={() => pick(s.id)}>
