@@ -120,51 +120,74 @@ Blocked/uncertain:
 Next:
 - After 175 merges and deploys, open the live site with ?flags=+walkGuide on a phone, tap Lost and try the camera on a sign; then refit the Union Sq places to the 2026-11-13 evening recording, which has positions on the mezzanine
 
-### 2026-11-14 03:11:03 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+### 2026-11-14 02:56:28 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
 
-<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":["The check job fails on 175, 176 and main because one unrelated test (stationRoute, 14 s on the Pro) times out at 180 s on the shared CI machine, which is at load 18 on 12 cores; main's deploy was skipped for the same reason"],"changed":["server/features/agent/seeSign.ts, src/features/walkguide/signWords.ts, SignScan.tsx, WalkGuide.tsx"],"completed":["The camera scan now reads the sign's words and matches them in code (pull request 175); simulate mode is in pull request 176"],"decisions":["no new decisions"],"evidence":["Held-out frames: choosing from a list gave 3 wrong signs in 10, reading gave none; on the Pro the 24 scan and walk guide tests, type check, lint and four layout cases pass"],"next_action":"Re-run the check jobs once the CI machine is quieter; when 175 and 176 merge and main deploys, run Simulate the trip and the camera scan on the live site at laptop width","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T03:11:03Z"} -->
-<!-- continuity:checkpoint-operation {"payload_sha256":"200aff593b4473297ecc10ee378523cd67f0de33ccb4b13db81ae51ea98e59a0","request_id":"a6c2bea9070b47058ad148f9ca1da1ab","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["src/features/walkguide/WalkGuide.tsx, progress.ts, walks.ts, e2e/walk-guide.spec.ts, .size-limit.json"],"completed":["The walk guide can play the trip by itself and shows which way the walk faces; 14 St-Union Sq places now come from the evening recording (pull request 176)"],"decisions":["no new decisions"],"evidence":["On the Pro: 16 walk guide tests and the full unit run pass, type check and lint clean on changed files, four layout cases pass; not yet seen on the live site"],"next_action":"After 176 deploys, run Simulate the trip on the live site at laptop width; find why the check job failed on pull request 175 and get the camera scan merged; then test the scan with held-out frames from the evening recording","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T02:56:28Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"474b7b736678c9b091a4fca5019e6d442ad56c8cf36fc9f870b043c81bc6bcec","request_id":"c0c7153b6dd3440a84ace3afa729830d","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
 
 Completed:
-- The camera scan now reads the sign's words and matches them in code (pull request 175); simulate mode is in pull request 176
+- The walk guide can play the trip by itself and shows which way the walk faces; 14 St-Union Sq places now come from the evening recording (pull request 176)
 
 Evidence:
-- Held-out frames: choosing from a list gave 3 wrong signs in 10, reading gave none; on the Pro the 24 scan and walk guide tests, type check, lint and four layout cases pass
+- On the Pro: 16 walk guide tests and the full unit run pass, type check and lint clean on changed files, four layout cases pass; not yet seen on the live site
 
 Decisions:
 - no new decisions
 
 Changed:
-- server/features/agent/seeSign.ts, src/features/walkguide/signWords.ts, SignScan.tsx, WalkGuide.tsx
-
-Blocked/uncertain:
-- The check job fails on 175, 176 and main because one unrelated test (stationRoute, 14 s on the Pro) times out at 180 s on the shared CI machine, which is at load 18 on 12 cores; main's deploy was skipped for the same reason
-
-Next:
-- Re-run the check jobs once the CI machine is quieter; when 175 and 176 merge and main deploys, run Simulate the trip and the camera scan on the live site at laptop width
-
-### 2026-11-14 03:38:30 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
-
-<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["src/lib/map/stationRoute.test.ts"],"completed":["The every-station route test has 600 s instead of 180 s (pull request 177), so a loaded CI runner stops failing the check job"],"decisions":["no new decisions"],"evidence":["The test passes in 14 s on the Pro; main's CI passed on a re-run"],"next_action":"When 177 merges, update 175 and 176 from main so their check jobs pass, then verify simulate and the scan on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T03:38:30Z"} -->
-<!-- continuity:checkpoint-operation {"payload_sha256":"5afaf1e39b171542fe1d6dd09080e1b69c9d08705e58ae1cb4aeec6a650bf265","request_id":"3796984b270d45f29521566aedda377c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
-
-Completed:
-- The every-station route test has 600 s instead of 180 s (pull request 177), so a loaded CI runner stops failing the check job
-
-Evidence:
-- The test passes in 14 s on the Pro; main's CI passed on a re-run
-
-Decisions:
-- no new decisions
-
-Changed:
-- src/lib/map/stationRoute.test.ts
+- src/features/walkguide/WalkGuide.tsx, progress.ts, walks.ts, e2e/walk-guide.spec.ts, .size-limit.json
 
 Blocked/uncertain:
 - none
 
 Next:
-- When 177 merges, update 175 and 176 from main so their check jobs pass, then verify simulate and the scan on the live site
+- After 176 deploys, run Simulate the trip on the live site at laptop width; find why the check job failed on pull request 175 and get the camera scan merged; then test the scan with held-out frames from the evening recording
+
+### 2026-11-14 03:46:52 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["src/features/walkguide/walks.ts, WalkGuide.tsx"],"completed":["Seen on the live site at laptop width, the walk guide draws its line on the real map; the Cortlandt passage now lies along Dey St and the camera goes to the walk as soon as the map is up (pull request 176)"],"decisions":["no new decisions"],"evidence":["Live site with ?flags=+walkGuide showed the line about 40 m north of Dey St before this; on the Pro the 16 walk guide tests and four layout cases pass after it"],"next_action":"When 177 merges, bring main into 176 and 175 so their check jobs pass; then run Simulate the trip and the camera scan on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T03:46:52Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"eb03cefd8cda115e4524cff9cf58b6c3a915db0c395d51674d4f351db1233983","request_id":"06c9a1c8bcdc42f5aaffde9d7bf190b6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Seen on the live site at laptop width, the walk guide draws its line on the real map; the Cortlandt passage now lies along Dey St and the camera goes to the walk as soon as the map is up (pull request 176)
+
+Evidence:
+- Live site with ?flags=+walkGuide showed the line about 40 m north of Dey St before this; on the Pro the 16 walk guide tests and four layout cases pass after it
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/walkguide/walks.ts, WalkGuide.tsx
+
+Blocked/uncertain:
+- none
+
+Next:
+- When 177 merges, bring main into 176 and 175 so their check jobs pass; then run Simulate the trip and the camera scan on the live site
+
+### 2026-11-14 04:15:13 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["tasks/TASK-NMA-0058-walk-guide.md"],"completed":["Pull request 177 merged, so the check job passes; main is merged into the simulate branch"],"decisions":["no new decisions"],"evidence":["177 merged with every check green; 176 had one conflict, in the task record"],"next_action":"After 176 merges, bring main into 175; then verify simulate and the scan on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T04:15:13Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"5f3a91e98698a54d351e29d516e1945edb3d49f83d2360ef07f043d5bcccb550","request_id":"1c86fe6780894a8c834eb421f3a458ae","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Pull request 177 merged, so the check job passes; main is merged into the simulate branch
+
+Evidence:
+- 177 merged with every check green; 176 had one conflict, in the task record
+
+Decisions:
+- no new decisions
+
+Changed:
+- tasks/TASK-NMA-0058-walk-guide.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After 176 merges, bring main into 175; then verify simulate and the scan on the live site
 
 ## Handoff
 

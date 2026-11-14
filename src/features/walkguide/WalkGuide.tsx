@@ -1,16 +1,21 @@
 import "@/components/task-screens.css";
-import { ArrowLeft, ArrowRight, Navigation, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Navigation, Pause, Play, Search, X } from "lucide-react";
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PullSheet } from "@/components/PullSheet";
 import type { SheetLevel } from "@/components/sheetSwipe";
 import { onMapInstance } from "@/lib/map/mapInstance";
 import { say } from "@/lib/voice/say";
-import { countStep, dueAtNext, initialSteps, nearbyFirst, nextStop, placeAt, placeForSign, stepsToNextStop, type Place } from "./progress";
+import { countStep, dueAtNext, facingAt, initialSteps, legPath, nearbyFirst, nextStop, placeAt, placeForSign, simTick, stepsToNextStop, type Place } from "./progress";
 import { photoUrl, WALK, WRONG_WAYS, type Checkpoint } from "./walks";
 
 const SRC = "walk-guide";
-const LAYERS = ["walk-guide-ahead", "walk-guide-done", "walk-guide-stops", "walk-guide-you"] as const;
+const LAYERS = ["walk-guide-ahead", "walk-guide-done", "walk-guide-stops", "walk-guide-facing", "walk-guide-you"] as const;
+/** A simulated trip walks this many steps a second, a few times a real pace, and waits this long at an elevator. */
+const SIM_TICK_MS = 160;
+const SIM_HOLD_MS = 1400;
+/** How far ahead of the dot the facing beam reaches, metres. */
+const BEAM_M = 10;
 const LEVEL: Record<Checkpoint["level"], string> = { street: "Street", concourse: "Concourse", mezzanine: "Mezzanine", platform: "Platform" };
 
 type MotionCtor = { requestPermission?: () => Promise<"granted" | "denied"> };
@@ -23,13 +28,24 @@ function features(p: Place): GeoJSON.FeatureCollection {
   // The ride between the two stations is not a walk: each station's line is drawn apart.
   const station = WALK[p.i].station;
   const here = WALK.map((c, j) => ({ c, j })).filter((x) => x.c.station === station);
-  const done = here.filter((x) => x.j <= p.i).map((x) => x.c.at);
-  const ahead = here.filter((x) => x.j > p.i).map((x) => x.c.at);
+  // Each leg with its corners: the legs before this one are behind the rider, the rest ahead.
+  const done = here.filter((x) => x.j < p.i).flatMap((x) => legPath(WALK, x.j).slice(0, -1));
+  const ahead = here.filter((x) => x.j > p.i).flatMap((x) => (x.j === here[here.length - 1].j ? [x.c.at] : legPath(WALK, x.j).slice(0, -1)));
+  // Corners of this leg the rider has not reached yet stay ahead of the dot.
+  const leg = legPath(WALK, p.i);
+  const share = WALK[p.i].steps > 0 ? Math.min(1, p.walked / WALK[p.i].steps) : 0;
+  const mid = leg.slice(1, -1);
+  const passed = mid.slice(0, Math.floor(share * (mid.length + 1)));
+  const toCome = mid.slice(passed.length);
+  const face = facingAt(WALK, p);
+  const rad = face === null ? 0 : (face * Math.PI) / 180;
+  const tip: [number, number] = [you[0] + (Math.sin(rad) * BEAM_M) / (111_320 * Math.cos((you[1] * Math.PI) / 180)), you[1] + (Math.cos(rad) * BEAM_M) / 110_540];
   return {
     type: "FeatureCollection",
     features: [
-      ...line("done", [...done, you]),
-      ...line("ahead", [you, ...ahead]),
+      ...line("done", [...done, WALK[p.i].at, ...passed, you]),
+      ...line("ahead", [you, ...toCome, ...ahead]),
+      ...(face === null ? [] : line("facing", [you, tip])),
       ...here.filter((x) => x.c.by === "elevator").map((x): GeoJSON.Feature => ({ type: "Feature", properties: { kind: "stop" }, geometry: { type: "Point", coordinates: x.c.at } })),
       { type: "Feature", properties: { kind: "you" }, geometry: { type: "Point", coordinates: you } },
     ],
@@ -42,6 +58,7 @@ function ensure(map: MapLibreMap): void {
   map.addLayer({ id: "walk-guide-ahead", type: "line", source: SRC, filter: ["==", ["get", "kind"], "ahead"], paint: { "line-color": "#FCCC0A", "line-width": 4, "line-dasharray": [1, 1.5] } });
   map.addLayer({ id: "walk-guide-done", type: "line", source: SRC, filter: ["==", ["get", "kind"], "done"], paint: { "line-color": "#FCCC0A", "line-width": 5, "line-opacity": 0.55 } });
   map.addLayer({ id: "walk-guide-stops", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "stop"], paint: { "circle-radius": 7, "circle-color": "#2FB36B", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+  map.addLayer({ id: "walk-guide-facing", type: "line", source: SRC, filter: ["==", ["get", "kind"], "facing"], layout: { "line-cap": "round" }, paint: { "line-color": "#2563eb", "line-width": 12, "line-opacity": 0.4 } });
   map.addLayer({ id: "walk-guide-you", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "you"], paint: { "circle-radius": 8, "circle-color": "#2563eb", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
 }
 
@@ -59,8 +76,17 @@ export default function WalkGuide() {
   const [lost, setLost] = useState(false);
   const [wrong, setWrong] = useState<string | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  // Set once the map exists, so the line is drawn and the camera goes to the walk without waiting for a tap.
+  const [mapReady, setMapReady] = useState(false);
   const steps = useRef(initialSteps());
   const stopSay = useRef<(() => void) | null>(null);
+  // A simulated trip: the dot walks the route by itself, for showing it away from the station.
+  const [sim, setSim] = useState(false);
+  const heard = useRef(true);
+  const heardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const arrivedAt = useRef(0);
+  const placeRef = useRef(place);
+  placeRef.current = place;
 
   const here = WALK[place.i];
   const next = WALK[place.i + 1] ?? null;
@@ -70,11 +96,16 @@ export default function WalkGuide() {
 
   const speak = useCallback((text: string) => {
     stopSay.current?.();
-    stopSay.current = say(text, "en", () => {});
+    heard.current = false;
+    clearTimeout(heardTimer.current);
+    // A browser with no voice never says it has finished: the line's length stands in.
+    heardTimer.current = setTimeout(() => { heard.current = true; }, Math.min(9000, 1500 + text.length * 70));
+    stopSay.current = say(text, "en", () => { heard.current = true; clearTimeout(heardTimer.current); });
   }, []);
 
   const go = useCallback((p: Place, line?: string) => {
     setPlace(p);
+    arrivedAt.current = Date.now();
     setLost(false);
     setLevel(1);
     const c = WALK[p.i];
@@ -82,7 +113,7 @@ export default function WalkGuide() {
   }, [speak]);
 
   // The line and the dot, drawn on the one map and taken off when this closes.
-  useEffect(() => onMapInstance((map) => { mapRef.current = map; }), []);
+  useEffect(() => onMapInstance((map) => { mapRef.current = map; setMapReady(!!map); }), []);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !open) return;
@@ -93,12 +124,12 @@ export default function WalkGuide() {
       } catch { /* the style is still loading: the next change draws it */ }
     };
     if (map.isStyleLoaded()) draw(); else void map.once("idle", draw);
-  }, [place, open]);
+  }, [place, open, mapReady]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !open) return;
     map.easeTo({ center: WALK[place.i].at, zoom: 17.6, duration: 900 });
-  }, [place.i, open]);
+  }, [place.i, open, mapReady]);
   useEffect(() => () => {
     stopSay.current?.();
     const map = mapRef.current;
@@ -123,6 +154,35 @@ export default function WalkGuide() {
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [started]);
 
+  // The simulated trip: a few steps each tick, and on to the next sign once this one's line has been heard.
+  useEffect(() => {
+    if (!sim) return;
+    const id = setInterval(() => {
+      const p = placeRef.current;
+      const ready = heard.current && Date.now() - arrivedAt.current >= SIM_HOLD_MS;
+      const nextPlace = simTick(WALK, p, 1, ready);
+      if (!nextPlace) { if (heard.current) setSim(false); return; }
+      if (nextPlace.i !== p.i) go(nextPlace); else if (nextPlace.walked !== p.walked) setPlace(nextPlace);
+    }, SIM_TICK_MS);
+    return () => clearInterval(id);
+  }, [sim, go]);
+  // The camera keeps the dot in view while it walks by itself.
+  useEffect(() => {
+    const map = mapRef.current;
+    // Every few steps is enough to keep it in view, and spares a slow phone.
+    if (!sim || !map || !open || place.walked % 4 !== 0) return;
+    map.easeTo({ center: placeAt(WALK, place), duration: SIM_TICK_MS * 4 });
+  }, [sim, place, open]);
+
+  const simulate = () => {
+    if (sim) { setSim(false); stopSay.current?.(); return; }
+    setStarted(true);
+    setWrong(null);
+    const from = place.i >= WALK.length - 1 ? { i: 0, walked: 0 } : place;
+    go(from);
+    setSim(true);
+  };
+
   const start = () => {
     // iOS only asks for motion inside a tap.
     const M = (globalThis as { DeviceMotionEvent?: MotionCtor }).DeviceMotionEvent;
@@ -143,11 +203,11 @@ export default function WalkGuide() {
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.VITE_E2E)) return;
     const w = window as unknown as { __walkGuide?: unknown };
-    w.__walkGuide = { pick: (id: string) => pick(id), walk: (n: number) => setPlace((p) => ({ ...p, walked: p.walked + n })) };
+    w.__walkGuide = { pick: (id: string) => pick(id), walk: (n: number) => setPlace((p) => ({ ...p, walked: p.walked + n })), simulate: () => simulate() };
     return () => { delete w.__walkGuide; };
   });
 
-  const close = () => { stopSay.current?.(); setOpen(false); };
+  const close = () => { stopSay.current?.(); clearTimeout(heardTimer.current); setSim(false); setOpen(false); };
   if (!open) return null;
 
   const signs = nearbyFirst(WALK, [...WALK, ...WRONG_WAYS], place.i);
@@ -159,7 +219,7 @@ export default function WalkGuide() {
         <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>
           <Navigation size={18} className="shrink-0" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="task-caption block truncate" data-testid="walk-level">{here.station} · {LEVEL[here.level]}</span>
+            <span className="task-caption block truncate" data-testid="walk-level">{sim ? "Simulation · " : ""}{here.station} · {LEVEL[here.level]}</span>
             <span className="block truncate text-[15px] font-bold" data-testid="walk-togo">{togo}</span>
           </span>
         </button>
@@ -193,7 +253,12 @@ export default function WalkGuide() {
               <p className="text-sm font-semibold leading-snug">{here.sign}</p>
             </div>
           </div>}
-          {!started ? <button type="button" className="task-action min-h-11 px-3" onClick={start}>Start the guide</button> : null}
+          <div className="flex gap-2">
+            {!started ? <button type="button" className="task-action min-h-11 flex-1 px-3" onClick={start}>Start the guide</button> : null}
+            <button type="button" className="task-action min-h-11 flex-1 px-3" onClick={simulate} data-testid="walk-sim">
+              <span className="inline-flex items-center gap-1.5">{sim ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}{sim ? "Pause" : "Simulate the trip"}</span>
+            </button>
+          </div>
           <div className="flex gap-2">
             <button type="button" aria-label="Previous sign" className="task-action min-h-11 px-3" disabled={place.i === 0} onClick={() => { setWrong(null); go({ i: place.i - 1, walked: 0 }); }}><ArrowLeft size={18} /></button>
             <button type="button" className="task-action min-h-11 flex-1 px-3" disabled={!next} onClick={() => { setWrong(null); setStarted(true); go({ i: place.i + 1, walked: 0 }); }}>

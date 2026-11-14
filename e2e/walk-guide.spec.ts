@@ -9,7 +9,7 @@ import { slow } from "./slow";
  * Sq, one sign at a time. The test browser has no motion sensor, so steps and
  * a named sign are handed in where the phone would give them.
  */
-type Hook = { pick: (id: string) => void; walk: (n: number) => void };
+type Hook = { pick: (id: string) => void; walk: (n: number) => void; simulate: () => void };
 const hook = async (page: Page, fn: "pick" | "walk", arg: string | number) => {
   await expect.poll(() => page.evaluate(() => typeof (window as unknown as { __walkGuide?: unknown }).__walkGuide), { timeout: slow(15_000) }).toBe("object");
   await page.evaluate(([f, a]) => ((window as unknown as { __walkGuide: Hook }).__walkGuide[f as "pick"] as (x: unknown) => void)(a), [fn, arg] as const);
@@ -52,6 +52,16 @@ for (const size of SIZES) {
     await expectLayout(page);
     await page.getByTestId("walk-signs").getByRole("button", { name: /Red Exit sign/ }).click();
     await expect(page.getByTestId("walk-togo")).toHaveText("Elevator");
+
+    // The simulated trip walks on by itself and says it is a simulation.
+    await hook(page, "pick", "us-downtown-sign");
+    await sheet.getByRole("button", { name: "Simulate the trip" }).click();
+    await expect(page.getByTestId("walk-level")).toContainText("Simulation · 14 St-Union Sq");
+    await expect(page.getByTestId("walk-level")).toContainText("Street", { timeout: slow(30_000) });
+    await expectLayout(page);
+    // At the last sign it stops by itself.
+    await expect(page.getByTestId("walk-level")).not.toContainText("Simulation", { timeout: slow(30_000) });
+    await expect(sheet.getByRole("button", { name: "Simulate the trip" })).toBeVisible();
 
     await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toHaveCount(0);
