@@ -235,6 +235,29 @@ Blocked/uncertain:
 Next:
 - When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map
 
+### 2026-11-14 15:29:37 UTC — agent:claude-code/b0ed82b9-28d0-45cb-b4c0-013173668427
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/b0ed82b9-28d0-45cb-b4c0-013173668427","blocked":[],"changed":["src/features/recorder, scripts/sensor-logger-to-walk.ts, docs/RECORDING_FORMAT.md"],"completed":["Added the station walk recording format, its checker, the Sensor Logger converter and docs; converted the three 2026-11-13 recordings."],"decisions":["no new decisions"],"evidence":["18 tests, type check, eslint and dependency check pass on the Pro; PR 182 open with auto-merge."],"next_action":"Wait for PR 182 checks to pass and merge; then the collaborator builds the browser recording page against the format.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T15:29:37Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"7f93a7e38013362d114bd0cbb4d705db37531e4be40cc3f0d4181a03c8449712","request_id":"be3071793f8d415e9774c111f284dc88","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Added the station walk recording format, its checker, the Sensor Logger converter and docs; converted the three 2026-11-13 recordings.
+
+Evidence:
+- 18 tests, type check, eslint and dependency check pass on the Pro; PR 182 open with auto-merge.
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder, scripts/sensor-logger-to-walk.ts, docs/RECORDING_FORMAT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Wait for PR 182 checks to pass and merge; then the collaborator builds the browser recording page against the format.
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
