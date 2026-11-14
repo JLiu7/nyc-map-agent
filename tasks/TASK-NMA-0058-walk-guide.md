@@ -373,6 +373,29 @@ Blocked/uncertain:
 Next:
 - After pull request 187 (the recorder page) and the cut-down replay page merge, re-read the two lines of the write-up that call them unmerged, then merge pull request 188
 
+### 2026-11-14 19:35:20 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["src/features/recorder/cloud/, src/App.tsx, e2e/station-3d.spec.ts"],"completed":["The demo had nothing to show for turning a walk video into a 3D station; a page at /station-3d now draws Fulton St as a cloud of 14,000 points that fills in along a walk (pull request 193). It is drawn from the existing station model and reads no video."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T19:35:20Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"96108736b92eca963ed99ad0393de087c53c6b599c89b154faa17e58ead13331","request_id":"d3bd6eabd82d440696d22e883051abd7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The demo had nothing to show for turning a walk video into a 3D station; a page at /station-3d now draws Fulton St as a cloud of 14,000 points that fills in along a walk (pull request 193). It is drawn from the existing station model and reads no video.
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder/cloud/, src/App.tsx, e2e/station-3d.spec.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

@@ -24,3 +24,6 @@ export const FEATURES: FeatureModule[] = [restrooms, agent, transit, daylight, w
 
 /** The recorder page at /record (#185), its own chunk; App routes to it by address. */
 export const loadRecordPage = () => import("./recorder/record/RecordPage");
+
+/** The 3D preview page at /station-3d (#186), its own chunk; App routes to it by address. */
+export const loadStationCloudPage = () => import("./recorder/cloud/StationCloudPage");
