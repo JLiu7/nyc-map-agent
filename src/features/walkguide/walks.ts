@@ -11,7 +11,9 @@
  * the levels come from the barometer. At 14 St-Union Sq the places come from a
  * second recording that evening, walked the other way with location on: the
  * phone logged a position every 15 s or so across the mezzanine, good to about
- * 20 m, and the gyroscope gave the corners. At Cortlandt St the places are
+ * 20 m, and the gyroscope gave the corners. The platform there is laid along
+ * the N/Q/R/W track as the map draws it, north of the elevator; which end of
+ * it we walked from is a guess. At Cortlandt St the places are
  * still estimates: the passage is laid along Dey St from Broadway to Church
  * St, where the live map draws those streets.
  */
@@ -55,7 +57,7 @@ export const WALK: Checkpoint[] = [
   { id: "cortlandt-turnstiles", station: "Cortlandt St", level: "concourse", at: [-74.01078, 40.71103], sign: "Turnstiles by the mosaic wall", say: "Go through the wide gate. The elevators are past the mosaic wall, about 20 steps.", steps: 20, photo: "cortlandt-turnstiles" },
   { id: "uptown-queens", station: "Cortlandt St", level: "concourse", at: [-74.01082, 40.711], sign: "Elevator to Uptown & Queens R W", say: "Take the glass elevator signed Uptown & Queens. It goes up to the platform.", steps: 0, by: "elevator", photo: "uptown-queens" },
   { id: "cortlandt-platform", station: "Cortlandt St", level: "platform", at: [-74.01086, 40.71092], sign: "Cortlandt Street (uptown platform)", say: "Board an R or W. Ride 5 stops to 14 St-Union Sq.", steps: 0, by: "train", photo: "cortlandt-platform" },
-  { id: "us-platform", station: "14 St-Union Sq", level: "platform", at: [-73.99134, 40.7364], sign: "14 Street, with the wheelchair symbol", say: "Walk along the platform to the elevator. About 220 steps.", steps: 220, photo: "us-platform" },
+  { id: "us-platform", station: "14 St-Union Sq", level: "platform", at: [-73.99048, 40.73645], sign: "14 Street, with the wheelchair symbol", say: "Walk along the platform to the elevator. About 220 steps.", steps: 220, photo: "us-platform" },
   { id: "us-to-mezzanine", station: "14 St-Union Sq", level: "platform", at: [-73.9908, 40.7353], sign: "To Mezzanine · L & Downtown N Q R W", say: "Take this elevator up one level, to the mezzanine.", steps: 0, by: "elevator", photo: "us-to-mezzanine" },
   { id: "us-to-l", station: "14 St-Union Sq", level: "mezzanine", at: [-73.99064, 40.73529], sign: "Elevator to L (overhead)", say: "Go under the Elevator to L sign and into the long corridor. About 20 steps.", steps: 22, photo: "us-to-l" },
   { id: "us-corridor", station: "14 St-Union Sq", level: "mezzanine", at: [-73.99046, 40.73527], sign: "Long white corridor with ad screens", say: "Walk the length of the corridor. About 90 steps.", steps: 89, via: [[-73.99025, 40.73515]], photo: "us-corridor" },

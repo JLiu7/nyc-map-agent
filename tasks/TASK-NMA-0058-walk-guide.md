@@ -212,6 +212,29 @@ Blocked/uncertain:
 Next:
 - When 175's checks pass and it merges, run Simulate the trip and the camera scan on the live site at laptop width
 
+### 2026-11-14 05:47:16 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["src/features/walkguide/walks.ts"],"completed":["Simulate mode ran the whole trip on the live site at 1440x900, Cortlandt St to the Union Sq street elevator; the camera scan merged as pull request 175; the Union Sq platform is moved onto the real track (pull request 178)"],"decisions":["no new decisions"],"evidence":["Live: header read Simulation, steps counted down about 6 a second, the dot followed Dey St and ended at 14th St and 4th Av; 175 and 176 merged with every check green"],"next_action":"When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T05:47:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"1705fd435c398f16431e96f140e02b52c3a9175a1fd3b7c0570946c14ece35de","request_id":"fbf4ae4ab87a4fee8da8e9984b4373c9","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Simulate mode ran the whole trip on the live site at 1440x900, Cortlandt St to the Union Sq street elevator; the camera scan merged as pull request 175; the Union Sq platform is moved onto the real track (pull request 178)
+
+Evidence:
+- Live: header read Simulation, steps counted down about 6 a second, the dot followed Dey St and ended at 14th St and 4th Av; 175 and 176 merged with every check green
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/walkguide/walks.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
