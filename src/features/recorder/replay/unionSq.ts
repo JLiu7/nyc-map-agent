@@ -3,35 +3,25 @@
  * for the replay: where the clock starts, how it maps onto the Walk Guide's
  * line, and the stills from the phone's own screen recording of Google Maps.
  */
-import type { LonLat } from "@/features/recorder/clean";
-import { legPath } from "@/features/walkguide/progress";
-import { WALK } from "@/features/walkguide/walks";
+import type { LonLat } from "../clean";
+import baked from "./union-sq-line.json";
 
 /** The replay clock's zero: the first second of the phone's screen recording (22:04:27 UTC). */
 export const T0 = Date.UTC(2026, 10, 13, 22, 4, 27);
 export const START_S = 10;
 export const END_S = 790;
 
-const at = (id: string): LonLat => {
-  const c = WALK.find((w) => w.id === id);
-  if (!c) throw new Error(`no checkpoint ${id}`);
-  return c.at;
-};
-
-/** The Walk Guide's line through the station, platform to street, corners included. */
-const ids = WALK.map((c, j) => ({ c, j })).filter((x) => x.c.station === "14 St-Union Sq");
-// An elevator's stretch leads off on the level it arrives at (the platform and mezzanine elevators sit one above the other).
-const legs = ids.map((x, k) => ({ level: (x.c.by === "elevator" ? (WALK[x.j + 1]?.level ?? x.c.level) : x.c.level) as string, pts: k === ids.length - 1 || x.c.by ? [x.c.at] : legPath(WALK, x.j).slice(0, -1) }));
-export const LINE: LonLat[] = legs.flatMap((l) => l.pts);
-/** The level of each point of LINE: the stretch that starts there is on it. */
-export const LINE_LEVELS: string[] = legs.flatMap((l) => l.pts.map(() => l.level));
+/**
+ * The Walk Guide's line through the station, platform to street, corners
+ * included, and the level of each point (the stretch that starts there is on
+ * it). Baked from the walk guide by scripts/derive-union-sq-walk.ts.
+ */
+export const LINE = baked.line as LonLat[];
+export const LINE_LEVELS: string[] = baked.lineLevels;
 
 export const LEVELS = ["platform", "mezzanine", "street"] as const;
 /** The two elevator rides, in order: EL219 (platform to mezzanine) and EL217 (mezzanine to 14 St & 4 Av). */
-export const RIDE_AT = [
-  { from: at("us-to-mezzanine"), to: at("us-to-mezzanine"), name: "EL219" },
-  { from: at("us-mural-elevator"), to: at("us-climate-clock"), name: "EL217" },
-];
+export const RIDE_AT = baked.rides as { from: LonLat; to: LonLat; name: string }[];
 
 /**
  * Google Maps on the same phone, one still every 10 s (screen recording,
