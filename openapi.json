@@ -5600,6 +5600,292 @@
           }
         }
       }
+    },
+    "/api/v1/live/{code}/state": {
+      "post": {
+        "summary": "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept and handed to the watchers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code, or not a JSON object under 200 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live/{code}/state": {
+      "post": {
+        "summary": "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code (alias of /api/v1/live/{code}/state)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept and handed to the watchers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code, or not a JSON object under 200 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/live/{code}/watch": {
+      "get": {
+        "summary": "Live phone demo: the phone's state now and then each change, as server-sent events",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One `data:` line of JSON per update",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many screens are watching this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live/{code}/watch": {
+      "get": {
+        "summary": "Live phone demo: the phone's state now and then each change, as server-sent events (alias of /api/v1/live/{code}/watch)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One `data:` line of JSON per update",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many screens are watching this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

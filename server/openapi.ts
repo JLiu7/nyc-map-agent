@@ -126,6 +126,39 @@ export const SEE_SIGN_ROUTE = createRoute({
   },
 });
 
+const LiveCode = z.object({ code: z.string().regex(/^[A-HJ-NP-Z2-9]{4,8}$/).openapi({ description: "The code the phone page shows: 4 to 8 capital letters and digits", example: "K7QF" }) });
+
+/** POST /api/live/{code}/state: where a phone in the live demo thinks it is (#186). */
+export const LIVE_STATE_ROUTE = createRoute({
+  method: "post",
+  path: "/api/live/{code}/state",
+  summary: "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code",
+  request: {
+    params: LiveCode,
+    body: { required: true, content: { "application/json": { schema: z.object({}).passthrough() } } },
+  },
+  responses: {
+    200: { description: "Kept and handed to the watchers", content: { "application/json": { schema: z.object({ ok: z.boolean() }) } } },
+    400: { description: "Not a code, or not a JSON object under 200 KB", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
+    503: { description: "Too many phones are being followed at once", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+/** GET /api/live/{code}/watch: the stream a second screen reads. */
+export const LIVE_WATCH_ROUTE = createRoute({
+  method: "get",
+  path: "/api/live/{code}/watch",
+  summary: "Live phone demo: the phone's state now and then each change, as server-sent events",
+  request: { params: LiveCode },
+  responses: {
+    200: { description: "One `data:` line of JSON per update", content: { "text/event-stream": { schema: z.string() } } },
+    400: { description: "Not a code", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many screens are watching this phone", content: { "application/json": { schema: ApiError } } },
+    503: { description: "Too many phones are being followed at once", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
 /** POST /api/agent: the smart-mode trip agent. Body mirrors src/features/agent/schema.ts `requestBody`. */
 export const AGENT_ROUTE = createRoute({
   method: "post",

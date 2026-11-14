@@ -396,6 +396,29 @@ Blocked/uncertain:
 Next:
 - After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play
 
+### 2026-11-14 21:19:55 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The follow-a-phone demo is served by the app at /live/phone.html and /live/screen.html with one code per phone and two in-memory routes; pull request 196 is open with auto-merge armed"],"decisions":["no new decisions"],"evidence":["Server tests pass with the new route tests (504 tests), the type check passes, and the pages showed a posted state when served with the API on a spare port; not walked on a real phone"],"next_action":"After pull request 196 merges and deploys, open /live/phone.html on an iPhone, type its code on /live/screen.html and walk ten steps","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T21:19:55Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"6aab1ad5f5cf0d507fa6f3c13d68901c797d6304dabca998128e25dbf4373c7d","request_id":"94800495fe7b46c58bbe358cda49201b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The follow-a-phone demo is served by the app at /live/phone.html and /live/screen.html with one code per phone and two in-memory routes; pull request 196 is open with auto-merge armed
+
+Evidence:
+- Server tests pass with the new route tests (504 tests), the type check passes, and the pages showed a posted state when served with the API on a spare port; not walked on a real phone
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 196 merges and deploys, open /live/phone.html on an iPhone, type its code on /live/screen.html and walk ten steps
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

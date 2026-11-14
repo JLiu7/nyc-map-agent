@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Where the phone is, without GPS</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<style>
+  html, body, #map { margin: 0; height: 100%; }
+  body { font: 16px/1.4 system-ui, sans-serif; color: #fff; background: #05070d; }
+  #panel { position: absolute; left: 20px; top: 20px; width: 300px; background: rgba(15, 23, 42, .92); border-radius: 18px; padding: 18px; box-shadow: 0 6px 24px rgba(0, 0, 0, .4); }
+  #panel h1 { font-size: 18px; margin: 0 0 4px; }
+  #chip { display: inline-block; margin: 6px 0 12px; padding: 5px 12px; border-radius: 999px; background: #1e293b; font-weight: 600; font-size: 14px; }
+  #chip.on { background: #14532d; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+  .big { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #off { margin-top: 12px; color: #fbbf24; font-weight: 600; min-height: 1.4em; }
+  .dot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dot span.tag { padding: 2px 9px; border-radius: 999px; background: #0f172a; font: 700 14px system-ui, sans-serif; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+  .dot span.pt { width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, .5); }
+  .dot span.pt { position: relative; }
+  .beam { position: absolute; left: 50%; bottom: 50%; width: 110px; height: 120px; margin-left: -55px; transform-origin: 50% 100%; clip-path: polygon(50% 100%, 0 0, 100% 0); background: linear-gradient(to top, rgba(37, 99, 235, .75), rgba(37, 99, 235, 0)); z-index: -1; display: none; }
+  .truth { width: 16px; height: 16px; border-radius: 50%; background: #f59e0b; border: 3px solid #fff; }
+  #data { position: absolute; right: 20px; bottom: 44px; width: 380px; background: rgba(15, 23, 42, .92); border-radius: 18px; padding: 16px 18px; box-shadow: 0 6px 24px rgba(0, 0, 0, .4); }
+  #data h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin: 10px 0 4px; font-weight: 600; }
+  #data h2:first-child { margin-top: 0; }
+  #data canvas { width: 100%; display: block; background: #0b1220; border-radius: 10px; }
+  #raw { font: 13px/1.5 ui-monospace, Menlo, monospace; color: #cbd5e1; margin-top: 8px; white-space: pre; }
+  #shake { color: #f87171; font-weight: 700; }
+  #three { position: absolute; left: 352px; bottom: 44px; width: 300px; height: 190px; border-radius: 18px; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 0, 0, .4); border: 3px solid #0f172a; }
+  #three .cap { position: absolute; left: 10px; top: 10px; z-index: 2; padding: 3px 10px; border-radius: 999px; background: #0f172a; font-weight: 700; font-size: 13px; }
+  #map3 { width: 100%; height: 100%; }
+  #cFloors { width: 100%; display: block; background: #0b1220; border-radius: 10px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<form id="ask" style="display:none;position:absolute;inset:0;z-index:5;background:#05070d;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <label for="code" style="font:700 28px system-ui">Type the code from the phone</label>
+  <input id="code" autocomplete="off" autocapitalize="characters" maxlength="8" style="font:700 44px ui-monospace,Menlo,monospace;text-align:center;letter-spacing:.2em;width:8em;padding:12px;border-radius:14px;border:0;text-transform:uppercase">
+  <button style="min-height:52px;padding:0 28px;border:0;border-radius:14px;background:#2563eb;color:#fff;font:700 20px system-ui;cursor:pointer">Watch</button>
+</form>
+<div id="panel">
+  <h1>Where the phone is <span id="codeTag" style="float:right;font:700 14px ui-monospace,Menlo,monospace;background:#1e293b;border-radius:8px;padding:2px 8px"></span></h1>
+  <span id="chip">Waiting for the phone…</span>
+  <div class="grid">
+    <div><div class="label">Floor</div><div class="big" id="floor">–</div></div>
+    <div><div class="label">Heading</div><div class="big" id="heading">–</div></div>
+    <div><div class="label">Steps</div><div class="big" id="steps">0</div></div>
+    <div><div class="label">Walked</div><div class="big" id="metres">0 m</div></div>
+  </div>
+  <div class="label" style="margin-top:12px">Floor, set on the phone</div>
+  <canvas id="cFloors" width="528" height="300" style="height:150px"></canvas>
+  <div id="off"></div>
+  <button id="export" style="margin-top:10px;width:100%;padding:10px;border:0;border-radius:10px;background:#7c3aed;color:#fff;font:700 15px system-ui;cursor:pointer">⬇ Export data (GeoJSON + CSV)</button>
+  <button id="place" style="margin-top:10px;width:100%;padding:10px;border:0;border-radius:10px;background:#2563eb;color:#fff;font:700 15px system-ui;cursor:pointer">Move the dot</button>
+</div>
+<div id="three"><span class="cap">3D · building and floor</span><div id="map3"></div></div>
+<div id="data">
+  <h2>Motion sensor, live <span id="shake"></span></h2>
+  <canvas id="cMotion" width="760" height="180" style="height:90px"></canvas>
+  <h2>Path from steps + compass (1 m grid)</h2>
+  <canvas id="cPath" width="760" height="420" style="height:210px"></canvas>
+  <h2>Compass heading over time</h2>
+  <canvas id="cHead" width="760" height="140" style="height:70px"></canvas>
+  <div id="raw"></div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+// Which phone: the code in the address (?c=K7QF). Without one, ask for it.
+const CODE = (new URLSearchParams(location.search).get("c") || "").toUpperCase();
+const HAVE = /^[A-HJ-NP-Z2-9]{4,8}$/.test(CODE);
+const API = "/api/v1/live/" + CODE + "/";
+if (!HAVE) {
+  $("ask").style.display = "flex";
+  $("ask").onsubmit = (e) => { e.preventDefault(); const c = $("code").value.trim().toUpperCase(); if (/^[A-HJ-NP-Z2-9]{4,8}$/.test(c)) location.search = "?c=" + c; };
+}
+const letter = (deg) => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
+const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/liberty", center: [-73.99, 40.74], zoom: 12, maxZoom: 24 });
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 240, unit: "metric" }), "bottom-left");
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+const el = document.createElement("div");
+el.className = "dot";
+el.innerHTML = '<span class="tag" id="tag">Floor –</span><span class="pt"><span class="beam" id="beam"></span></span>';
+const dot = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, 11] });
+const truthEl = document.createElement("div");
+truthEl.className = "truth";
+const truth = new maplibregl.Marker({ element: truthEl });
+let lastSteps = -1, onMap = false, truthOn = false, framed = false, ready = false, pending = null;
+
+map.on("load", () => {
+  // The last 25 steps are bright and fade towards the older end; everything before that stays as a faint line.
+  map.addSource("trailOld", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+  map.addLayer({ id: "trailOld", type: "line", source: "trailOld", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#16a34a", "line-width": 3, "line-opacity": 0.16 } });
+  map.addSource("trail", { type: "geojson", lineMetrics: true, data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+  map.addLayer({ id: "trail", type: "line", source: "trail", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 6, "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, "rgba(34,197,94,0.05)", 0.6, "rgba(34,197,94,0.75)", 1, "rgba(34,197,94,1)"] } });
+  map.addSource("room", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "room-fill", type: "fill", source: "room", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#e0f2fe", "fill-opacity": 0.85 } }, "trail");
+  map.addLayer({ id: "room-grid", type: "line", source: "room", filter: ["==", ["get", "k"], "grid"], paint: { "line-color": "#93c5fd", "line-width": 1 } }, "trail");
+  map.addLayer({ id: "room-wall", type: "line", source: "room", filter: ["==", ["get", "k"], "wall"], paint: { "line-color": "#0f172a", "line-width": 5 } }, "trail");
+  map.addLayer({ id: "room-name", type: "symbol", source: "room", filter: ["==", ["get", "k"], "name"], layout: { "text-field": ["get", "t"], "text-size": 18, "text-font": ["Noto Sans Bold"], "text-allow-overlap": true }, paint: { "text-color": "#0f172a", "text-halo-color": "#fff", "text-halo-width": 2 } });
+  ready = true;
+  if (pending) draw(pending);
+});
+
+// A room drawn around the starting point: 10 m by 8 m, with a 1 m grid, so small moves read on the map.
+let roomAt = "";
+function room(s) {
+  const o = s.start || (s.trail && s.trail[0]);
+  if (!o || roomAt === o.join()) return;
+  roomAt = o.join();
+  const k = 111320 * Math.cos(o[1] * Math.PI / 180), W = 5, H = 4;
+  const P = (x, y) => [o[0] + x / k, o[1] + y / 110540];
+  const ring = [P(-W, -H), P(W, -H), P(W, H), P(-W, H), P(-W, -H)];
+  const f = [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }, { type: "Feature", properties: { k: "wall" }, geometry: { type: "LineString", coordinates: ring } }, { type: "Feature", properties: { k: "name", t: "Room · 10 m × 8 m" }, geometry: { type: "Point", coordinates: P(0, H - 0.5) } }];
+  for (let x = -W + 1; x < W; x++) f.push({ type: "Feature", properties: { k: "grid" }, geometry: { type: "LineString", coordinates: [P(x, -H), P(x, H)] } });
+  for (let y = -H + 1; y < H; y++) f.push({ type: "Feature", properties: { k: "grid" }, geometry: { type: "LineString", coordinates: [P(-W, y), P(W, y)] } });
+  map.getSource("room").setData({ type: "FeatureCollection", features: f });
+}
+
+function draw(s) {
+  if (!ready) { pending = s; return; }
+  if (s.lon == null) return;
+  $("chip").textContent = s.started ? "Location off · following by steps" : "Waiting for the phone…";
+  $("chip").className = s.started ? "on" : "";
+  $("floor").textContent = s.floor;
+  el.querySelector(".tag").textContent = "Floor " + s.floor;
+  $("steps").textContent = s.steps;
+  $("metres").textContent = Math.round(s.steps * 0.7) + " m";
+  $("heading").textContent = s.heading == null ? "–" : Math.round(s.heading) + "° " + letter(s.heading);
+  lastState = s;
+  keep(s);
+  three(s);
+  floors(s);
+  charts(s);
+  room(s);
+  const beam = el.querySelector(".beam");
+  if (s.heading == null) beam.style.display = "none";
+  else { beam.style.display = "block"; beam.style.transform = "rotate(" + (s.heading - map.getBearing()) + "deg)"; }
+  dot.setLngLat([s.lon, s.lat]);
+  if (!onMap) { dot.addTo(map); onMap = true; }
+  const all = s.trail || [], fresh = all.slice(-RECENT);
+  map.getSource("trailOld").setData({ type: "Feature", geometry: { type: "LineString", coordinates: all.length > RECENT ? all.slice(0, all.length - RECENT + 1) : [] } });
+  map.getSource("trail").setData({ type: "Feature", geometry: { type: "LineString", coordinates: fresh.length > 1 ? fresh : [] } });
+  if (s.steps === 0) framed = false;
+  if (!framed) { map.jumpTo({ center: [s.lon, s.lat], zoom: 21.5 }); framed = true; }
+  else if (s.steps !== lastSteps) map.easeTo({ center: [s.lon, s.lat], duration: 400 });
+  lastSteps = s.steps;
+  if (s.truth) {
+    truth.setLngLat(s.truth);
+    if (!truthOn) { truth.addTo(map); truthOn = true; }
+    $("off").textContent = "Location says: off by " + s.offBy + " m after " + s.steps + " steps";
+  } else {
+    if (truthOn) { truth.remove(); truthOn = false; }
+    $("off").textContent = "";
+  }
+}
+
+
+const heads = [], RECENT = 26;
+// The second map: the same spot, tilted, with the buildings standing up.
+const map3 = new maplibregl.Map({ container: "map3", style: "https://tiles.openfreemap.org/styles/liberty", center: [-73.99, 40.74], zoom: 17.3, pitch: 62, bearing: -25, interactive: false, attributionControl: false });
+const el3 = document.createElement("div");
+el3.className = "dot";
+el3.innerHTML = '<span class="tag" id="tag3">Floor –</span><span class="pt"></span>';
+const dot3 = new maplibregl.Marker({ element: el3, anchor: "bottom", offset: [0, 11] });
+let on3 = false, spin3 = -25;
+function three(s) {
+  dot3.setLngLat([s.lon, s.lat]);
+  if (!on3) { dot3.addTo(map3); on3 = true; map3.jumpTo({ center: [s.lon, s.lat] }); }
+  el3.querySelector(".tag").textContent = "Floor " + s.floor;
+  spin3 += 0.15;
+  map3.easeTo({ center: [s.lon, s.lat], bearing: spin3, duration: 300 });
+}
+// A side view of the building: the floors as a stack, the phone on the floor set on it.
+function floors(s) {
+  const c = $("cFloors"), x = c.getContext("2d"), W = c.width, H = c.height;
+  x.clearRect(0, 0, W, H);
+  const at = Number(s.floor) || 0, n = 5, rowH = H / n, top = at + 2;
+  for (let i = 0; i < n; i++) {
+    const f = top - i;
+    x.fillStyle = f === at ? "#14532d" : "#111c33"; x.fillRect(70, i * rowH + 3, W - 80, rowH - 6);
+    x.fillStyle = "#94a3b8"; x.font = "24px system-ui"; x.fillText(String(f), 22, i * rowH + rowH / 2 + 8);
+  }
+  x.fillStyle = "#2563eb"; x.strokeStyle = "#fff"; x.lineWidth = 4; x.beginPath(); x.arc(W / 2, 2 * rowH + rowH / 2, 13, 0, 7); x.fill(); x.stroke();
+}
+function line(c, vals, lo, hi, color, marks) {
+  const x = c.getContext("2d"), W = c.width, H = c.height;
+  x.clearRect(0, 0, W, H);
+  if (marks != null) { x.strokeStyle = "#f59e0b"; x.setLineDash([6, 6]); x.beginPath(); const y = H - ((marks - lo) / (hi - lo)) * H; x.moveTo(0, y); x.lineTo(W, y); x.stroke(); x.setLineDash([]); }
+  if (!vals.length) return;
+  x.strokeStyle = color; x.lineWidth = 3; x.beginPath();
+  vals.forEach((v, i) => { const px = (i / Math.max(1, vals.length - 1)) * W, py = H - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * H; i ? x.lineTo(px, py) : x.moveTo(px, py); });
+  x.stroke();
+}
+function path(c, trail) {
+  const x = c.getContext("2d"), W = c.width, H = c.height;
+  x.clearRect(0, 0, W, H);
+  if (!trail || !trail.length) return;
+  const o = trail[0], k = Math.cos(o[1] * Math.PI / 180);
+  const pts = trail.map((p) => [(p[0] - o[0]) * 111320 * k, (p[1] - o[1]) * 110540]);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const half = Math.max(3, Math.ceil(Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2 + 1));
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  const sc = Math.min(W, H) / (half * 2);
+  const X = (m) => W / 2 + (m - cx) * sc, Y = (m) => H / 2 - (m - cy) * sc;
+  x.strokeStyle = "#1e293b"; x.lineWidth = 1;
+  for (let g = Math.floor(cx - W / sc); g <= cx + W / sc; g++) { x.beginPath(); x.moveTo(X(g), 0); x.lineTo(X(g), H); x.stroke(); }
+  for (let g = Math.floor(cy - half); g <= cy + half; g++) { x.beginPath(); x.moveTo(0, Y(g)); x.lineTo(W, Y(g)); x.stroke(); }
+  x.lineJoin = "round"; x.lineCap = "round";
+  for (let i = 1; i < pts.length; i++) {
+    const age = pts.length - 1 - i, k = age >= RECENT ? 0.14 : 1 - (age / RECENT) * 0.8;
+    x.strokeStyle = "rgba(34,197,94," + k.toFixed(2) + ")"; x.lineWidth = age >= RECENT ? 3 : 5;
+    x.beginPath(); x.moveTo(X(pts[i - 1][0]), Y(pts[i - 1][1])); x.lineTo(X(pts[i][0]), Y(pts[i][1])); x.stroke();
+  }
+  x.fillStyle = "#f59e0b"; x.beginPath(); x.arc(X(0), Y(0), 9, 0, 7); x.fill();
+  const e = pts[pts.length - 1];
+  x.fillStyle = "#2563eb"; x.strokeStyle = "#fff"; x.lineWidth = 4; x.beginPath(); x.arc(X(e[0]), Y(e[1]), 12, 0, 7); x.fill(); x.stroke();
+  if (heads.length) { const h = heads[heads.length - 1] * Math.PI / 180; x.strokeStyle = "#60a5fa"; x.lineWidth = 6; x.beginPath(); x.moveTo(X(e[0]), Y(e[1])); x.lineTo(X(e[0]) + Math.sin(h) * 46, Y(e[1]) - Math.cos(h) * 46); x.stroke(); }
+  x.fillStyle = "#94a3b8"; x.font = "22px system-ui"; x.fillText("N ↑   " + Math.hypot(e[0], e[1]).toFixed(1) + " m from start", 14, 30);
+}
+function charts(s) {
+  line($("cMotion"), s.motion || [], -6, 6, "#38bdf8", 1.3);
+  $("shake").textContent = s.shaking ? "· shake ignored" : "";
+  if (s.heading != null) { heads.push(s.heading); if (heads.length > 240) heads.shift(); }
+  line($("cHead"), heads, 0, 360, "#a78bfa");
+  path($("cPath"), s.trail);
+  $("raw").textContent = "lat " + s.lat.toFixed(6) + "   lon " + s.lon.toFixed(6) + "\n" + (s.accuracy === 0 ? "start placed by hand" : "start fix ±" + (s.accuracy == null ? "–" : Math.round(s.accuracy)) + " m") + "   stride 0.7 m   points " + (s.trail ? s.trail.length : 0);
+}
+// A location fix indoors can be tens of metres out. Click the map where the phone really is: that becomes the start.
+let lastState = null;
+// Everything the screen has shown, kept so it can be saved: one row per update.
+const rows = [];
+function keep(s) {
+  const last = rows[rows.length - 1];
+  if (last && last.steps === s.steps && Date.now() - last.t < 1000) return;
+  rows.push({ t: Date.now(), lon: s.lon, lat: s.lat, steps: s.steps, heading: s.heading, floor: s.floor });
+  if (s.steps === 0 && rows.length > 1 && rows[rows.length - 2].steps > 0) rows.splice(0, rows.length - 1);
+}
+function save(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$("export").onclick = () => {
+  if (!rows.length) return;
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const fc = { type: "FeatureCollection", features: [
+    { type: "Feature", properties: { kind: "path from steps and compass", steps: rows[rows.length - 1].steps, strideM: 0.7, startedAt: new Date(rows[0].t).toISOString() }, geometry: { type: "LineString", coordinates: (lastState && lastState.trail) || rows.map((r) => [r.lon, r.lat]) } },
+    ...rows.map((r) => ({ type: "Feature", properties: { time: new Date(r.t).toISOString(), steps: r.steps, headingDeg: r.heading, floor: r.floor }, geometry: { type: "Point", coordinates: [r.lon, r.lat] } })),
+  ] };
+  save("phone-walk-" + stamp + ".geojson", JSON.stringify(fc, null, 1), "application/geo+json");
+  const csv = ["time,lon,lat,steps,heading_deg,floor", ...rows.map((r) => [new Date(r.t).toISOString(), r.lon, r.lat, r.steps, r.heading ?? "", r.floor].join(","))].join("\n");
+  setTimeout(() => save("phone-walk-" + stamp + ".csv", csv, "text/csv"), 400);
+};
+let placing = false;
+map.on("click", (e) => {
+  if (!placing) return;
+  placing = false; $("place").textContent = "Move the dot"; map.getCanvas().style.cursor = "";
+  const lon = +e.lngLat.lng.toFixed(7), lat = +e.lngLat.lat.toFixed(7);
+  const next = { ...(lastState || {}), started: true, lon, lat, start: [lon, lat], accuracy: 0, steps: 0, trail: [[lon, lat]], truth: null, offBy: null, placed: Date.now() };
+  fetch(API + "state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(next) });
+});
+$("place").onclick = () => { placing = !placing; $("place").textContent = placing ? "Now click where the phone is…" : "Move the dot"; map.getCanvas().style.cursor = placing ? "crosshair" : ""; };
+$("codeTag").textContent = CODE;
+const source = HAVE ? new EventSource(API + "watch") : { set onmessage(_) {} };
+source.onmessage = (e) => { try { draw(JSON.parse(e.data)); } catch { /* skip a bad line */ } };
+</script>
+</body>
+</html>

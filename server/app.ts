@@ -8,7 +8,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { apiRateLimit } from "./lib/apiRateLimit";
-import { AGENT_ROUTE, SEE_SIGN_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
+import { AGENT_ROUTE, LIVE_STATE_ROUTE, LIVE_WATCH_ROUTE, SEE_SIGN_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
 import * as aggregate from "../api/aggregate";
 import * as area from "../api/area/[block]";
 import * as areas from "../api/areas";
@@ -36,6 +36,7 @@ import * as transitBusSegments from "./features/transit/busSegments";
 import * as events from "./features/events/routes";
 import * as placeToilets from "./features/place-toilets/routes";
 import * as storefronts from "./features/storefronts/routes";
+import * as live from "./features/live/routes";
 
 type Handler = { GET: (request: Request) => Promise<Response> };
 
@@ -91,7 +92,7 @@ app.use("/api/*", apiRateLimit());
 app.use("/api/*", async (c, next) => {
   // Tile ranges are already-compressed binary; gzip would break Content-Range.
   const p = c.req.path.replace(/^\/api\/v1\//, "/api/");
-  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent" || p === "/api/tts") return next(); // streams
+  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent" || p === "/api/tts" || p.startsWith("/api/live/")) return next(); // streams
   return compress()(c, next);
 });
 // Canonical paths are /api/v1/*; /api/* stays as an alias (marked deprecated in the spec).
@@ -141,6 +142,16 @@ const seeSignHandler = async (c: Context) => {
 };
 app.openapi(toV1Route(SEE_SIGN_ROUTE), seeSignHandler as never);
 app.openapi(legacyAlias(SEE_SIGN_ROUTE), seeSignHandler as never);
+// The live phone demo (#186): a phone posts its state under a code, screens watch the code. A bad code is the handler's 400.
+const liveStateHandler = async (c: Context) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  return live.postState(c.req.param("code") ?? "", body, Number(c.req.header("content-length") ?? 0) || JSON.stringify(body ?? null).length);
+};
+const liveWatchHandler = (c: Context) => live.watch(c.req.param("code") ?? "", c.req.raw.signal);
+app.openapi(toV1Route(LIVE_STATE_ROUTE), liveStateHandler as never);
+app.openapi(legacyAlias(LIVE_STATE_ROUTE), liveStateHandler as never);
+app.openapi(toV1Route(LIVE_WATCH_ROUTE), liveWatchHandler as never);
+app.openapi(legacyAlias(LIVE_WATCH_ROUTE), liveWatchHandler as never);
 // Keep the speech server on our stack so the first spoken answer is not the one that waits for a model swap.
 startVoiceKeeper();
 
