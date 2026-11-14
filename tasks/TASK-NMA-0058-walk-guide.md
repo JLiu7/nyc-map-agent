@@ -327,6 +327,29 @@ Blocked/uncertain:
 Next:
 - After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check it plays
 
+### 2026-11-14 16:13:07 UTC — agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235","blocked":[],"changed":["none"],"completed":["The station replay now plays the trip film in step with the dot, offers 1x to 30x, and shows each Walk Guide sign as the rider reaches it"],"decisions":["no new decisions"],"evidence":["tsc, lint, boundaries, knip and size pass on the Pro; 25 recorder tests and the layout spec at five sizes pass"],"next_action":"After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check the film plays","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T16:13:07Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"a1f8d0c5fe20852d69a94476ca9ceebf83f7c057bb4ef90508126e38c248b58a","request_id":"34a062964e424389b17970d0e48aec31","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The station replay now plays the trip film in step with the dot, offers 1x to 30x, and shows each Walk Guide sign as the rider reaches it
+
+Evidence:
+- tsc, lint, boundaries, knip and size pass on the Pro; 25 recorder tests and the layout spec at five sizes pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check the film plays
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
