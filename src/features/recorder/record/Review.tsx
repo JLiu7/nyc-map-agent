@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MarkKind, Recording } from "../format";
+import { fitPath, walkPath } from "./path";
 import { clock, recordingJson } from "./session";
 
 /** What Stop hands on: the recording and its video. */
@@ -64,6 +65,11 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
     ["Marks", rec.marks.length],
   ] as const, [rec]);
 
+  const path = useMemo(() => {
+    const p = walkPath(rec);
+    return { ...p, drawn: fitPath(p.points, 300, 160, 16) };
+  }, [rec]);
+
   const save = () => {
     if (files.json) download(files.json, take.jsonFile);
     // One after the other: two downloads started in the same instant are often cut to one.
@@ -100,6 +106,18 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
             ))}
           </ol>
         )}
+        <div data-testid="review-path" className="rounded-xl bg-neutral-900 px-3 py-3 text-sm">
+          {path.why ? <p className="text-center text-white/80">{path.why}</p> : (
+            <>
+              <svg viewBox="0 0 300 160" role="img" aria-label="The path walked" className="w-full">
+                <polyline data-testid="path-line" points={path.drawn.map((p) => p.join(",")).join(" ")} fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={path.drawn[0][0]} cy={path.drawn[0][1]} r="5" fill="#fff" />
+                <circle cx={path.drawn[path.drawn.length - 1][0]} cy={path.drawn[path.drawn.length - 1][1]} r="5" fill="#22c55e" stroke="#fff" strokeWidth="2" />
+              </svg>
+              <p data-testid="path-note" className="text-center text-white/80">{Math.round(path.lengthM)} m, from {path.points.length} location fixes. North is up.</p>
+            </>
+          )}
+        </div>
         {files.error && <p role="alert" className="text-sm text-red-400">{files.error}</p>}
         <div className="mt-auto flex gap-3 pt-2">
           <button type="button" data-testid="delete-button" onClick={() => (sure ? onDelete() : setSure(true))} className="min-h-12 flex-1 rounded-full border border-white/40 px-4 text-sm font-semibold">

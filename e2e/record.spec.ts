@@ -62,6 +62,7 @@ for (const size of SIZES) {
     await expect(page.getByTestId("count-marks")).toHaveText("3");
     await expect(page.getByTestId("count-motion")).toHaveText("0");
     await expect(page.getByTestId("review-marks").locator("li")).toHaveText([/Sign/, /Stairs/, /Elevator/]);
+    await expect(page.getByTestId("review-path")).toContainText("No location in this recording");
     await expectLayout(page);
     expect(errors).toEqual([]);
   });
@@ -104,4 +105,24 @@ test("Save downloads the recording and its video, and nothing is sent anywhere",
   await page.getByTestId("delete-button").click();
   await expect(page.getByTestId("record-review")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Record" })).toBeVisible();
+});
+
+test("the review draws the path from the location fixes", async ({ page, context }) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 40.735, longitude: -73.99, accuracy: 8 });
+  await open(page, SIZES[2]);
+  await page.getByRole("button", { name: "Record" }).click();
+  await expect(page.getByTestId("record-timer")).toBeVisible({ timeout: slow(10_000) });
+  // About 110 m north, then about 84 m east, as a phone's location would report it.
+  await page.waitForTimeout(700);
+  await context.setGeolocation({ latitude: 40.736, longitude: -73.99, accuracy: 8 });
+  await page.waitForTimeout(700);
+  await context.setGeolocation({ latitude: 40.736, longitude: -73.989, accuracy: 8 });
+  await page.waitForTimeout(700);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByTestId("record-review")).toBeVisible({ timeout: slow(10_000) });
+  await expect(page.getByTestId("count-location")).toHaveText("3");
+  await expect(page.getByTestId("path-note")).toHaveText("195 m, from 3 location fixes. North is up.");
+  expect((await page.getByTestId("path-line").getAttribute("points"))!.split(" ")).toHaveLength(3);
+  await expectLayout(page);
 });
