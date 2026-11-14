@@ -6,9 +6,11 @@ Older state: [`history/2026-11.md`](history/2026-11.md) and earlier months in `h
 
 ## Current projection
 
-*Updated 2026-11-13. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
+*Updated 2026-11-14. Read this first; it says where the work stands so a new agent does not have to rebuild that from branches and pull requests.*
 
 ## In flight
+
+**The demo had no way to show Friday's walk out of 14 St-Union Sq beside Google Maps, which said "No GPS signal" for the first ten minutes underground (#183, branch `feat/station-replay`).** A replay page behind `?flags=+stationReplay` plays that walk (2026-11-13, 5:04 to 5:17 pm) on our map with a moving dot, a three-level height graph from the barometer with both elevator rides, and the same phone's Google Maps screen at that second. Cleanup functions in `src/features/recorder/clean/` turn steps and turns into a path, pin it to the elevators and to the phone's better location fixes, and snap it to the walk guide's line underground; the raw path is grey dots, the cleaned one a green line. The data is a thinned set of real sensor rows (85 KB) and 75 small stills from the owner's screen recording. The phone was held sideways, so its compass is 50 to 100 degrees off: the turns are kept and the whole raw path is turned once to fit. It includes the recording format from #182. Not done: the Cortlandt St leg.
 
 **A rider's recorded walk through a station had no file format, and the owner's two hand recordings were stuck in another app's CSV layout (#181, branch `feat/recording-format`).** `src/features/recorder/format.ts` fixes the recording file (motion, heading, GPS, barometer, steps, marks, optional video) with a checker, `parseRecording`, and `docs/RECORDING_FORMAT.md` says each field and unit. `pnpm walk:from-sensor-logger <export> <out.json>` converts a Sensor Logger export; the 2026-11-13 recordings converted and passed the checker. Nothing on screen changes. Not done: the browser recording page, which is the collaborator's.
 
