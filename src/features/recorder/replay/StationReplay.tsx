@@ -1,259 +1,223 @@
 import "@/components/task-screens.css";
-import { Pause, Play, RotateCcw, X } from "lucide-react";
-import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Pause, Play, RotateCcw } from "lucide-react";
+import { Marker, type Map as MapLibreMap } from "maplibre-gl";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PullSheet } from "@/components/PullSheet";
-import type { SheetLevel } from "@/components/sheetSwipe";
-import { cleanWalk, levelAt, pathAt, type Cleaned, type LonLat } from "@/features/recorder/clean";
-import { parseRecording, type Recording } from "@/features/recorder/format";
 import { onMapInstance } from "@/lib/map/mapInstance";
-import { framePadding } from "@/lib/map/mapCover";
-import { keepInView } from "@/lib/map/keepInView";
+import { framePadding, measureCover } from "@/lib/map/mapCover";
 import { useLeftCard } from "@/lib/store/leftColumn";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { LEVEL_NAME, LevelGraph } from "./LevelGraph";
-import { END_S, filmAt, GOOGLE_NO_GPS, LEVELS, LINE, LINE_LEVELS, loadWalk, RIDE_AT, SIGNS, signAt, signTimes, START_S, stillAt, T0 } from "./unionSq";
+import { FILM, FILM_S, frameOf, RIDE, tripAt, WALKED, type Part } from "./trip";
 
 const SRC = "station-replay";
-const LAYERS = ["station-replay-raw", "station-replay-clean", "station-replay-signs", "station-replay-raw-now", "station-replay-now"] as const;
-/** Replay seconds per real second: real time first, then faster, as the trip preview offers. */
-const SPEEDS = [1, 2, 5, 10, 30] as const;
-const TICK_MS = 100;
+const LAYERS = ["station-replay-ride", "station-replay-walk"] as const;
 
-const clock = (s: number) => new Date(T0 + s * 1000).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", second: "2-digit" }).toLowerCase();
-
-function features(c: Cleaned, s: number): GeoJSON.FeatureCollection {
-  const t = T0 + s * 1000;
-  const pt = (kind: string, at: LonLat): GeoJSON.Feature => ({ type: "Feature", properties: { kind }, geometry: { type: "Point", coordinates: at } });
-  return {
-    type: "FeatureCollection",
-    features: [
-      ...c.raw.filter((_, i) => i % 2 === 0).map((p) => pt("raw", p.at)),
-      ...SIGNS.map((x) => pt("sign", x.at)),
-      { type: "Feature", properties: { kind: "clean" }, geometry: { type: "LineString", coordinates: c.clean.map((p) => p.at) } },
-      ...(c.raw.length ? [pt("raw-now", pathAt(c.raw, t))] : []),
-      ...(c.clean.length ? [pt("now", pathAt(c.clean, t))] : []),
-    ],
-  };
-}
+const LINES: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [
+    ...WALKED.map((line): GeoJSON.Feature => ({ type: "Feature", properties: { kind: "walk" }, geometry: { type: "LineString", coordinates: line } })),
+    { type: "Feature", properties: { kind: "ride" }, geometry: { type: "LineString", coordinates: RIDE } },
+  ],
+};
 
 function ensure(map: MapLibreMap): void {
   if (map.getSource(SRC)) return;
-  map.addSource(SRC, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "station-replay-raw", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "raw"], paint: { "circle-radius": 2.6, "circle-color": "#9ca3af", "circle-opacity": 0.8 } });
-  map.addLayer({ id: "station-replay-clean", type: "line", source: SRC, filter: ["==", ["get", "kind"], "clean"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#22c55e", "line-width": 5 } });
-  map.addLayer({ id: "station-replay-signs", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "sign"], paint: { "circle-radius": 5, "circle-color": "#ffffff", "circle-stroke-color": "#0f172a", "circle-stroke-width": 2 } });
-  map.addLayer({ id: "station-replay-raw-now", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "raw-now"], paint: { "circle-radius": 6, "circle-color": "#9ca3af", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
-  map.addLayer({ id: "station-replay-now", type: "circle", source: SRC, filter: ["==", ["get", "kind"], "now"], paint: { "circle-radius": 9, "circle-color": "#2563eb", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+  map.addSource(SRC, { type: "geojson", data: LINES });
+  map.addLayer({ id: "station-replay-ride", type: "line", source: SRC, filter: ["==", ["get", "kind"], "ride"], layout: { "line-cap": "round" }, paint: { "line-color": "#facc15", "line-width": 4, "line-dasharray": [1, 2] } });
+  map.addLayer({ id: "station-replay-walk", type: "line", source: SRC, filter: ["==", ["get", "kind"], "walk"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#22c55e", "line-width": 5 } });
+}
+
+/** The dot and the level label it carries, as one map marker. */
+function dotElement(): { el: HTMLElement; label: HTMLElement } {
+  const el = document.createElement("div");
+  el.dataset.testid = "replay-dot";
+  el.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;";
+  const label = document.createElement("span");
+  label.dataset.testid = "replay-level";
+  label.style.cssText = "padding:2px 8px;border-radius:999px;background:#0f172a;color:#fff;font:700 13px/1.4 system-ui,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4);";
+  const dot = document.createElement("span");
+  dot.style.cssText = "width:20px;height:20px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);";
+  el.append(label, dot);
+  return { el, label };
 }
 
 /**
- * Station replay (a demo page, off unless `?flags=+stationReplay`): Friday's
- * real walk out of 14 St-Union Sq played back on the map, beside its three
- * levels from the barometer and the same phone's Google Maps saying "No GPS
- * signal". Grey dots are steps and turns alone; the green line is the same walk
- * pinned to the elevators and the phone's good fixes, then snapped to the walk line.
+ * The bottom padding that keeps the dot above the chat bar on a phone. The bar is not a map cover there,
+ * and the trip starts at the south end of its frame, so a fixed 60 px put the dot under the bar at 375×667.
+ * A strip of at least 60 px always stays between the film's panel and the padding, so the frame still fits.
+ */
+function clearOfChatBar(map: MapLibreMap): number {
+  const box = map.getContainer().getBoundingClientRect();
+  const bar = document.querySelector("[data-testid=agent-bar]")?.getBoundingClientRect();
+  // The bar can mount after the map on a slow machine: allow for its usual height until it does.
+  const want = Math.max(60, (bar && bar.height > 0 ? box.bottom - bar.top : 96) + 28);
+  const room = box.height - measureCover(map).top - 16 - 60;
+  return Math.max(16, Math.min(want, room));
+}
+
+/**
+ * Station replay (a demo page, off unless `?flags=+stationReplay`): the film of
+ * the step-free trip from Cortlandt St to 14 St-Union Sq, and the map with a
+ * dot that moves along the walk as the film plays. The dot carries its level.
+ * The film is the clock: the dot is placed from the film's own time on every
+ * frame, so the two cannot drift apart.
  */
 export default function StationReplay() {
-  const [open, setOpen] = useState(true);
-  const [level, setLevel] = useState<SheetLevel>(1);
-  const [rec, setRec] = useState<Recording | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  const [s, setS] = useState(START_S);
+  const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState<number>(1);
   const filmRef = useRef<HTMLVideoElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const dotRef = useRef<{ marker: Marker; label: HTMLElement } | null>(null);
+  const tRef = useRef(0);
+  const partRef = useRef<Part | null>(null);
   const desktop = useMediaQuery("(min-width: 1024px)");
-  const { slot, top } = useLeftCard("station-replay", desktop && open);
+  const { slot, top } = useLeftCard("station-replay", desktop);
 
-  useEffect(() => {
-    let live = true;
-    loadWalk().then((json) => {
-      const p = parseRecording(json);
-      if (!live) return;
-      if (p.ok) setRec(p.recording); else setFailed(p.errors[0] ?? "The recording did not load.");
-    }).catch(() => live && setFailed("The recording did not load."));
-    return () => { live = false; };
-  }, []);
-
-  const cleaned = useMemo(() => (rec ? cleanWalk(rec, { levels: LEVELS, rideAt: RIDE_AT, line: LINE, lineLevels: LINE_LEVELS, snapFrom: T0, snapTo: T0 + GOOGLE_NO_GPS.to * 1000 }) : null), [rec]);
-
-  const times = useMemo(() => (rec && cleaned ? signTimes(rec.steps, cleaned.rides) : null), [rec, cleaned]);
-
-  // The film of the trip follows the replay clock: played at the matching rate where it can be, stepped frame by frame where it runs too slow.
-  useEffect(() => {
-    const v = filmRef.current;
-    if (!v || !times) return;
-    const { at, rate } = filmAt(times, s);
-    const want = rate * speed;
-    try {
-      if (playing && want >= 0.25 && want <= 16) {
-        v.playbackRate = want;
-        if (Math.abs(v.currentTime - at) > 0.6) v.currentTime = at;
-        if (v.paused) void v.play().catch(() => {});
-      } else {
-        if (!v.paused) v.pause();
-        if (Math.abs(v.currentTime - at) > 0.15) v.currentTime = at;
-      }
-    } catch { /* the film is not loaded yet */ }
-  }, [s, playing, speed, times]);
-
-  useEffect(() => onMapInstance((map) => { mapRef.current = map; setMapReady(!!map); }), []);
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !open || !cleaned) return;
-    const draw = () => {
-      try {
-        ensure(map);
-        void map.getSource<GeoJSONSource>(SRC)?.setData(features(cleaned, s));
-      } catch { /* the style is still loading: the next tick draws it */ }
-    };
-    if (map.isStyleLoaded()) draw(); else void map.once("idle", draw);
-  }, [cleaned, s, open, mapReady]);
-  // The app swaps or reloads the map's style while starting up, which takes added layers with it: put them back.
-  const sRef = useRef(s);
-  sRef.current = s;
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !open || !cleaned) return;
-    const again = () => {
-      if (map.getSource(SRC) || !map.isStyleLoaded()) return;
-      try {
-        ensure(map);
-        void map.getSource<GeoJSONSource>(SRC)?.setData(features(cleaned, sRef.current));
-      } catch { /* not ready yet */ }
-    };
-    map.on("styledata", again);
-    map.on("idle", again);
-    return () => { map.off("styledata", again); map.off("idle", again); };
-  }, [cleaned, open, mapReady]);
-  // Frame the walk once it is loaded, clear of the card or the sheet.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !open || !cleaned?.clean.length) return;
-    const pts = cleaned.clean.map((p) => p.at);
-    const lons = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
-    const frame = () => map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: framePadding(map, { top: 90, bottom: 40, left: 40, right: 90 }), maxZoom: 17.5, duration: 900 });
-    // The app's own opening camera runs first; frame the walk after it, and again once the panels have settled.
-    const ids = [setTimeout(frame, 400), setTimeout(frame, 2500)];
-    return () => ids.forEach(clearTimeout);
-  }, [cleaned, open, mapReady]);
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !open || !cleaned?.clean.length || !playing) return;
-    keepInView(map, pathAt(cleaned.clean, T0 + s * 1000));
-  }, [s, playing, cleaned, open]);
-  useEffect(() => () => {
+  const frame = useCallback((part: Part, duration = 900) => {
     const map = mapRef.current;
     if (!map) return;
+    partRef.current = part;
     try {
-      for (const id of LAYERS) if (map.getLayer(id)) map.removeLayer(id);
-      if (map.getSource(SRC)) map.removeSource(SRC);
-    } catch { /* the map has gone */ }
-  }, []);
+      map.fitBounds(frameOf(part), { padding: framePadding(map, { top: 90, bottom: desktop ? 60 : clearOfChatBar(map), left: 60, right: 90 }), maxZoom: 17.5, duration });
+    } catch { /* the map is not ready yet: the next move frames it */ }
+  }, [desktop]);
 
-  const speedRef = useRef(speed);
-  speedRef.current = speed;
+  /** Put the dot, its label and the camera where second `at` of the film is. */
+  const show = useCallback((at: number) => {
+    tRef.current = at;
+    const p = tripAt(at);
+    const d = dotRef.current;
+    if (d) {
+      d.marker.setLngLat(p.at);
+      if (d.label.textContent !== p.level) d.label.textContent = p.level;
+    }
+    if (partRef.current !== null && partRef.current !== p.part) frame(p.part);
+  }, [frame]);
+
+  useEffect(() => onMapInstance((map) => { mapRef.current = map; setMapReady(!!map); }), []);
+
+  // The dot is a marker, so it stays through the style reloads that take added layers with them.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const { el, label } = dotElement();
+    const marker = new Marker({ element: el, anchor: "bottom", offset: [0, 10] }).setLngLat(tripAt(tRef.current).at).addTo(map);
+    dotRef.current = { marker, label };
+    show(tRef.current);
+    return () => { marker.remove(); dotRef.current = null; };
+  }, [mapReady, show]);
+
+  // The walked line. The app swaps or reloads the map's style while starting up: put the line back each time.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const draw = () => {
+      if (!map.isStyleLoaded()) return;
+      try { ensure(map); } catch { /* not ready yet: the next event draws it */ }
+    };
+    draw();
+    map.on("styledata", draw);
+    map.on("idle", draw);
+    return () => {
+      map.off("styledata", draw);
+      map.off("idle", draw);
+      try {
+        for (const id of LAYERS) if (map.getLayer(id)) map.removeLayer(id);
+        if (map.getSource(SRC)) map.removeSource(SRC);
+      } catch { /* the map has gone */ }
+    };
+  }, [mapReady]);
+
+  // Frame the station the dot is in. The app's own opening camera runs first; frame after it, and again once the panels have settled.
+  useEffect(() => {
+    if (!mapReady) return;
+    const now = () => frame(tripAt(tRef.current).part);
+    const ids = [setTimeout(now, 400), setTimeout(now, 2500)];
+    return () => ids.forEach(clearTimeout);
+  }, [mapReady, frame, desktop]);
+
+  // While it plays, every screen frame reads the film's time and moves the dot there.
   useEffect(() => {
     if (!playing) return;
-    const id = setInterval(() => setS((v) => {
-      const next = v + (speedRef.current * TICK_MS) / 1000;
-      if (next >= END_S) { setPlaying(false); return END_S; }
-      return next;
-    }), TICK_MS);
-    return () => clearInterval(id);
-  }, [playing]);
+    let raf = 0;
+    let last = performance.now();
+    let shown = -1;
+    const tick = (now: number) => {
+      const v = filmRef.current;
+      // A browser that cannot decode the film (the test browser has no H.264) still plays the trip, on the wall clock.
+      const blind = !v || !!v.error || v.networkState === v.NETWORK_NO_SOURCE;
+      const at = Math.min(FILM_S, blind ? tRef.current + (now - last) / 1000 : v.currentTime);
+      last = now;
+      show(at);
+      if (Math.abs(at - shown) >= 0.1) { shown = at; setT(at); }
+      if (at >= FILM_S || (!blind && v.ended)) { setT(at); setPlaying(false); return; }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, show]);
 
-  // For tests and rehearsals: jump to a moment, and read where the dot is.
+  const seek = useCallback((at: number) => {
+    const to = Math.max(0, Math.min(FILM_S, at));
+    const v = filmRef.current;
+    try { if (v) v.currentTime = to; } catch { /* the film is not loaded yet */ }
+    show(to);
+    setT(to);
+  }, [show]);
+
+  const play = () => {
+    const v = filmRef.current;
+    if (playing) { v?.pause(); setPlaying(false); return; }
+    if (tRef.current >= FILM_S - 0.05) seek(0);
+    void v?.play().catch(() => { /* no film in this browser: the trip still plays */ });
+    setPlaying(true);
+  };
+
+  // For tests and rehearsals: jump to a second of the film, and read where the dot is.
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.VITE_E2E)) return;
     const w = window as unknown as { __stationReplay?: unknown };
     w.__stationReplay = {
-      seek: (sec: number) => { setPlaying(false); setS(sec); },
-      dot: () => (cleaned?.clean.length ? pathAt(cleaned.clean, T0 + s * 1000) : null),
+      seek: (sec: number) => { filmRef.current?.pause(); setPlaying(false); seek(sec); },
+      dot: () => tripAt(tRef.current).at,
+      time: () => tRef.current,
     };
     return () => { delete w.__stationReplay; };
-  });
+  }, [seek]);
 
-  if (!open) return null;
-  const close = () => { setPlaying(false); setOpen(false); };
-  const lv = cleaned?.spans ? levelAt(cleaned.spans, T0 + s * 1000) : null;
-  const where = lv === "ride" ? "Elevator" : lv ? LEVEL_NAME[lv] ?? lv : "";
-  const still = stillAt(s);
-  const noGps = s >= GOOGLE_NO_GPS.from && s <= GOOGLE_NO_GPS.to;
-  const sign = times ? SIGNS[signAt(times, s)] : null;
-  const play = () => { if (s >= END_S) setS(START_S); setPlaying((p) => !p); };
-
-  const header = (
-    <div className="flex items-center gap-2.5">
-      <button type="button" className="task-action min-h-11 min-w-11 px-3" aria-label={playing ? "Pause" : s >= END_S ? "Play again" : "Play"} onClick={play} data-testid="replay-play">
-        {playing ? <Pause size={18} aria-hidden /> : s >= END_S ? <RotateCcw size={18} aria-hidden /> : <Play size={18} aria-hidden />}
-      </button>
-      <button type="button" className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left" aria-expanded={level > 0} onClick={() => setLevel((l) => (l === 0 ? 1 : l))}>
-        <span className="task-caption block truncate">Fri · 14 St-Union Sq</span>
-        <span className="block truncate text-[15px] font-bold" data-testid="replay-now">{clock(s)}{where ? ` · ${where}` : ""}</span>
-      </button>
-      <label className="sr-only" htmlFor="replay-speed">Speed</label>
-      <select id="replay-speed" value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="task-action min-h-11 rounded-xl px-2 text-sm font-bold" data-testid="replay-speed">
-        {SPEEDS.map((x) => <option key={x} value={x}>{x}×</option>)}
-      </select>
-      <button type="button" aria-label="Close" className="task-action task-close" onClick={close}><X size={18} /></button>
-    </div>
+  const ended = t >= FILM_S - 0.05;
+  const film = (
+    // The film has its words on screen, so it plays without sound.
+    <video ref={filmRef} src={FILM} muted playsInline preload="auto" data-testid="replay-film" aria-label="The film of the trip"
+      onEnded={() => setPlaying(false)}
+      className={desktop ? "aspect-[9/16] min-h-0 w-full shrink rounded-xl bg-black object-contain" : "mx-auto aspect-[9/16] h-[min(44dvh,calc(100dvh-420px))] shrink-0 rounded-xl bg-black object-contain"} />
   );
-
-  const body = (
-    <div className="pull-sheet-body mt-2 flex flex-col gap-2" data-testid="replay-body">
-      <input type="range" min={START_S} max={END_S} step={1} value={Math.round(s)} aria-label="Time in the walk" className="h-8 w-full shrink-0 accent-amber-300"
-        onChange={(e) => { setPlaying(false); setS(Number(e.target.value)); }} />
-      {failed ? <p className="text-sm text-amber-200" role="status">{failed}</p> : null}
-      {cleaned?.gaps.length ? <p className="text-xs text-amber-200" role="status" data-testid="replay-gaps">{cleaned.gaps.join(" ")}</p> : null}
-      {cleaned?.spans ? <LevelGraph baro={rec!.baro} spans={cleaned.spans} rides={cleaned.rides} rideNames={RIDE_AT.map((r) => r.name)} from={START_S} to={END_S} now={s} noGps={GOOGLE_NO_GPS} t0={T0} /> : null}
-      {sign ? (
-        <div className="flex shrink-0 items-center gap-2.5 rounded-xl bg-black/30 p-2" data-testid="replay-sign" aria-live="polite">
-          <img src={`/walks/${sign.photo}.jpg`} alt={sign.sign} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
-          <div className="min-w-0 text-[13px] leading-snug">
-            <p className="truncate font-bold">{sign.sign}</p>
-            <p className="text-slate-200">{sign.say}</p>
-          </div>
-        </div>
-      ) : null}
-      <div className="flex shrink-0 gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="task-caption">Our walk</span>
-          <figure className="relative flex h-[min(340px,38vh)] w-full items-center justify-center overflow-hidden rounded-xl bg-black" data-testid="replay-film">
-            <video ref={filmRef} src="/walks/trip.mp4" muted playsInline preload="auto" className="max-h-full max-w-full object-contain" aria-label="The film of the walk at this moment" />
-          </figure>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="task-caption">Google Maps</span>
-          <figure className="relative flex h-[min(340px,38vh)] w-full items-center justify-center overflow-hidden rounded-xl bg-black" data-testid="replay-google">
-            <img src={still.src} alt="Google Maps on the same phone at this moment" className="max-h-full max-w-full object-contain" />
-            {noGps ? <figcaption className="absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-red-600/90 px-2 py-0.5 text-center text-xs font-bold">No GPS signal</figcaption> : null}
-          </figure>
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 shrink-0 rounded-full border-2 border-white bg-blue-600" aria-hidden />Now</span>
-        <span className="flex items-center gap-1.5"><span className="h-1.5 w-6 shrink-0 rounded bg-green-500" aria-hidden />Cleaned</span>
-        <span className="flex items-center gap-1.5"><span className="flex w-6 shrink-0 justify-between" aria-hidden>{[0, 1, 2].map((k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-gray-400" />)}</span>Steps + turns</span>
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 shrink-0 rounded-full border-2 border-slate-900 bg-white" aria-hidden />Sign</span>
+  const controls = (
+    <div className="flex shrink-0 items-center gap-2.5">
+      <button type="button" className="task-action min-h-11 min-w-11 shrink-0 px-3" aria-label={playing ? "Pause" : ended ? "Play again" : "Play"} onClick={play} data-testid="replay-play">
+        {playing ? <Pause size={18} aria-hidden /> : ended ? <RotateCcw size={18} aria-hidden /> : <Play size={18} aria-hidden />}
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[15px] font-bold" data-testid="replay-place">{tripAt(t).place}</span>
+        <input type="range" min={0} max={FILM_S} step={0.1} value={t} aria-label="Time in the trip" className="h-7 w-full accent-amber-300" data-testid="replay-scrubber"
+          onChange={(e) => seek(Number(e.target.value))} />
       </div>
     </div>
   );
 
   if (slot) return createPortal(
-    <section data-testid="station-replay" aria-label="Station replay" className={`task-panel ${top ? "flex" : "hidden"} min-h-0 flex-col overflow-y-auto rounded-2xl p-3`}>
-      {header}
-      {body}
+    <section data-testid="station-replay" aria-label="Station replay" className={`task-panel ${top ? "flex" : "hidden"} min-h-0 flex-col gap-2 rounded-2xl p-3`}>
+      {film}
+      {controls}
     </section>,
     slot,
   );
+  // On a phone the film sits above the map: a panel under the menu row, with the map and the dot below it.
   return (
-    <PullSheet testId="station-replay" label="Station replay" level={level} onLevel={setLevel} onClose={close} header={header}>
-      {body}
-    </PullSheet>
+    <section data-testid="station-replay" aria-label="Station replay" className="task-panel task-top flex flex-col gap-2 rounded-2xl p-2">
+      {film}
+      {controls}
+    </section>
   );
 }

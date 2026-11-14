@@ -1,9 +1,10 @@
 import type { FeatureModule } from "@/lib/features/types";
 
 /**
- * Station replay (a demo page, off unless `?flags=+stationReplay`): Friday's
- * real walk out of 14 St-Union Sq, played on the map with its three levels and
- * the same phone's Google Maps. Overlay only; it loads when the flag is on.
+ * Station replay (a demo page, off unless `?flags=+stationReplay`): the film of
+ * the step-free trip from Cortlandt St to 14 St-Union Sq, and the map with a
+ * dot that moves along the walk as the film plays. Overlay only; it loads when
+ * the flag is on.
  */
 const stationReplay: FeatureModule = {
   id: "stationReplay",

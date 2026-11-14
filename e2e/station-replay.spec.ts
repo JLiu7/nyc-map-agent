@@ -4,17 +4,20 @@ import { mockNetwork } from "./mocks";
 import { slow } from "./slow";
 
 /**
- * The station replay (a demo page behind `?flags=+stationReplay`): Friday's
- * real walk out of 14 St-Union Sq on the map, its three levels from the
- * barometer, and the same phone's Google Maps saying "No GPS signal". Built
- * for a 1920×1080 screen first, and held to the phone layout bar too.
+ * The station replay (a demo page behind `?flags=+stationReplay`): the film of
+ * the step-free trip from Cortlandt St to 14 St-Union Sq, and the map with a
+ * dot that moves in step with it and carries its level. Two things on screen,
+ * with Play and a scrubber. Built for a 1920×1080 screen first, and held to
+ * the phone layout bar too. The test browser cannot decode the film, so the
+ * dot is checked through the page's own clock.
  */
-type Hook = { seek: (s: number) => void; dot: () => [number, number] | null };
+type Hook = { seek: (s: number) => void; dot: () => [number, number]; time: () => number };
 const replay = async (page: Page) => {
   await expect.poll(() => page.evaluate(() => typeof (window as unknown as { __stationReplay?: unknown }).__stationReplay), { timeout: slow(15_000) }).toBe("object");
   return {
     seek: (s: number) => page.evaluate((x) => (window as unknown as { __stationReplay: Hook }).__stationReplay.seek(x), s),
     dot: () => page.evaluate(() => (window as unknown as { __stationReplay: Hook }).__stationReplay.dot()),
+    time: () => page.evaluate(() => (window as unknown as { __stationReplay: Hook }).__stationReplay.time()),
   };
 };
 
@@ -30,36 +33,75 @@ for (const size of sizes) {
     await expect(page.locator("canvas.maplibregl-canvas").first()).toBeVisible();
     const card = page.getByTestId("station-replay");
     await expect(card).toBeVisible({ timeout: slow(15_000) });
-    await expect(page.getByTestId("replay-now")).toContainText("5:04:37 pm · Platform", { timeout: slow(15_000) });
-    await expect(page.getByTestId("replay-graph")).toBeVisible();
-    await expect(page.getByTestId("replay-google")).toContainText("No GPS signal");
-    await expect(page.getByTestId("replay-film").locator("video")).toBeAttached();
-    await expect(page.getByTestId("replay-sign")).toContainText("14 Street");
+    const place = page.getByTestId("replay-place");
+    const level = page.getByTestId("replay-level");
+    const film = page.getByTestId("replay-film");
+    const map = page.locator("canvas.maplibregl-canvas").first();
+
+    // It opens at the start of the trip: the street entrance at Cortlandt St.
+    await expect(place).toHaveText("Cortlandt St");
+    await expect(level).toHaveText("Street", { timeout: slow(15_000) });
+    await expect(film).toBeVisible();
+    await expect(card.getByRole("button", { name: "Play" })).toBeVisible();
+    await expect(page.getByTestId("replay-scrubber")).toBeVisible();
+
+    // The film and the map, and nothing from the old page.
+    for (const gone of ["replay-graph", "replay-google", "replay-sign", "replay-speed", "replay-now", "replay-gaps"]) await expect(page.getByTestId(gone)).toHaveCount(0);
+    await expect(card.locator("img, select, p, figcaption")).toHaveCount(0);
+    await expect(card).not.toContainText("No GPS signal");
+
+    // The film is large, and on a phone it sits above the map's open part; on a desktop it is in the left column.
+    const f = (await film.boundingBox())!;
+    const m = (await map.boundingBox())!;
+    expect(f.height).toBeGreaterThan(size.height * 0.25);
+    if (size.width >= 1024) {
+      expect(f.x + f.width).toBeLessThan(size.width * 0.45);
+      expect(f.height).toBeGreaterThan(size.height * 0.5);
+    } else {
+      expect(f.y + f.height).toBeLessThan(size.height * 0.62);
+    }
+    expect(m.width).toBeGreaterThan(size.width - 2);
+
     const r = await replay(page);
-    // Let the camera frame the walk before the layout is measured.
+    // Let the camera frame the station before the layout is measured.
     await page.waitForTimeout(3500);
-    await expectLayout(page, { focus: (await r.dot())! });
+    await expectLayout(page, { focus: await r.dot() });
 
-    // On the mezzanine, between the two elevators.
-    await r.seek(400);
-    await expect(page.getByTestId("replay-now")).toContainText("5:11:07 pm · Mezzanine");
-    await expect(page.getByTestId("replay-sign")).not.toContainText("14 Street, with");
-    await expectLayout(page, { focus: (await r.dot())! });
+    // Down the first elevator, in the passage under Dey St.
+    await r.seek(24);
+    await expect(level).toHaveText("Concourse");
+    await expect(place).toHaveText("Cortlandt St");
 
-    // Out on 14th St: Google has its GPS back.
-    await r.seek(700);
-    await expect(page.getByTestId("replay-now")).toContainText("Street");
-    await expect(page.getByTestId("replay-google")).not.toContainText("No GPS signal");
+    // On the train between the two stations: the map shows both.
+    await r.seek(52);
+    await expect(level).toHaveText("Train");
+    await expect(place).toHaveText("R or W train");
+    await page.waitForTimeout(1500);
+    await expectLayout(page, { focus: await r.dot() });
 
-    // Play moves the clock on by itself, faster at 30×.
-    await r.seek(100);
-    await page.getByTestId("replay-speed").selectOption("30");
+    // Off the train at 14 St-Union Sq, then up to the mezzanine and the street.
+    await r.seek(60);
+    await expect(level).toHaveText("Platform");
+    await expect(place).toHaveText("14 St-Union Sq");
+    await r.seek(80);
+    await expect(level).toHaveText("Mezzanine");
+    await page.waitForTimeout(1500);
+    await expectLayout(page, { focus: await r.dot() });
+    await r.seek(110);
+    await expect(level).toHaveText("Street");
+
+    // The scrubber moves the dot, and Play moves it on by itself.
+    await page.getByTestId("replay-scrubber").fill("30");
+    await expect(level).toHaveText("Concourse");
+    const before = await r.dot();
     await card.getByRole("button", { name: "Play" }).click();
-    await expect(page.getByTestId("replay-now")).not.toContainText("5:06:07 pm", { timeout: slow(5_000) });
+    await expect.poll(() => r.time(), { timeout: slow(5_000) }).toBeGreaterThan(30.5);
     await card.getByRole("button", { name: "Pause" }).click();
+    expect(await r.dot()).not.toEqual(before);
+    const stopped = await r.time();
+    await page.waitForTimeout(400);
+    expect(await r.time()).toBe(stopped);
 
-    await card.getByRole("button", { name: "Close" }).click();
-    await expect(card).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 }
