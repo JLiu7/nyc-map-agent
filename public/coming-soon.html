@@ -3,19 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>What is coming: NYC Map Agent</title>
+<title>What is coming to NYC Map Agent: step-free station guidance from riders' walks</title>
+<meta name="description" content="Riders record a station walk, we clean it into open, versioned datasets and 3D stations, and the next rider gets a 3D preview before the trip and live camera guidance in the station.">
+<link rel="canonical" href="https://nyc.design-bakery.com/coming-soon.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#14161A">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NYC Map Agent">
+<meta property="og:url" content="https://nyc.design-bakery.com/coming-soon.html">
+<meta property="og:title" content="What is coming to NYC Map Agent">
+<meta property="og:description" content="Riders record a station walk, we clean it into open, versioned datasets and 3D stations, and the next rider gets a 3D preview before the trip and live camera guidance in the station.">
+<meta property="og:image" content="https://nyc.design-bakery.com/coming-soon-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A phone camera view of a subway junction: a green arrow turns right to the elevator and the wrong passage is crossed out.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What is coming to NYC Map Agent">
+<meta name="twitter:description" content="Riders record a station walk, we clean it into open, versioned datasets and 3D stations, and the next rider gets a 3D preview before the trip and live camera guidance in the station.">
+<meta name="twitter:image" content="https://nyc.design-bakery.com/coming-soon-og.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"What is coming to NYC Map Agent","url":"https://nyc.design-bakery.com/coming-soon.html","description":"Riders record a station walk, we clean it into open, versioned datasets and 3D stations, and the next rider gets a 3D preview before the trip and live camera guidance in the station.","isPartOf":{"@type":"WebSite","name":"NYC Map Agent","url":"https://nyc.design-bakery.com/"},"primaryImageOfPage":"https://nyc.design-bakery.com/coming-soon-og.png"}</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&display=swap">
 <style>
 /* Layout: one stage, five scenes that play in a loop; the picture carries each scene, words are labels. */
 :root{--bg:#14161A;--panel:#1D2026;--line:#2C313A;--fg:#F6F4EF;--mute:#B9BEC7;--green:#3FBF6F;--orange:#FF8A3D;--red:#D9261C;--blue:#4C8DF6;--purple:#9B8CFF;
 --display:"Space Grotesk",system-ui,sans-serif;--body:Inter,system-ui,sans-serif;color-scheme:dark}
-html,body{height:100%}
+html{height:100%}
+body{min-height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
 .steps{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .steps button{font:600 15px var(--body);color:var(--mute);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer}
 .steps button[aria-current="true"]{background:var(--green);border-color:var(--green);color:#0c1a11}
 .steps button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
-.stage{flex:1;min-height:420px;display:grid;place-items:center;position:relative}
+.stage{flex:1 0 auto;min-height:420px;display:grid;place-items:center;position:relative}
 .scene{display:none;width:100%;max-width:1500px;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(16px,4vw,64px);align-items:center}
 .scene.on{display:grid}
 h1{font:700 clamp(34px,6vw,84px)/1 var(--display);margin:0 0 18px;text-wrap:balance}
@@ -110,7 +130,7 @@ body{margin:0}
 
 <section class="scene" aria-label="Clean">
   <div><div class="num">Step 2</div><h1>Our backend <em>cleans</em> it</h1>
-    <div class="tags"><span class="tag">Steps + turns → path</span><span class="tag">Barometer → levels</span><span class="tag">Snapped to elevators</span><span class="tag">Faces blurred</span></div></div>
+    <div class="tags"><span class="tag">Faces blurred</span><span class="tag">Steps + turns → path</span><span class="tag">Barometer → levels</span><span class="tag">Snapped to elevators</span></div></div>
   <svg viewBox="0 0 640 600" role="img" aria-label="A shaky raw path becomes a clean path across three station levels">
     <g font-family="Inter" font-size="18" font-weight="600" fill="#B9BEC7">
       <path d="M40 130L600 130L560 210L80 210Z" fill="#1D2026" stroke="#2C313A"/><text x="52" y="122">Street</text>
@@ -203,6 +223,7 @@ body{margin:0}
   <input id="seek" type="range" min="0" max="30" step="0.1" value="0" aria-label="Seek through the loop">
   <output id="clock" for="seek">0:00 / 0:30</output>
 </div>
+<noscript><p>NYC Map Agent is building step-free subway guidance from riders' own walks: record a walk, we clean it, it becomes open datasets and a 3D station, and the next rider previews the trip and is guided live.</p></noscript>
 <div class="loop">Better guidance → more riders → <b>more walks recorded</b> → back to step 1</div>
 
 <script>
