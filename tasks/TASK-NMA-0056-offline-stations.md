@@ -97,6 +97,31 @@ Blocked/uncertain:
 Next:
 - Let the pull request for #132 merge, then replay the Fulton St walk on the live site with the network off
 
+### 2026-11-13 13:06:20 UTC — agent:claude-code/90e3e9c8-8798-441c-bc53-8ed604803638
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/90e3e9c8-8798-441c-bc53-8ed604803638","blocked":[],"changed":["none"],"completed":["The Fulton St walk plays with no signal once its trip card has shown (#132): #137 kept station files, spoken steps and translations in the offline worker; #154 sent /sw.js with no-cache; #157 steadied the street-shops test; #158 fetched the walk on the trip card; #159 translated its steps there"],"decisions":["Voice is kept once spoken, not fetched ahead of Play, because live speech takes 20 s or more a line"],"evidence":["Live site 2026-11-13 13:00Z, worker uw-2 in control, network off before Play: the dollhouse walk ran from the platform to the E exit on Fulton Street (12 screenshots, steps advancing, no page errors). Origin sends cache-control: no-cache for /sw.js (checked on the nyc-map-web container). e2e/offline-replay.spec.ts passes both cases"],"next_action":"After #159 deploys, repeat the live check in Spanish with the network off before Play; then close #132","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0056","timestamp":"2026-11-13T13:06:20Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"742d69e575c5da4768b467e933220c0e73e990e24f54d313f17e2654b1dd4120","request_id":"11b11a734a0c4db3bc61042b82663c4c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0056"} -->
+
+Completed:
+- The Fulton St walk plays with no signal once its trip card has shown (#132): #137 kept station files, spoken steps and translations in the offline worker; #154 sent /sw.js with no-cache; #157 steadied the street-shops test; #158 fetched the walk on the trip card; #159 translated its steps there
+
+Evidence:
+- Live site 2026-11-13 13:00Z, worker uw-2 in control, network off before Play: the dollhouse walk ran from the platform to the E exit on Fulton Street (12 screenshots, steps advancing, no page errors). Origin sends cache-control: no-cache for /sw.js (checked on the nyc-map-web container). e2e/offline-replay.spec.ts passes both cases
+
+Decisions:
+- Voice is kept once spoken, not fetched ahead of Play, because live speech takes 20 s or more a line
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #159 deploys, repeat the live check in Spanish with the network off before Play; then close #132
+
+Update 13:30Z: #159 deployed; the live check in Spanish passed twice (steps read in Spanish with the network off, dollhouse walk on screen). One earlier Spanish run showed no preview after Play and its log was cut short; not reproduced. #132 closed.
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
