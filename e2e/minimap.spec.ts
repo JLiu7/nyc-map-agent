@@ -17,10 +17,13 @@ test("street level shows a mini map whose heading cone turns with the camera", a
   const cone = page.getByTestId("minimap-cone");
   await page.waitForTimeout(1500);
   const before = Number(await cone.getAttribute("data-bearing"));
-  await page.keyboard.down("d");
-  await page.waitForTimeout(1200);
-  await page.keyboard.up("d");
-  await expect.poll(async () => Number(await cone.getAttribute("data-bearing"))).not.toBe(before);
+  // On a loaded runner one held key can pass without a frame being drawn: turn again until the cone has moved.
+  await expect(async () => {
+    await page.keyboard.down("d");
+    await page.waitForTimeout(800);
+    await page.keyboard.up("d");
+    expect(Number(await cone.getAttribute("data-bearing"))).not.toBe(before);
+  }).toPass({ timeout: slow(30_000) });
   // Tapping the corner handle steps to the next size.
   const size = Number(await mini.getAttribute("data-size"));
   await page.getByRole("button", { name: "Resize map" }).click();

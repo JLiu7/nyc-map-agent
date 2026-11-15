@@ -591,6 +591,29 @@ Blocked/uncertain:
 Next:
 - After pull request 197 deploys, open the page on a phone-sized screen and check the picture shows, then check its tags and share image; report on issue 186
 
+### 2026-11-15 08:56:16 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["Two browser tests failed on unrelated pull requests whenever the shared runners were loaded (the replay layout at 1920x1080 and the minimap heading); both now wait for the real condition, in pull request 221"],"decisions":["no new decisions"],"evidence":["Lint is clean on the two specs; they are not yet seen passing in CI"],"next_action":"When pull request 221 merges, tell the other sessions to merge main into their branches so their browser jobs stop failing on these two tests","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-15T08:56:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"1f6b0333dc5e8babacaca17e24a53ccaf857a0dcbc26ed9a1f461ff7d7163f25","request_id":"ebad271ee64a4de688ab45ba5dc3e429","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Two browser tests failed on unrelated pull requests whenever the shared runners were loaded (the replay layout at 1920x1080 and the minimap heading); both now wait for the real condition, in pull request 221
+
+Evidence:
+- Lint is clean on the two specs; they are not yet seen passing in CI
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull request 221 merges, tell the other sessions to merge main into their branches so their browser jobs stop failing on these two tests
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

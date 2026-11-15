@@ -69,8 +69,18 @@ for (const size of sizes) {
     expect(m.width).toBeGreaterThan(size.width - 2);
 
     const r = await replay(page);
+    // The camera flies to the dot's station. A fixed wait was too short on a loaded runner (the layout bar then
+    // found the dot off the map): wait until the dot itself is inside the screen, then a moment for the fly to end.
+    const dotOnScreen = async () => {
+      await expect.poll(async () => {
+        const b = await page.getByTestId("replay-dot").boundingBox();
+        return !!b && b.x >= 0 && b.y >= 0 && b.x + b.width <= size.width && b.y + b.height <= size.height;
+      }, { timeout: slow(20_000) }).toBe(true);
+      await page.waitForTimeout(1200);
+    };
     // Let the camera frame the station before the layout is measured.
     await page.waitForTimeout(3500);
+    await dotOnScreen();
     await expectLayout(page, { focus: await r.dot() });
 
     // Down the first elevator, in the passage under Dey St.
@@ -82,7 +92,7 @@ for (const size of sizes) {
     await r.seek(52);
     await expect(level).toHaveText("Platform");
     await expect(place).toHaveText("Cortlandt St");
-    await page.waitForTimeout(1500);
+    await dotOnScreen();
     await expectLayout(page, { focus: await r.dot() });
 
     // Off the train at 14 St-Union Sq, then up to the mezzanine and the street.
@@ -91,7 +101,7 @@ for (const size of sizes) {
     await expect(place).toHaveText("14 St-Union Sq");
     await r.seek(80);
     await expect(level).toHaveText("Mezzanine");
-    await page.waitForTimeout(1500);
+    await dotOnScreen();
     await expectLayout(page, { focus: await r.dot() });
     await r.seek(110);
     await expect(level).toHaveText("Street");
