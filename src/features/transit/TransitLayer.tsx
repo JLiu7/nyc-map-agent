@@ -1566,7 +1566,7 @@ export default function TransitLayer() {
             <Layer id="transit-alert-reroute" type="line" layout={{ "line-join": "round" }}
               paint={{ "line-color": ["get", "color"], "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 7], "line-dasharray": [1.4, 1.2] }} />
           </Source>
-          <Source id="transit-alert-skipped" type="geojson" data={shuttleFocus ? EMPTY_FC : alertFc.skipped}>
+          <Source id="transit-alert-skipped" type="geojson" data={shuttleFocus || alertGeo?.stopping ? EMPTY_FC : alertFc.skipped}>
             <Layer id="transit-alert-skipped" type="symbol"
               layout={{ "icon-image": ["get", "icon"], "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 16, 1], "icon-allow-overlap": true, "icon-ignore-placement": true,
                 "icon-offset": [18, -18],

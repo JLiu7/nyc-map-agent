@@ -52,6 +52,14 @@ describe("alert focus geometry", () => {
     expect(suspendedBetween("In Queens, no [7] at Flushing-Main St")).toBeNull();
     expect(alertGeometry({ ...base, kind: "delay", reroute: false, routes: ["Q"] }, sub).suspended).toBe(false);
   });
+  it("says trains still stop when the notice takes none away, so the map draws no skip mark", () => {
+    const info: TransitAlert = { ...base, kind: "notice", type: "Information Outage", reroute: false, routes: ["1"], stops: ["117", "118", "119"], skipNames: [], changes: [], text: "Downtown [1] trains are stopping at 116 St-Columbia University, Cathedral Pkwy-110 St, and 103 St, but real-time arrival information may be unavailable" };
+    const g = alertGeometry(info, sub);
+    expect(g.stopping).toBe(true);
+    // The stations still frame the notice.
+    expect(g.skipped.map((x) => x.id)).toEqual(["117", "118", "119"]);
+    expect(alertGeometry({ ...info, type: "Planned - Stops Skipped", text: "Downtown [1] skips 125 St", skipNames: ["125 St"] }, sub).stopping).toBe(false);
+  });
   it("highlights the whole line for a line-wide delay", () => {
     const g = alertGeometry({ ...base, kind: "delay", reroute: false, routes: ["Q"] }, sub);
     expect(g.affected[0].coords).toHaveLength(sub.shapes.Q.c.length);

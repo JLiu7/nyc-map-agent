@@ -132,10 +132,11 @@ for (const size of SIZES) {
   });
 }
 
-// Owner, 2026-11-14: a notice with nothing to draw said only "What's happening? Technical issue" and the dates,
-// "it doesn't say the other part, what train is it, what's affected". The card and the voice say all of it (#198).
+// Owner, 2026-11-14: a notice about arrival times said only "What's happening? Technical issue" and the dates,
+// "it doesn't say the other part, what train is it, what's affected". The card and the voice say all of it (#198),
+// and since it names its stations it is drawn and walked like a skip or a shuttle notice.
 for (const size of SIZES) {
-  test(`a notice with nothing to draw says which train and stations, then why and when, at ${size.width}×${size.height}`, async ({ page }) => {
+  test(`a notice that names its stations draws them and says which train, then why and when, at ${size.width}×${size.height}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     // A voice that finishes each line at once, so the whole summary is spoken.
     await page.addInitScript(() => {
@@ -174,7 +175,15 @@ for (const size of SIZES) {
       "When: November 14 to 16, Saturday 12:01 AM to Monday 5:00 AM.",
     ];
     await expect(walk.getByTestId("notice-step")).toHaveText(summary);
-    await expect(walk.getByTestId("notice-diagram")).toHaveCount(0);
+    // Its stations on their stretch of line, downtown from the top, each tagged with what the notice is about.
+    const diagram = walk.getByTestId("notice-diagram");
+    await expect(diagram).toContainText("Downtown 2");
+    await expect(diagram.locator('[data-state="noted"]')).toHaveText([/Times Square-42 Street.*No live times/, /34 Street-Penn Station.*No live times/]);
+    // Trains still stop there: the map marks no station as skipped.
+    await expect.poll(() => page.evaluate(async () => {
+      const src = (window as unknown as { __map?: { getSource: (id: string) => { getData: () => Promise<{ features?: unknown[] }> } | undefined } }).__map?.getSource("transit-alert-skipped");
+      return src ? ((await src.getData()).features ?? []).length : -1;
+    })).toBe(0);
     // "Read it to me" is the same summary, start to end (the browser voice takes it in pieces, cut at each colon).
     const packed = (t: string[]) => t.join("").replace(/\s+/g, "");
     await expect.poll(async () => packed(await page.evaluate(() => (window as unknown as { __said: string[] }).__said)), { timeout: slow(10_000) }).toBe(packed(summary));

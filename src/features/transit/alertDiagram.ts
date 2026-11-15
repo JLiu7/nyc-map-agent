@@ -1,6 +1,6 @@
 import { formatStationName, formatStreetText } from "@/lib/streetName";
 import { sameStation, towardEnd } from "@/lib/transit/serviceChanges";
-import { routeEnds, skippedStations } from "./alertFocus";
+import { namedStations, routeEnds, skippedStations } from "./alertFocus";
 import type { TransitAlert } from "./hooks";
 import { stationOf, type StaticSystem } from "./model";
 
@@ -10,7 +10,8 @@ import { stationOf, type StaticSystem } from "./model";
  * affected stretch in travel order, what happens at each station, and short
  * steps that a voice reads while the diagram lights each one up. Pure.
  */
-export type StopState = "skip" | "closed" | "shuttle" | "local" | "transfer" | "open";
+/** "noted": the notice is about this station, and trains still stop there; the diagram's `tag` says what. */
+export type StopState = "skip" | "closed" | "shuttle" | "local" | "transfer" | "noted" | "open";
 export interface DiagramStop {
   id: string; name: string; state: StopState;
   /** Lines to change to, for a station off this line. */
@@ -35,7 +36,9 @@ export interface DiagramStep {
 /** Where the rider is, when they share it: the guidance starts from the nearest station. */
 type Near = { lon: number; lat: number } | null | undefined;
 export interface AlertDiagram {
-  kind: "skip" | "suspended" | "shuttle" | "local";
+  kind: "skip" | "suspended" | "shuttle" | "local" | "named";
+  /** What a "noted" station's tag says: "No live times", "Boarding change", "Delays", "Affected". */
+  tag?: string;
   /** Who it is for: "Uptown A", "Both ways", "No 1 trains". */
   heading: string;
   /** Top to bottom in the direction of travel; north at the top when it is both ways. */
@@ -225,7 +228,11 @@ export function alertDiagram(a: TransitAlert, sys: StaticSystem | undefined, rou
   if (!sys || !sys.stopM[route]) return null;
   const all = `${a.text}\n${a.description ?? ""}`;
   const d = suspension(a, sys, route, all, near) ?? skipStops(a, sys, route, all) ?? local(a, sys, route, all);
-  if (!d) return null;
+  if (!d) {
+    const n = named(a, sys, route);
+    if (n) n.steps.push(...laterSteps(a, sys, route));
+    return n;
+  }
   const head = headlineSteps(a, sys, route);
   // A delay's diagram comes from a reminder in its description: the delay itself is said first.
   if (a.kind === "delay") d.steps.unshift(...head);
@@ -285,11 +292,60 @@ function advice(description: string): string {
   return shortNotice((end < 0 ? body : body.slice(0, end)).join("\n"));
 }
 
+const MAX_NAMED = 10;
+/**
+ * A notice that takes no train away but names its stations (owner, 2026-11-14: "not sure if it does for train
+ * affected"): "Downtown [1] trains are stopping at 116 St…, but real-time arrival information may be unavailable",
+ * a boarding change, a closed staircase, a delay at one station. The stations are drawn on their stretch of line
+ * and tagged with what the notice is about; the steps are the plain ones, with the stations lit on the first.
+ */
+function named(a: TransitAlert, sys: StaticSystem, route: string): AlertDiagram | null {
+  const head = cleanAlertText(a.text);
+  // "the St George-bound platform" and "Coney Island-bound D trains" name a direction, not a station of the notice.
+  const text = head.replace(/\b[A-Z][\w.']*(?:[ -][A-Z][\w.']*){0,3}-bound\b/g, " ");
+  // The line that holds the most of the headline's stations: the A's "stops at 50 St, 23 St" are on the C's track.
+  let line = route, hits = namedStations(text, sys, route);
+  for (const r of Object.keys(sys.stopM)) {
+    if (r === route) continue;
+    const h = namedStations(text, sys, r);
+    // Only a line that shares track with this one.
+    if (h.length > hits.length && Object.keys(sys.stopM[route]).some((id) => id in sys.stopM[r])) { line = r; hits = h; }
+  }
+  const sm = sys.stopM[line];
+  const seq = Object.keys(sm).sort((x, y) => sm[x] - sm[y]);
+  const at = (id: string) => seq.indexOf(id);
+  // Two stations of one name on the line (36 St in Queens and in Brooklyn): only the feed's list can say which.
+  const listed = new Set(a.stops.map((x) => stationOf(sys.system, x)));
+  hits = hits.filter((id) => listed.has(id) || hits.filter((o) => nameOf(sys, o) === nameOf(sys, id)).length === 1);
+  const adds = a.kind !== "delay" && /\bstops? at\b/i.test(head) && !/arrival/i.test(head);
+  // The feed's own station list fills in names that do not match by word ("Cathedral Pkwy-110 St"): those between
+  // the named ones, or a few when the headline names none.
+  const informed = [...new Set(a.stops.map((x) => stationOf(sys.system, x)))].filter((id) => id in sm);
+  const lo0 = Math.min(...hits.map(at)), hi0 = Math.max(...hits.map(at));
+  const extra = adds ? [] : hits.length ? informed.filter((id) => at(id) > lo0 && at(id) < hi0) : informed.length <= 4 ? informed : [];
+  const ids = [...new Set([...hits, ...extra])].sort((x, y) => at(x) - at(y));
+  if (!ids.length || ids.length > MAX_NAMED) return null;
+  const idx = ids.map(at);
+  // A direction only when it is the train's: "Downtown 1 trains", "Coney Island-bound F".
+  const m = /\b([Uu]ptown|[Dd]owntown|[A-Z][\w.']*(?: [A-Z][\w.']*){0,2}-bound) (?:[A-Z0-9]\b|trains?\b)/.exec(head);
+  const dir = m ? m[1].charAt(0).toUpperCase() + m[1].slice(1).replace(/-bound$/, "") : null;
+  const tag = /arrival (?:information|times?)/i.test(head) ? "No live times" : /\bboard/i.test(head) ? "Boarding change" : a.kind === "delay" ? "Delays" : "Affected";
+  const state = new Map<string, StopState>(ids.map((id) => [id, adds ? "local" : "noted"]));
+  const steps = plainHead(a, sys, route);
+  steps[0] = { ...steps[0], ids };
+  const who = dir ? `${/^(?:Uptown|Downtown)$/.test(dir) ? dir : `${dir}-bound`} ${route}` : route;
+  return { kind: "named", heading: who, tag, rows: rowsFor(seq, Math.max(0, Math.min(...idx) - 1), Math.min(seq.length - 1, Math.max(...idx) + 1), state, sys, drawReversed(sys, line, dir)), steps };
+}
+
+/** The headline's lines, then what the description adds. */
+function plainHead(a: TransitAlert, sys: StaticSystem | undefined, route: string): DiagramStep[] {
+  const more = advice(a.description ?? "");
+  return [...headlineSteps(a, sys, route), ...(more ? [{ text: said(more), ids: [] }] : [])];
+}
+
 /** A notice with nothing to draw, in order: which train and where, what the notice adds, tips, why, when. */
 export function plainSteps(a: TransitAlert, sys: StaticSystem | undefined, route: string): DiagramStep[] {
-  const head = headlineSteps(a, sys, route);
-  const more = advice(a.description ?? "");
-  return [...head, ...(more ? [{ text: said(more), ids: [] }] : []), ...laterSteps(a, sys, route)];
+  return [...plainHead(a, sys, route), ...laterSteps(a, sys, route)];
 }
 
 /** True when the MTA's own words hold more than the card's lines already say, so "Full notice" is worth a button. */

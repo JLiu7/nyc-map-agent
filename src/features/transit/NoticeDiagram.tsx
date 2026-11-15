@@ -64,13 +64,14 @@ const TAG: Record<StopState, { label: string; bg: string; fg: string } | null> =
   shuttle: { label: "Shuttle bus", bg: "#f59e0b", fg: "#111827" },
   local: { label: "Now stops", bg: "#16a34a", fg: "#ffffff" },
   transfer: { label: "Change here", bg: "#2563eb", fg: "#ffffff" },
+  noted: { label: "Affected", bg: "#0ea5e9", fg: "#0b1220" },
   open: null,
 };
 
 function Diagram({ d, color, lit, labels }: { d: AlertDiagram; color: string; lit: Set<string> | null; labels: Record<StopState, string> & { heading: string } }) {
   const rail = d.rows.filter((r) => isGap(r) || !r.off);
   const off = d.rows.filter((r) => !isGap(r) && r.off);
-  const directional = d.kind === "skip" || d.kind === "local";
+  const directional = d.kind === "skip" || d.kind === "local" || (d.kind === "named" && /^(?:Uptown|Downtown|.*-bound) /.test(d.heading));
   return (
     <div data-testid="notice-diagram" className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-[#a5b4cb]">
@@ -103,7 +104,7 @@ function Diagram({ d, color, lit, labels }: { d: AlertDiagram; color: string; li
               <span aria-hidden className="relative w-4 shrink-0">
                 {seg("top")}{seg("bottom")}
                 <span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] bg-[#0f172a]"
-                  style={{ borderColor: r.state === "skip" ? "#dc2626" : r.state === "transfer" ? "#60a5fa" : broken ? "#94a3b8" : color, background: r.state === "local" || r.state === "open" ? color : "#0f172a" }} />
+                  style={{ borderColor: r.state === "skip" ? "#dc2626" : r.state === "transfer" ? "#60a5fa" : r.state === "noted" ? "#38bdf8" : broken ? "#94a3b8" : color, background: r.state === "local" || r.state === "open" ? color : "#0f172a" }} />
               </span>
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 py-1 text-[13px]">
                 <span className={r.state === "skip" || broken ? "text-[#cbd5e1] line-through decoration-[#94a3b8]/70" : "font-medium"}>{formatStationName(r.name)}</span>
@@ -169,12 +170,12 @@ export default function NoticeDiagram({ alert, sys, route, color, auto }: { aler
   const more = useMemo(() => hasMore(alert, Boolean(diagram)), [alert, diagram]);
   // One call translates the steps, the tags and the heading together (owner, 2026-11-08: "in user preffered language").
   const lang = useAppLang();
-  const words = useMemo(() => [...english.map((s) => s.text), ...TAG_KEYS.map((k) => TAG[k]!.label), "Change here", diagram?.heading ?? ""], [english, diagram]);
+  const words = useMemo(() => [...english.map((s) => s.text), ...TAG_KEYS.map((k) => TAG[k]!.label), "Change here", diagram?.heading ?? "", diagram?.tag ?? ""], [english, diagram]);
   const said = useNoticeLines(words, lang);
   const steps = useMemo(() => english.map((s, i) => ({ ...s, text: said.lines[i] })), [english, said.lines]);
   const labels = useMemo(() => {
     const t = said.lines.slice(english.length);
-    return { ...Object.fromEntries(TAG_KEYS.map((k, i) => [k, t[i]])), transfer: t[TAG_KEYS.length], heading: diagram?.heading ? t[TAG_KEYS.length + 1] : "" } as Record<StopState, string> & { heading: string };
+    return { ...Object.fromEntries(TAG_KEYS.map((k, i) => [k, t[i]])), transfer: t[TAG_KEYS.length], heading: diagram?.heading ? t[TAG_KEYS.length + 1] : "", noted: t[TAG_KEYS.length + 2] } as Record<StopState, string> & { heading: string };
   }, [said.lines, english.length, diagram]);
   const walk = useNoticeWalk(steps, auto && said.ready, lang === "en" || said.failed ? "en-US" : lang);
   const [open, setOpen] = useState(false);

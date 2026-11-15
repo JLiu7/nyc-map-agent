@@ -177,7 +177,15 @@ describe("plainSteps", () => {
       text: "Downtown [1] trains are stopping at 116 St-Columbia University, Cathedral Pkwy-110 St, and 103 St, but real-time arrival information may be unavailable",
       description: "What's happening?\nTechnical issue",
     });
-    expect(alertDiagram(a, sys, "1")).toBeNull();
+    // It names its stations, so it is drawn and walked like the others (owner, 2026-11-14).
+    const d = alertDiagram(a, sys, "1")!;
+    expect(d.kind).toBe("named");
+    expect(d.heading).toBe("Downtown 1");
+    expect(d.tag).toBe("No live times");
+    // Downtown, top to bottom, one open station either side.
+    expect(states(d)).toEqual(["125 St:open", "116 St-Columbia University:noted", "Cathedral Pkwy (110 St):noted", "103 St:noted", "96 St:open"]);
+    expect(d.steps.map((x) => x.text)).toEqual(lines(a, "1"));
+    expect(d.steps[0].ids).toEqual(["117", "118", "119"]);
     expect(lines(a, "1")).toEqual([
       "Downtown 1 trains are stopping at 116 Street-Columbia University, Cathedral Parkway-110 Street, and 103 Street.",
       "Live arrival times may be missing there.",
@@ -295,5 +303,35 @@ describe("a shuttle notice's bus stops", () => {
     // The frame holds every stop, not only the first.
     expect(g.bounds![0][0]).toBeLessThan(g.bounds![1][0]);
     expect(shuttleFeatures(null, at)).toEqual({ line: [], stops: [], bounds: null });
+  });
+});
+
+// Notices that take no train away but name their stations are drawn too (owner, 2026-11-14).
+describe("a notice that names its stations", () => {
+  const notice = (over: Partial<TransitAlert>): TransitAlert => ({ id: "t", kind: "notice", type: "", reroute: false, text: "", agency: "MTASBWY", routes: ["1"], stops: [], ...over });
+
+  it("draws a boarding change, and does not take the platform's direction for a station or for the train's", () => {
+    const d = alertDiagram(notice({ type: "Boarding Change", routes: ["M"], text: "In Queens, all [M] trains at Fresh Pond Rd, Forest Av and Seneca Av board from the Metropolitan Av-bound platform" }), sys, "M")!;
+    expect(d.kind).toBe("named");
+    expect(d.heading).toBe("M");
+    expect(d.tag).toBe("Boarding change");
+    expect(states(d).filter((x) => x.endsWith(":noted"))).toEqual(["Seneca Av:noted", "Forest Av:noted", "Fresh Pond Rd:noted"]);
+  });
+
+  it("marks the extra stops of an express running local, on the track that has them", () => {
+    const d = alertDiagram(notice({ kind: "planned", type: "Planned - Express to Local", routes: ["A"], text: "In Manhattan, uptown [A] stops at 23 St and 50 St" }), sys, "A")!;
+    expect(d.heading).toBe("Uptown A");
+    expect(states(d)).toEqual(["14 St:open", "23 St:local", "34 St-Penn Station:open", "42 St-Port Authority Bus Terminal:open", "50 St:local", "59 St-Columbus Circle:open"]);
+  });
+
+  it("draws the one station a delay or a station notice is at", () => {
+    const d = alertDiagram(notice({ kind: "delay", type: "Delays", routes: ["4", "5"], text: "Downtown [4][5] trains are delayed while we request EMS for someone in need at 138 St-Grand Concourse." }), sys, "4")!;
+    expect(d.tag).toBe("Delays");
+    expect(states(d).filter((x) => !x.endsWith(":open"))).toEqual(["138 St-Grand Concourse:noted"]);
+  });
+
+  it("stays plain when no station is named, or the name fits two stations of the line", () => {
+    expect(alertDiagram(notice({ kind: "planned", type: "Reduced Service", text: "[1] runs every 8 minutes" }), sys, "1")).toBeNull();
+    expect(alertDiagram(notice({ kind: "delay", routes: ["R"], text: "Bay Ridge-bound [R] trains are running with delays after we addressed a door problem on a train at 36 St." }), sys, "R")).toBeNull();
   });
 });

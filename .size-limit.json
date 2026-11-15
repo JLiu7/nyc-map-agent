@@ -7,7 +7,7 @@
   {
     "name": "app (boot chunk, loaded after the first paint)",
     "path": ".size-build/assets/boot-*.js",
-    "limit": "294.5 kB"
+    "limit": "295 kB"
   },
   {
     "name": "map library (maplibre-gl, its own chunk so it stays cached across deploys)",
@@ -82,7 +82,7 @@
   {
     "name": "feature: notice diagram (lazy, opens with the first notice)",
     "path": ".size-build/assets/NoticeDiagram-*.js",
-    "limit": "10 kB"
+    "limit": "10.5 kB"
   },
   {
     "name": "shared 3D layer: threeLayer + three (vehicles, hydrants, street signs, storefronts, street furniture, overpasses; lazy)",
@@ -125,6 +125,6 @@
       ".size-build/assets/*.js",
       "!.size-build/assets/StationWalkScene-*.js"
     ],
-    "limit": "1257 kB"
+    "limit": "1262 kB"
   }
 ]
