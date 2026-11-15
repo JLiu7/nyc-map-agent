@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { bandLabel, clock, directions, dowOf, grid, percent, routeTotals, SCHEDULES, schedOf, short, stretches, type Cell, type CoverageRow, type Segment, type System } from "./summary";
+import { bandLabel, byPlatform, clock, directions, dowOf, grid, percent, routeTotals, SCHEDULES, schedOf, short, stretches, type Cell, type CoverageRow, type Segment, type System } from "./summary";
 import { nyHourOfWeek } from "../history";
 import { removeShell } from "@/lib/shellDraft";
 
@@ -147,7 +147,8 @@ function LineDetail({ system, route, cell, colors, statics }: { system: System; 
   const q = useQuery({ queryKey: ["tracker-health", "line", path], queryFn: () => getJson<{ segments: Segment[] }>(API + path), staleTime: 5 * 60_000, retry: 1 });
   const stops = useQuery({ queryKey: ["transit", "bus-route", route], queryFn: () => getJson<BusRoute>(`${API}/api/transit/bus-route?${new URLSearchParams({ route })}`), staleTime: Infinity, retry: 0, enabled: system === "bus" });
   const [dirPick, setDir] = useState<number | null>(null);
-  const segments = q.data?.segments ?? NO_SEGMENTS;
+  const raw = q.data?.segments ?? NO_SEGMENTS;
+  const segments = useMemo(() => (system === "subway" ? byPlatform(raw) : raw), [raw, system]);
   const dirs = directions(segments);
   const dir = dirPick !== null && dirs.includes(dirPick) ? dirPick : dirs[0];
   const names = useMemo(() => {

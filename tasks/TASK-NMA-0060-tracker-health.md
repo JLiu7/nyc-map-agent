@@ -143,6 +143,29 @@ Blocked/uncertain:
 Next:
 - When the VPS jobs checkout is on main, read the first job log and stored scores; check the live endpoints and the page after pull request 203 deploys
 
+### 2026-11-15 04:01:31 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The scoring and the tracker health page are live; the One line view now splits a subway line by platform direction"],"decisions":["no new decisions"],"evidence":["The first VPS run stored 740 scores; the live page loads real coverage; the fix passes its unit test and browser case at four sizes"],"next_action":"After the direction fix deploys, pick the 1 on the live page; then the station view with per-hour counts, stored conditions, the pooling comparison and the MTA bus speeds comparison","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T04:01:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"90c5b7be75e987ca190388da8e910eca5648779c93c9bff2b2f0b028616f2a35","request_id":"7b24c64f141f4fef9634f7f39c401b36","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The scoring and the tracker health page are live; the One line view now splits a subway line by platform direction
+
+Evidence:
+- The first VPS run stored 740 scores; the live page loads real coverage; the fix passes its unit test and browser case at four sizes
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After the direction fix deploys, pick the 1 on the live page; then the station view with per-hour counts, stored conditions, the pooling comparison and the MTA bus speeds comparison
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandLabel, clock, directions, dowOf, grid, percent, routeTotals, schedOf, short, stretches, type CoverageRow, type Segment } from "./summary";
+import { bandLabel, byPlatform, clock, directions, dowOf, grid, percent, routeTotals, schedOf, short, stretches, type CoverageRow, type Segment } from "./summary";
 
 const row = (system: "subway" | "bus", route: string, sched: number, band: number, segments: number, solid: number, samples: number): CoverageRow => ({ system, route, sched, band, segments, used: segments, solid, samples });
 const ROWS = [
@@ -55,6 +55,11 @@ describe("stretches", () => {
     const out = stretches(segs, 0);
     expect(out.map((s) => `${s.from}-${s.to}`)).toEqual(["1-2", "2-3", "3-4", "2-4"]);
     expect(out[1]).toEqual({ from: "2", to: "3", n: 2, median: 80, thin: true });
+  });
+  it("reads a train's direction from its platform when the feed gives both ways one number", () => {
+    const segs = byPlatform([seg(0, "101N", "103N", 9), seg(0, "103S", "101S", 9), seg(0, "104S", "103S", 9)]);
+    expect(directions(segs)).toEqual([1, 0]);
+    expect(stretches(segs, 1).map((s) => `${s.from}>${s.to}`)).toEqual(["104S>103S", "103S>101S"]);
   });
   it("lists the directions with the most stretches first", () => {
     expect(directions([seg(1, "A", "B", 3), seg(0, "A", "B", 3), seg(0, "B", "C", 3)])).toEqual([0, 1]);

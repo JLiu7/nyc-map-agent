@@ -51,6 +51,14 @@ export function grid(rows: CoverageRow[], system: System, bands: ReadonlyArray<r
 export type Segment = { dir: number; from: string; to: string; kind: "travel" | "dwell"; n: number; median: number; p80?: number };
 export type Stretch = { from: string; to: string; n: number; median: number; p80?: number; thin: boolean };
 
+/**
+ * Subway rows by platform: the feed's direction number is the same both ways on some lines (the 1),
+ * so a train's direction is read from its platform id, which ends in N or S.
+ */
+export function byPlatform(segments: Segment[]): Segment[] {
+  return segments.map((s) => (/[NS]$/.test(s.from) ? { ...s, dir: s.from.endsWith("S") ? 1 : 0 } : s));
+}
+
 /** The directions a line's learned stretches run in, most stretches first. */
 export function directions(segments: Segment[]): number[] {
   const count = new Map<number, number>();

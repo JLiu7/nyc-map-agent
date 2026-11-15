@@ -21,7 +21,8 @@ const coverage = () => {
 const stops = ["A02", "A03", "A05", "A06", "A07"];
 const subwaySegments = { route: "A", dow: 3, hour: 7, segments: stops.slice(1).flatMap((to, i) => [
   { dir: 0, from: `${stops[i]}N`, to: `${to}N`, kind: "travel", n: i === 1 ? 3 : 24, median: 95 + i * 30, p80: 130 + i * 30 },
-  { dir: 1, from: `${to}S`, to: `${stops[i]}S`, kind: "travel", n: 18, median: 90, p80: 110 },
+  // The feed gives some lines one direction number both ways (the 1 on the live site): the page splits by platform.
+  { dir: 0, from: `${to}S`, to: `${stops[i]}S`, kind: "travel", n: 18, median: 90, p80: 110 },
 ]) };
 const busSegments = { route: "M40", dow: 3, hour: 7, segments: [1, 2, 3, 4].map((i) => ({ dir: 0, from: `40${i}`, to: `40${i + 1}`, kind: "travel", n: i + 1, median: 60 + i * 10 })) };
 const busRoute = { route: "M40", lines: [], stops: [1, 2, 3, 4, 5].map((i) => ({ id: `MTA_40${i}`, name: `EAST BROADWAY/STOP NUMBER ${i} WITH A LONG NAME`, lon: -74, lat: 40.7 })) };
@@ -65,6 +66,7 @@ for (const size of SIZES) {
       await expect(page.getByTestId("coverage-row").first()).toHaveAttribute("data-route", "A");
       await expect(page.getByTestId("grid-system").getByTestId("grid-cell")).toHaveCount(18);
       await expect(page.getByTestId("line-count")).toHaveText("4 stretches · 1 under 5 samples");
+      await expect(page.getByTestId("line-direction").locator("option")).toHaveCount(2);
       await expect(page.getByTestId("stretch").first()).toContainText("Inwood-207 St → Dyckman St", { timeout: slow(15_000) });
       await expect(page.getByTestId("accuracy-data")).toBeVisible();
       await expect(page.getByTestId("accuracy-waiting")).toHaveCount(0);
