@@ -5,7 +5,7 @@ import { useAppLang } from "@/lib/i18n/appLang";
 import { formatStationName } from "@/lib/streetName";
 import { say } from "@/lib/voice/say";
 import { alertDiagram, cleanAlertText, hasMore, isGap, plainSteps, type AlertDiagram, type Corner, type DiagramStep, type StopState } from "./alertDiagram";
-import { setWalkFocus } from "./alertFocus";
+import { setShuttleFocus, setWalkFocus } from "./alertFocus";
 import { useNoticeLines } from "./noticeLang";
 import type { TransitAlert } from "./hooks";
 import type { StaticSystem } from "./model";
@@ -181,6 +181,13 @@ export default function NoticeDiagram({ alert, sys, route, color, auto }: { aler
   const lit = walk.step !== null && steps[walk.step].ids.length ? new Set(steps[walk.step].ids) : null;
   // The map follows the walk: this step's stations, their shuttle bus corners, the buses a tip names.
   const corners = useMemo(() => new Map((diagram?.rows ?? []).flatMap((r) => (!isGap(r) && r.corners ? [[r.id, r.corners] as const] : []))), [diagram]);
+  // A shuttle notice: the bus's line and every stop stay on the map while the notice is open.
+  useEffect(() => {
+    if (!diagram?.bus) return;
+    const closed = new Set(diagram.rows.flatMap((r) => (!isGap(r) && (r.state === "shuttle" || r.state === "closed") ? [r.id] : [])));
+    setShuttleFocus({ stops: diagram.bus.map((id) => ({ id, change: !closed.has(id), corners: (corners.get(id) ?? []).map((c) => (c.note ? `${c.text} (${c.note})` : c.text)) })) });
+    return () => setShuttleFocus(null);
+  }, [diagram, corners]);
   const current = walk.step === null ? null : english[walk.step];
   useEffect(() => {
     if (!current) { setWalkFocus(null); return; }

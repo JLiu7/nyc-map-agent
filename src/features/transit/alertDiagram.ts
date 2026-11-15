@@ -41,6 +41,8 @@ export interface AlertDiagram {
   /** Top to bottom in the direction of travel; north at the top when it is both ways. */
   rows: DiagramRow[];
   steps: DiagramStep[];
+  /** A shuttle notice: the stations the bus calls at, in the order it runs, ends included. */
+  bus?: string[];
 }
 
 export const isGap = (r: DiagramRow): r is DiagramGap => "gap" in r;
@@ -441,7 +443,8 @@ function suspension(a: TransitAlert, sys: StaticSystem, route: string, all: stri
   const busTransfers = changes.find((t) => t.bus)?.at ?? [];
   if (shuttle) steps.push(...shuttleGuide(sys, route, a, { seq, span: busSpan ?? span, state, bused: bused.length ? bused : closed, corners, busTransfers, onLine, near }));
   for (const t of changes) if (!t.bus || !shuttle) steps.push({ text: t.text, ids: idsOf(sys, t, onLine) });
-  return { kind: shuttle ? "shuttle" : "suspended", heading: `No ${route} trains`, rows, steps };
+  const ran = busSpan ?? span;
+  return { kind: shuttle ? "shuttle" : "suspended", heading: `No ${route} trains`, rows, steps, ...(shuttle ? { bus: seq.slice(ran[0], ran[1] + 1) } : {}) };
 }
 
 /**

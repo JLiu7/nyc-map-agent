@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { alertDiagram, causeOf, cleanAlertText, hasMore, isGap, laterSteps, periodWords, plainSteps, shortNotice, shuttleCorners, travelTips, type AlertDiagram, type DiagramStop } from "./alertDiagram";
+import { shuttleFeatures } from "./alertFocus";
 import type { TransitAlert } from "./hooks";
 import type { StaticSystem } from "./model";
 
@@ -267,5 +268,32 @@ describe("plainSteps", () => {
   it("adds the reason to a drawn notice, before when", () => {
     const steps = laterSteps(notice({ kind: "planned", description: "For service to this station, take the [1] to 116 St.\n\nWhat's happening?\nWe're making station improvements\n\n[accessibility icon] This service change affects one or more ADA accessible stations.", period: "Through December 2026" }), sys, "1");
     expect(steps.map((s) => s.text)).toEqual(["Why: We're making station improvements.", "When: Through December 2026."]);
+  });
+});
+
+// Owner, 2026-11-14: "it did not show the shuttle bus route". The diagram names the stations the bus calls at,
+// in order, and the map draws its line through them.
+describe("a shuttle notice's bus stops", () => {
+  const name = (id: string) => String(sys.stations.features.find((f) => f.properties.id === id)?.properties.name ?? "");
+  const at = (id: string) => sys.stations.features.find((f) => f.properties.id === id)?.geometry.coordinates as [number, number] | undefined;
+
+  it("lists the bus's stations end to end, on a branch the line's track order does not hold", () => {
+    const d = alertDiagram(live.aBranch, sys, "A")!;
+    expect(d.kind).toBe("shuttle");
+    expect(d.bus!.map(name)).toEqual(["Rockaway Blvd", "104 St", "111 St", "Ozone Park-Lefferts Blvd"]);
+  });
+
+  it("gives no bus stations when no bus runs", () => {
+    expect(alertDiagram(live.aSkip, sys, "A")!.bus).toBeUndefined();
+  });
+
+  it("draws a line through the stops and names the place to change", () => {
+    const d = alertDiagram(live.aBranch, sys, "A")!;
+    const g = shuttleFeatures({ stops: d.bus!.map((id, i) => ({ id, change: i === 0, corners: i === 1 ? ["Liberty Avenue at 104 Street"] : [] })) }, at);
+    expect(g.line).toHaveLength(4);
+    expect(g.stops.map((x) => x.label)).toEqual(["Change here", "Liberty Avenue at 104 Street", "", ""]);
+    // The frame holds every stop, not only the first.
+    expect(g.bounds![0][0]).toBeLessThan(g.bounds![1][0]);
+    expect(shuttleFeatures(null, at)).toEqual({ line: [], stops: [], bounds: null });
   });
 });

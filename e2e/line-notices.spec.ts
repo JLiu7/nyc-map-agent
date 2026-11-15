@@ -251,6 +251,29 @@ for (const size of SIZES) {
       const src = (window as unknown as { __map?: { getSource: (id: string) => { getData: () => Promise<{ features?: Array<{ properties?: { label?: string } }> }> } | undefined } }).__map?.getSource("transit-walk-corners");
       return (await src?.getData())?.features?.map((f) => f.properties?.label ?? "").join("|") ?? "";
     })).toContain("7 Avenue at 42 Street");
+    // Owner, 2026-11-14: "it did not show the shuttle bus route". The bus has its own line through its
+    // stops, each stop is marked with its corner, and Times Sq-42 St is the place to change, not a skipped stop.
+    const source = (id: string) => page.evaluate(async (sid) => {
+      const src = (window as unknown as { __map?: { getSource: (id: string) => { getData: () => Promise<{ features?: Array<{ geometry: { coordinates: unknown[] }; properties?: { label?: string } }> }> } | undefined } }).__map?.getSource(sid);
+      return (await src?.getData())?.features ?? [];
+    }, id);
+    // Six stations lie on the stretch (the 2's night local stops among them); three have a corner in the notice.
+    await expect.poll(async () => (await source("transit-shuttle-route"))[0]?.geometry.coordinates.length ?? 0).toBe(6);
+    const labels = (await source("transit-shuttle-stops")).map((f) => f.properties?.label);
+    expect(labels).toHaveLength(6);
+    expect(labels[0]).toBe("Change here\n7 Avenue at 42 Street");
+    expect(labels[1]).toBe("7 Avenue at 34 Street");
+    expect(labels[5]).toBe("7 Avenue at 14 Street");
+    expect(await source("transit-alert-skipped")).toHaveLength(0);
+    await expect(page.locator(".maplibregl-marker", { hasText: /Skipped|Work|Affected/ })).toHaveCount(0);
+    await expectLayout(page);
+    // With the walk stopped, the map shows the whole stretch the buses cover: both ends are on screen.
+    await walk.getByRole("button", { name: "Stop" }).click();
+    await expect.poll(() => page.evaluate(async () => {
+      const m = (window as unknown as { __map: { getBounds(): { contains(p: [number, number]): boolean }; getSource(id: string): { getData(): Promise<{ features: Array<{ geometry: { coordinates: [number, number] } }> }> } } }).__map;
+      const stops = (await m.getSource("transit-shuttle-stops").getData()).features;
+      return stops.length === 6 && stops.every((f) => m.getBounds().contains(f.geometry.coordinates));
+    }), { timeout: slow(10_000) }).toBe(true);
     await expectLayout(page);
   });
 }

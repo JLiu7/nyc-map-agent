@@ -12,7 +12,7 @@ import { framePadding } from "@/lib/map/mapCover";
 import { showView } from "@/lib/map/viewChange";
 import { sendScreen, useScreen, useScreenSize } from "@/lib/screen/screenSpace";
 import { heldTrains } from "@/lib/transit/holds";
-import { setAlertFocus } from "./alertFocus";
+import { setAlertFocus, useShuttleFocus } from "./alertFocus";
 import { useAlerts, useAlertsBetween, useNow, useTransitData } from "./hooks";
 import { setLineDay, useLineDay, weekendWindow } from "@/lib/transit/lineDay";
 import { boardingArrivals, minutesUntil } from "./model";
@@ -63,11 +63,13 @@ function useNoticeRings(map: MaplibreMap | undefined, notice: LineNotice | null,
   const { walking } = useMapState();
   const walkingRef = useRef(walking);
   walkingRef.current = walking;
+  const bused = Boolean(useShuttleFocus());
   // The notice already taken out of street view: the sheet moving must not take you out again.
   const leftFor = useRef<string | null>(null);
   useEffect(() => {
     if (!notice) leftFor.current = null;
-    if (!map || !notice?.stations.length) return;
+    // A shuttle notice's stops are drawn by the map itself, each named as a bus stop or the place to change.
+    if (!map || !notice?.stations.length || bused) return;
     const tone = TONE[notice.tone];
     const markers = notice.stations.map((s) => new Marker({ element: ringMarker(tone.color, tone.glow, s.label) }).setLngLat(s.coord).addTo(map));
     // The ring's tag names each skip and its direction: the station's own "Skipped …-bound" words would print under it.
@@ -92,7 +94,7 @@ function useNoticeRings(map: MaplibreMap | undefined, notice: LineNotice | null,
       markers.forEach((m) => m.remove());
       if (quiet && map.getLayer(quiet)) map.setPaintProperty(quiet, "text-opacity", 1);
     };
-  }, [map, notice, panel, sheet]);
+  }, [map, notice, panel, sheet, bused]);
 }
 
 /**
