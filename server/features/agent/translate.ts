@@ -6,6 +6,7 @@
  */
 import { generateText, type LanguageModel } from "ai";
 import { clientIp } from "../../lib/clientIp";
+import { exportTrace, sessionFrom } from "../../lib/tracing";
 import { APP_LANGS, LANG_LABELS, type AppLang } from "../../../src/lib/voice/langPref";
 import { createLimiter } from "./fair-use";
 import { pickProfile } from "./providers";
@@ -46,21 +47,31 @@ export async function translate(req: Request, model?: () => LanguageModel): Prom
   if (!lang || lang === "en" || !Array.isArray(lines) || !lines.length || lines.length > MAX_LINES || !lines.every((l) => typeof l === "string" && l.length <= MAX_LINE)) {
     return json({ error: "lang must be one of the app's other languages; lines 1-24 strings of up to 400 characters" }, 400);
   }
+  const started = Date.now();
+  // One trace per translation (#126), so a language check can see what was asked and what came back.
+  const span = (out: { ok: boolean; text: string; cached?: boolean; model?: string }) => exportTrace({
+    name: "translate", kind: "CHAIN", start: started, end: Date.now(), error: !out.ok,
+    attributes: { "input.value": JSON.stringify(lines), "output.value": out.text, "translate.lang": lang, "translate.cached": out.cached ? "yes" : "no", ...(out.model ? { "llm.model_name": out.model } : {}) },
+  }, sessionFrom(req.headers));
   const key = `${lang}\u0000${lines.join("\u0000")}`;
   const hit = cache.get(key);
-  if (hit) return json({ lines: hit }, 200);
+  if (hit) { span({ ok: true, text: JSON.stringify(hit), cached: true }); return json({ lines: hit }, 200); }
   if (!limiter.take(clientIp(req.headers)).ok) return json({ error: "too many" }, 429);
+  let modelName: string | undefined;
   try {
     // Imported here so the route file stays light for tests that pass their own model.
     const m = model?.() ?? (await import("./routes")).defaultModel(undefined, undefined, pickProfile(undefined));
+    modelName = typeof m === "string" ? m : m.modelId;
     const { text } = await generateText({ model: m, system: translatePrompt(lang), prompt: JSON.stringify(lines), maxOutputTokens: 2000, abortSignal: req.signal });
     const out = parseLines(text, lines.length);
-    if (!out) return json({ error: "the model did not answer with the lines" }, 502);
+    if (!out) { span({ ok: false, text, model: modelName }); return json({ error: "the model did not answer with the lines" }, 502); }
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!);
     cache.set(key, out);
+    span({ ok: true, text: JSON.stringify(out), model: modelName });
     return json({ lines: out }, 200);
   } catch (e) {
     console.warn(`translate: ${(e as Error).message}`);
+    span({ ok: false, text: `error: ${(e as Error).message}`, model: modelName });
     return json({ error: "translation failed" }, 502);
   }
 }

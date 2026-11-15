@@ -1,4 +1,5 @@
 import type { AppLang } from "@/lib/voice/langPref";
+import { SESSION_ID } from "@/lib/sessionId";
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 /** The server takes this many lines a call. */
@@ -26,7 +27,7 @@ export async function translateLines(lines: string[], lang: AppLang, signal?: Ab
     const batch = ask.slice(i, i + BATCH);
     try {
       // x-keep: the offline worker (public/sw.js) keeps the answer, so a trip replayed underground still reads in the rider's language (#132).
-      const r = await fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json", "x-keep": "1" }, body: JSON.stringify({ lang, lines: batch }), signal });
+      const r = await fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json", "x-keep": "1", "x-session-id": SESSION_ID }, body: JSON.stringify({ lang, lines: batch }), signal });
       if (!r.ok) continue;
       const b = (await r.json()) as { lines?: unknown };
       if (!Array.isArray(b.lines) || b.lines.length !== batch.length) continue;

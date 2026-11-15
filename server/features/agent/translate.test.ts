@@ -1,8 +1,11 @@
 import { MockLanguageModelV4 } from "ai/test";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { exportTrace } from "../../lib/tracing";
 import { parseLines, translate, translatePrompt } from "./translate";
 
-const req = (body: unknown) => new Request("http://x/api/agent/translate", { method: "POST", body: JSON.stringify(body) });
+vi.mock("../../lib/tracing", () => ({ exportTrace: vi.fn(), sessionFrom: (h: Headers) => h.get("x-session-id") }));
+
+const req = (body: unknown) => new Request("http://x/api/agent/translate", { method: "POST", headers: { "x-session-id": "page-visit-1" }, body: JSON.stringify(body) });
 const model = (reply: string) => () => new MockLanguageModelV4({
   doGenerate: () => Promise.resolve({ content: [{ type: "text", text: reply }], finishReason: { unified: "stop", raw: "stop" }, usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } }, warnings: [] } as never),
 });
@@ -35,5 +38,33 @@ describe("notice translation (#55)", () => {
 
   it("answers 502 when the model does not return the lines", async () => {
     expect((await translate(req({ lang: "fr", lines: ["a", "b"] }), model('["seulement un"]'))).status).toBe(502);
+  });
+
+  describe("traces (#126)", () => {
+    beforeEach(() => vi.mocked(exportTrace).mockClear());
+    const last = () => vi.mocked(exportTrace).mock.calls.at(-1)!;
+
+    it("writes one span per translation, with what was asked and what came back", async () => {
+      await translate(req({ lang: "zh", lines: ["Take the A uptown."] }), model('["乘坐A线往上城方向。"]'));
+      const [span, session] = last();
+      expect(session).toBe("page-visit-1");
+      expect(span).toMatchObject({ name: "translate", error: false });
+      expect(span.attributes).toMatchObject({ "input.value": '["Take the A uptown."]', "output.value": '["乘坐A线往上城方向。"]', "translate.lang": "zh", "translate.cached": "no" });
+      await translate(req({ lang: "zh", lines: ["Take the A uptown."] }), () => { throw new Error("not called"); });
+      expect(last()[0].attributes).toMatchObject({ "translate.cached": "yes" });
+      expect(exportTrace).toHaveBeenCalledTimes(2);
+    });
+
+    it("marks a bad reply and a failure as errors, keeping the raw reply", async () => {
+      await translate(req({ lang: "fr", lines: ["one", "two"] }), model('["un"]'));
+      expect(last()[0]).toMatchObject({ error: true, attributes: { "output.value": '["un"]' } });
+      await translate(req({ lang: "fr", lines: ["three"] }), () => { throw new Error("no model"); });
+      expect(last()[0]).toMatchObject({ error: true, attributes: { "output.value": "error: no model" } });
+    });
+
+    it("writes nothing for a refused request", async () => {
+      await translate(req({ lang: "en", lines: ["a"] }), model("[]"));
+      expect(exportTrace).not.toHaveBeenCalled();
+    });
   });
 });

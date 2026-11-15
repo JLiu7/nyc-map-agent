@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AppLang } from "@/lib/voice/langPref";
+import { SESSION_ID } from "@/lib/sessionId";
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 const done = new Map<string, string[]>();
@@ -17,7 +18,7 @@ export function useNoticeLines(lines: string[], lang: AppLang): { lines: string[
     const ctl = new AbortController();
     // Long enough for a cold model, short enough that the rider still hears the notice soon.
     const timer = setTimeout(() => ctl.abort(), 8000);
-    fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang, lines }), signal: ctl.signal })
+    fetch(`${API_BASE}/api/agent/translate`, { method: "POST", headers: { "content-type": "application/json", "x-session-id": SESSION_ID }, body: JSON.stringify({ lang, lines }), signal: ctl.signal })
       .then((r) => (r.ok ? (r.json() as Promise<{ lines?: unknown }>) : Promise.reject(new Error(String(r.status)))))
       .then((b) => {
         if (!Array.isArray(b.lines) || b.lines.length !== lines.length) throw new Error("shape");

@@ -327,6 +327,29 @@ Blocked/uncertain:
 Next:
 - After #139 merges, check the thick walls live; then build the partner's entering walk once the owner picks dollhouse or Street view
 
+### 2026-11-13 03:40:57 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After the deploy, translate a trip step on the live site and read the translate span back from Phoenix","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T03:40:57Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"71367ee129c399a410b810c7bd9180cca280aba9cfd034162e6256a6e66ff162","request_id":"6a079ba5c0b24dc4840d460fb143a7a9","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After the deploy, translate a trip step on the live site and read the translate span back from Phoenix
+
 ### 2026-11-13 04:32:38 UTC — claude-code
 
 <!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After the voice fix deploys, ask in Chinese then in English on the live site and check the voice and the mic follow each question","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T04:32:38Z"} -->
@@ -372,6 +395,29 @@ Blocked/uncertain:
 
 Next:
 - After the place-name fix deploys, ask in Spanish for a trip from Pratt Institute to 55 Fulton Market on the live site and check it lands on Fulton St in Manhattan
+
+### 2026-11-13 04:46:27 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After #142 merges, check a translate span shows in Phoenix through the Octo read route","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T04:46:27Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"31e3d3be880bcdbc6227964879f410827aa5a38d59bfd25de0adb743454651f0","request_id":"7bec686d2cf444cebfd1562f590d41f1","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After #142 merges, check a translate span shows in Phoenix through the Octo read route
 
 ### 2026-11-13 05:34:18 UTC — claude-code
 
@@ -1171,6 +1217,52 @@ Blocked/uncertain:
 
 Next:
 - After pull request 146 merges and deploys, ask in Chinese then in English on the live site and check the voice and the mic follow each question; then bring pull request 142 up to date
+
+### 2026-11-15 10:32:39 UTC — agent:claude-code/2d3f5334-9b7a-4d93-ad48-043e8f0d960b
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/2d3f5334-9b7a-4d93-ad48-043e8f0d960b","blocked":[],"changed":["src/lib/i18n/translateLines.ts, checkpoints/CURRENT.md, tasks/TASK-NMA-0055-dollhouse-fulton.md"],"completed":["Pull request 142 (one trace per translation) has main merged in; the translate call keeps the offline worker's x-keep header and gains the session id"],"decisions":["Size limits are main's; the branch's own 1 kB bump was not needed"],"evidence":["On the earlier merge of this branch the check, size and api jobs passed in CI; lint was killed for memory on the runner (exit 137) and passes on the MacBook Pro"],"next_action":"After pull request 142 merges and deploys, translate a trip step on the live site and read the translate span back from Phoenix; then bring pull request 148 up to date","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-15T10:32:39Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"00b0d3ffb978ca206e45f5da69b2ff264267ed34168d3304f4c224871ab221fc","request_id":"c18778e6d3794114ae4bd6b6784bbe60","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- Pull request 142 (one trace per translation) has main merged in; the translate call keeps the offline worker's x-keep header and gains the session id
+
+Evidence:
+- On the earlier merge of this branch the check, size and api jobs passed in CI; lint was killed for memory on the runner (exit 137) and passes on the MacBook Pro
+
+Decisions:
+- Size limits are main's; the branch's own 1 kB bump was not needed
+
+Changed:
+- src/lib/i18n/translateLines.ts, checkpoints/CURRENT.md, tasks/TASK-NMA-0055-dollhouse-fulton.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 142 merges and deploys, translate a trip step on the live site and read the translate span back from Phoenix; then bring pull request 148 up to date
+
+### 2026-11-15 12:13:19 UTC — agent:claude-code/2d3f5334-9b7a-4d93-ad48-043e8f0d960b
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/2d3f5334-9b7a-4d93-ad48-043e8f0d960b","blocked":[],"changed":["none beyond the merge"],"completed":["Pull request 142 has main merged in again, which brings the 710 kB walk chunk limit; every other check had passed"],"decisions":["No limit raised in this pull request; main's limit is used"],"evidence":["CI on the previous commit: check, lint, api, deps, e2e and gitleaks passed; size failed by 40 bytes on the station walk chunk"],"next_action":"After pull request 142 merges and deploys, translate a trip step on the live site and read the translate span back from Phoenix; then bring pull request 148 up to date","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-15T12:13:19Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"4736825b30cc6b5cae1c642a6f7fbe220f93f3e5d6517b07c14077be083669ba","request_id":"f2d1222a16804dac90c9455e8aac43a7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- Pull request 142 has main merged in again, which brings the 710 kB walk chunk limit; every other check had passed
+
+Evidence:
+- CI on the previous commit: check, lint, api, deps, e2e and gitleaks passed; size failed by 40 bytes on the station walk chunk
+
+Decisions:
+- No limit raised in this pull request; main's limit is used
+
+Changed:
+- none beyond the merge
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 142 merges and deploys, translate a trip step on the live site and read the translate span back from Phoenix; then bring pull request 148 up to date
 
 ## Handoff
 
