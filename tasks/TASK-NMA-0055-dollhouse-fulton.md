@@ -258,6 +258,29 @@ Blocked/uncertain:
 Next:
 - Let PR 134 merge, check the Fulton St walk (solid walls, floor guide, new start) on the live site, then comment live on #126
 
+### 2026-11-13 02:54:33 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Let the trip-bar button PR merge, then check the classic preview bar on the live site; #126's partner check is live (commented 2026-11-13). Next design step: Google Maps-style layout (Ask Maps research done; phone chat goes full screen per owner).","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T02:54:33Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"e4ceca2f1b02edbe1d821547e5b516e78eb048ca852583a6d3e5916d68c2742f","request_id":"c8a287987f6b418d84aa995150cbfb59","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0055"} -->
+
+Completed:
+- work completed
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Let the trip-bar button PR merge, then check the classic preview bar on the live site; #126's partner check is live (commented 2026-11-13). Next design step: Google Maps-style layout (Ask Maps research done; phone chat goes full screen per owner).
+
 ### 2026-11-13 03:05:06 UTC — claude-code
 
 <!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["none"],"completed":["work completed"],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Check thick walls live on the Fulton St walk, then plan the partner's entering walk to the uptown A/C platform","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0055","timestamp":"2026-11-13T03:05:06Z"} -->
