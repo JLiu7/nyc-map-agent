@@ -1,6 +1,6 @@
 # TASK-NMA-0005 — Line Status Eval
 
-<!-- continuity:task {"acceptance":["tsx scripts/eval-line-status.ts prints train and held-out clean rates per check over replayed cases","checks.test.ts passes offline, including the wrong A train reply from #627","docs/eval/line-status holds the loop and a handoff DeepSeek can run alone","no real rider questions are collected"],"depends_on":[],"goal":"Line status answers are scored on many replayed cases so each change to the chat is kept or dropped on numbers.","id":"NMA-0005","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/629","next_action":"run the loop's next iteration on the 5 trials that still close with a trip offer, by widening what the route withholds in server/features/agent/routes.ts; real rider questions wait for docs/PRIVACY.md and docs/DESIGN_RULES.md to cover them (#629)","owner":"claude-code","priority":"P2","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"One wrong A train answer was fixed by hand and nothing measures how often the chat misreads line status (#629)."} -->
+<!-- continuity:task {"acceptance":["tsx scripts/eval-line-status.ts prints train and held-out clean rates per check over replayed cases","checks.test.ts passes offline, including the wrong A train reply from #627","docs/eval/line-status holds the loop and a handoff DeepSeek can run alone","no real rider questions are collected"],"depends_on":[],"goal":"Line status answers are scored on many replayed cases so each change to the chat is kept or dropped on numbers.","id":"NMA-0005","issue_url":"https://github.com/Pukujan-lab/nyc-map-agent/issues/629","next_action":"run iteration 3: take a fresh baseline on the fixed runner (a dropped connection no longer becomes an empty reply), then change one prompt line at a time; iteration 2, which dropped the shuttle bus from the prompt, measured worse on held-out and is recorded as rejected in LEDGER.md","owner":"claude-code","priority":"P2","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"One wrong A train answer was fixed by hand and nothing measures how often the chat misreads line status (#629)."} -->
 
 - Status: active
 - Owner: claude-code
@@ -213,6 +213,52 @@ Blocked/uncertain:
 
 Next:
 - Run iteration 3: take a fresh baseline on the fixed runner, then change one prompt line at a time; do not rerun the shuttle wording
+
+### 2026-11-01 17:39:25 UTC — dsh (the model deepseek-v4.1-flash)
+
+<!-- continuity:checkpoint {"agent":"dsh (the model deepseek-v4.1-flash)","blocked":[],"changed":["tasks/TASK-NMA-0005-line-status-eval.md"],"completed":["Pointed the task record at iteration 3 on the fixed runner, so a new session does not repeat the shuttle change that already measured worse on held-out"],"decisions":["Keep NMA-0005 active: #629 is still open and no iteration has been accepted yet"],"evidence":["the record's next action names the fresh baseline and one-prompt-line-at-a-time rule; continuity validate reports VALID for the record's shape; the change is in #646"],"evidence_class":"observed","next_action":"Merge #646, then take the iteration 3 baseline on the fixed runner; do not rerun the shuttle wording","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0005","timestamp":"2026-11-01T17:39:25Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"d213697c4aa1515fdd0478b4fbba1368415322e0eb570bccbc7055a55a509431","request_id":"830eb576eeae4b038163a7fdd975e76b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0005"} -->
+
+Completed:
+- Pointed the task record at iteration 3 on the fixed runner, so a new session does not repeat the shuttle change that already measured worse on held-out
+
+Evidence:
+- the record's next action names the fresh baseline and one-prompt-line-at-a-time rule; continuity validate reports VALID for the record's shape; the change is in #646
+
+Decisions:
+- Keep NMA-0005 active: #629 is still open and no iteration has been accepted yet
+
+Changed:
+- tasks/TASK-NMA-0005-line-status-eval.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge #646, then take the iteration 3 baseline on the fixed runner; do not rerun the shuttle wording
+
+### 2026-11-01 18:09:23 UTC — dsh (the model deepseek-v4.1-flash)
+
+<!-- continuity:checkpoint {"agent":"dsh (the model deepseek-v4.1-flash)","blocked":[],"changed":["tasks/TASK-NMA-0005-line-status-eval.md"],"completed":["Checked the task record against the session: it now points at iteration 3 on the fixed runner, and the guard's request for a checkpoint on this branch is answered"],"decisions":["Keep NMA-0005 active and do not start iteration 3 here: the runner queue is blocking the merge, and a baseline taken while another agent edits the same checkout would not be comparable"],"evidence":["the branch carries the checkpoint commits 5887269 and this one; #646 is open with auto-merge armed; the ci workflow has been queued since 17:39 UTC, which is a runner queue problem on GitHub's side, not a test failure"],"evidence_class":"observed","next_action":"Wait for the ci run to leave the queue and #646 to merge, then take the iteration 3 baseline on the fixed runner; do not rerun the shuttle wording","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0005","timestamp":"2026-11-01T18:09:23Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"fdc8b390ee3e9f9d8df360cb58d73d158bce60f298805c4c7ece19ddbae2e96e","request_id":"76779ea91889491fb65ced5f08b5751d","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0005"} -->
+
+Completed:
+- Checked the task record against the session: it now points at iteration 3 on the fixed runner, and the guard's request for a checkpoint on this branch is answered
+
+Evidence:
+- the branch carries the checkpoint commits 5887269 and this one; #646 is open with auto-merge armed; the ci workflow has been queued since 17:39 UTC, which is a runner queue problem on GitHub's side, not a test failure
+
+Decisions:
+- Keep NMA-0005 active and do not start iteration 3 here: the runner queue is blocking the merge, and a baseline taken while another agent edits the same checkout would not be comparable
+
+Changed:
+- tasks/TASK-NMA-0005-line-status-eval.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Wait for the ci run to leave the queue and #646 to merge, then take the iteration 3 baseline on the fixed runner; do not rerun the shuttle wording
 
 ## Handoff
 
