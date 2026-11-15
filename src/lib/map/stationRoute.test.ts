@@ -92,7 +92,8 @@ describe("the committed stations", () => {
     console.log(`routes: ${found} of ${tried} underground stations; slowest ${slowest.toFixed(0)} ms`);
     expect(tried).toBeGreaterThan(100);
     expect(found / tried).toBeGreaterThan(0.8);
-  }, 180_000);
+    // 14 s on a quiet machine. The shared CI runner took over 180 s three times on 2026-11-13 with other jobs running (load 18 on 12 cores), which failed main and skipped its deploy.
+  }, 600_000);
 });
 
 describe("routeThrough on a stair at an angle to the grid", () => {

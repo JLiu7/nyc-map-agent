@@ -45,6 +45,18 @@ for (const size of SIZES) {
       await expectLayout(page);
     });
 
+    test("home shows the red Record button inside the layout bar", async ({ page }) => {
+      await open(page);
+      await expect(page.getByTestId("open-recorder")).toBeVisible();
+      await expectLayout(page);
+    });
+
+    test("the Record button opens /record", async ({ page }) => {
+      await open(page);
+      await page.getByTestId("open-recorder").click();
+      await expect(page).toHaveURL(/\/record$/);
+    });
+
     test("home with the live trains moving", async ({ page }) => {
       await open(page);
       await expect(page.getByTestId("agent-bar")).toBeVisible();
@@ -86,6 +98,26 @@ for (const size of SIZES) {
       await ask(page, "Plan a trip from Union Square to Grand Central");
       await expect(page.getByRole("region", { name: "Trip preview" })).toBeVisible();
       await expectLayout(page);
+    });
+
+    // The classic preview bar (agentHome off): its play, skip and close buttons kept shrinking to 17 px beside a long step.
+    test("the classic trip preview bar", async ({ page }) => {
+      // On a phone the classic bar waits until the Ask sheet closes; the squeeze was a wide-screen one.
+      test.skip(size.width < 1024, "the classic bar shows beside the Ask sheet only on wide screens");
+      await mockNetwork(page);
+      await page.route("**/api/agent", (r) => r.fulfill({ contentType: "application/x-ndjson", body: stream([{ type: "command", command: { type: "playFlythrough", trip, speed: 30 } }, { type: "done" }]) }));
+      await page.goto("/?flags=-agentHome");
+      await expect(page.locator("canvas.maplibregl-canvas").first()).toBeVisible();
+      await page.getByRole("button", { name: "Ask", exact: true }).click();
+      await ask(page, "preview it");
+      const bar = page.getByRole("region", { name: "Trip preview" });
+      await expect(bar.getByRole("button", { name: "Skip to next leg" })).toBeVisible();
+      // Only the bar is checked: the classic sheet behind it has older overlaps of its own, outside this fix.
+      for (const name of [/^(Play|Pause) preview$/, /^Skip to next leg$/, /^Close preview$/]) {
+        const box = await bar.getByRole("button", { name }).boundingBox();
+        expect(box?.width ?? 0, String(name)).toBeGreaterThanOrEqual(24);
+        expect(box?.height ?? 0, String(name)).toBeGreaterThanOrEqual(24);
+      }
     });
 
     // A trip the day's service changes break says so whole, on the card (owner, 2026-10-27: the 7's weekend work never reached the plan).
@@ -151,11 +183,24 @@ for (const size of SIZES) {
         // The bar and the chat under it leave most of the screen to the map.
         expect(box.height).toBeLessThan(size.height * 0.3);
       }
+      // A small north-up map of the trip stays in the corner the whole way, as it does for a followed train (2026-11-13).
+      const mini = page.getByRole("button", { name: /^Map of the trip/ });
+      await expect(mini).toBeVisible();
       await page.waitForTimeout(900);
       await expectLayout(page);
       // Change view names the preview's own view for what it is: a walk through your eyes, not a flat map.
       await page.getByRole("button", { name: "Change view", exact: true }).first().click();
       await expect(page.getByRole("menuitemradio", { name: /Walkthrough/ })).toHaveAttribute("aria-checked", "true");
+      await expectLayout(page);
+      // The mini map steps aside while Change view is open, and is back once a view is picked.
+      await expect(mini).toBeHidden();
+      await page.getByRole("menuitemradio", { name: /Chase/ }).click();
+      await expect(mini).toBeVisible();
+      await expectLayout(page);
+      // Tapping it goes to the flat map, as it does when following a train; it stays in the corner.
+      await mini.click();
+      await expect(page.getByRole("button", { name: "Change view", exact: true }).first()).toBeVisible();
+      await expect(mini).toBeVisible();
       await expectLayout(page);
     });
 
@@ -229,7 +274,8 @@ for (const size of SIZES) {
     });
 
     // Fulton St's card offers Walk inside (#126); the walk fills the screen with its back button and,
-    // on a screen without touch, the keys hint; Back to the map closes it.
+    // on a screen without touch, the keys hint; Back to the map closes it. The walls and ceilings it
+    // draws are the ones baked from the model (pnpm build:station-shell).
     test("walking inside Fulton St", async ({ page }) => {
       await open(page);
       // Open the card the way a map tap does, so it carries the station's details.
@@ -240,7 +286,9 @@ for (const size of SIZES) {
       const walkInside = page.getByTestId("walk-inside");
       await expect(walkInside).toBeVisible({ timeout: 15_000 });
       await expectLayout(page);
+      const shell = page.waitForResponse((r) => r.url().endsWith("/transit/fulton-shell.json"));
       await walkInside.click();
+      expect((await shell).ok()).toBe(true);
       const walk = page.getByTestId("station-walk");
       await expect(walk).toBeVisible();
       await expect(walk.locator("canvas")).toBeVisible({ timeout: 30_000 });

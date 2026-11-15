@@ -16,7 +16,8 @@ vi.stubGlobal("document", {
     getContext: () => {
       let px = 10;
       return new Proxy({}, {
-        get: (_, k) => (k === "measureText" ? (t: string) => ({ width: t.length * px * 0.65 }) : () => {}),
+        // Gradients (the street picture's sky) take colour stops and draw nothing.
+        get: (_, k) => (k === "measureText" ? (t: string) => ({ width: t.length * px * 0.65 }) : () => ({ addColorStop: () => {} })),
         set: (_, k, v) => { if (k === "font") px = parseFloat(/([\d.]+)px/.exec(String(v))?.[1] ?? "10"); return true; },
       });
     },
@@ -73,7 +74,8 @@ describe("Fulton St's dressing for walking inside", () => {
     expect(ahead.length).toBeGreaterThan(0);
   });
 
-  it("keeps every sign's board, rods and all, out of every wall", () => {
+  // Tests every board against every wall slab: about 5 s on a CI runner.
+  it("keeps every sign's board, rods and all, out of every wall", { timeout: 30_000 }, () => {
     const stuck: string[] = [];
     for (const s of signs()) {
       // The board's own box, turned and scaled as it hangs, sampled every 3 cm.
@@ -109,8 +111,10 @@ describe("Fulton St's dressing for walking inside", () => {
     const all = signs().map((s) => ({ head: JSON.stringify((JSON.parse((s.userData.sign as { key: string }).key) as unknown[])[0]), p: s.position }));
     const twice = all.flatMap((a, i) => all.slice(i + 1).filter((b) => b.head === a.head && Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) < 3 && Math.abs(b.p.z - a.p.z) < 1).map(() => a.head));
     expect(twice).toEqual([]);
-    // 37 along the walks and on the platforms, then one at each fork and each dead end.
-    expect(all.length).toBeLessThan(55);
+    // The A/C level's walks add their own stairs' boards (42 with them, 2026-11-13).
+    // 42 along the walks (the A/C level's included) and on the platforms, then one at each fork and
+    // each dead end: 59 in all on 2026-11-15.
+    expect(all.length).toBeLessThan(64);
   });
 
   it("hangs each stair's board at the stair's foot, facing whoever walks up to it", () => {

@@ -12,7 +12,7 @@ import { framePadding } from "@/lib/map/mapCover";
 import { showView } from "@/lib/map/viewChange";
 import { sendScreen, useScreen, useScreenSize } from "@/lib/screen/screenSpace";
 import { heldTrains } from "@/lib/transit/holds";
-import { setAlertFocus } from "./alertFocus";
+import { setAlertFocus, useShuttleFocus } from "./alertFocus";
 import { useAlerts, useAlertsBetween, useNow, useTransitData } from "./hooks";
 import { setLineDay, useLineDay, weekendWindow } from "@/lib/transit/lineDay";
 import { boardingArrivals, minutesUntil } from "./model";
@@ -63,11 +63,13 @@ function useNoticeRings(map: MaplibreMap | undefined, notice: LineNotice | null,
   const { walking } = useMapState();
   const walkingRef = useRef(walking);
   walkingRef.current = walking;
+  const bused = Boolean(useShuttleFocus());
   // The notice already taken out of street view: the sheet moving must not take you out again.
   const leftFor = useRef<string | null>(null);
   useEffect(() => {
     if (!notice) leftFor.current = null;
-    if (!map || !notice?.stations.length) return;
+    // A shuttle notice's stops are drawn by the map itself, each named as a bus stop or the place to change.
+    if (!map || !notice?.stations.length || bused) return;
     const tone = TONE[notice.tone];
     const markers = notice.stations.map((s) => new Marker({ element: ringMarker(tone.color, tone.glow, s.label) }).setLngLat(s.coord).addTo(map));
     // The ring's tag names each skip and its direction: the station's own "Skipped …-bound" words would print under it.
@@ -92,7 +94,7 @@ function useNoticeRings(map: MaplibreMap | undefined, notice: LineNotice | null,
       markers.forEach((m) => m.remove());
       if (quiet && map.getLayer(quiet)) map.setPaintProperty(quiet, "text-opacity", 1);
     };
-  }, [map, notice, panel, sheet]);
+  }, [map, notice, panel, sheet, bused]);
 }
 
 /**
@@ -206,9 +208,9 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
                     style={{ borderColor: open ? "rgba(96,165,250,0.6)" : "rgba(148,163,184,0.16)", background: open ? "rgba(37,99,235,0.22)" : "rgba(15,23,42,0.35)" }}>
                     <NoticeIcon kind={noticeKind(`${n.title} ${n.body}`, { kind: n.alert?.kind ?? (n.tone === "delay" ? "delay" : undefined), reroute: n.alert?.reroute })} color={tone.dot} className="mt-[2px] h-4 w-4 shrink-0" />
                     <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      {/* Closed: one line each; the full text opens on tap. */}
-                      <span className={`font-semibold ${open ? "" : "truncate"}`}>{n.title}</span>
-                      {n.meta ? <span className={`text-[13px] text-[#cbd5e1] ${open ? "" : "truncate"}`}>{n.meta}</span> : null}
+                      {/* Closed: one line each; the full text opens on tap. An open alert keeps its one-line label: its card says it all, the dates too (#198). */}
+                      <span className={`font-semibold ${open && !n.alert ? "" : "truncate"}`}>{n.title}</span>
+                      {n.meta && !(open && n.alert?.period) ? <span className={`text-[13px] text-[#cbd5e1] ${open ? "" : "truncate"}`}>{n.meta}</span> : null}
                       {open && !n.alert && n.body !== n.title ? <span className="mt-1 whitespace-pre-line text-[13px] leading-[1.45] text-[#e2e8f0]">{n.body}</span> : null}
                     </span>
                     <span aria-hidden className="mt-0.5 text-[#a5b4cb] transition-transform" style={{ transform: `rotate(${open ? 180 : 0}deg)` }}>⌄</span>

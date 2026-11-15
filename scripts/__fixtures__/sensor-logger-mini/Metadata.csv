@@ -1,0 +1,2 @@
+version,device name,recording epoch time,recording time,recording timezone,platform,appVersion,device id,sensors,sampleRateMs,standardisation,platform version
+3,Test Phone,1794607474359,2026-11-13_22-04-34,America/New_York,ios,1.68.1,00000000-0000-0000-0000-000000000000,Accelerometer|Gyroscope,10|10,false,27.0.1

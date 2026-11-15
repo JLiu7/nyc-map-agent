@@ -11,6 +11,8 @@ export function StationWalkHost() {
   useEffect(() => {
     const w = window as unknown as { __walkInside?: (exit?: [number, number]) => void };
     w.__walkInside = (exit) => openStationWalk(exit ?? null);
+    // Dev: after a reload the walk opens again where it was left (the readout saves the spot).
+    if (import.meta.env.DEV) { try { if (sessionStorage.getItem("walk-dev-spot")) openStationWalk(null); } catch { /* private window */ } }
     return () => { delete w.__walkInside; };
   }, []);
   // The walk covers the whole screen: the app behind it takes no taps, keys or screen-reader focus.

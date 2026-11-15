@@ -1,0 +1,550 @@
+# TASK-NMA-0058 — Walk Guide
+
+<!-- continuity:task {"acceptance":["replace this with observable, task-specific acceptance checks"],"depends_on":[],"goal":"Guide a wheelchair rider sign by sign from the street elevator at Cortlandt St to the street at 14 St-Union Sq, with a camera scan that names the sign in front of them","id":"NMA-0058","issue_url":"https://github.com/pukujan-lab-2/nyc-map-agent/issues/88","next_action":"define scope and observable acceptance checks, then begin bounded work","owner":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","priority":"P1","protocol_version":"0.1.0-draft","schema":"project-continuity.task.v1","status":"active","why":"Those stations have no model in the app, and the demo on 2026-11-14 tells this trip"} -->
+
+- Status: active
+- Owner: agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+- Priority: P1
+- Depends on: none
+
+## Goal
+
+Guide a wheelchair rider sign by sign from the street elevator at Cortlandt St to the street at 14 St-Union Sq, with a camera scan that names the sign in front of them
+
+## Why
+
+Those stations have no model in the app, and the demo on 2026-11-14 tells this trip
+
+## Allowed files
+
+- define bounded paths before implementation.
+
+## Human outcome
+
+Describe what becomes easier, safer, clearer, or possible when this task is complete.
+
+## Scope and boundaries
+
+- In scope:
+- Out of scope:
+- Dependencies/uncertainty:
+
+## Acceptance criteria
+
+- [ ] state observable, task-specific outcomes.
+
+## Evidence and sources
+
+Link repository state at a revision and cite external factual claims directly. Record commands and results for claims that need verification.
+
+## Reproduction details (only when needed)
+
+Starting revision, material inputs/configuration, runtime, exact command or prompt, observed result, and limitations.
+
+## Related records
+
+- Required leaf owning issue, parent ancestry and dependencies (or explicitly none):
+- Primary writer / branch / source issue revision / as-of status:
+- Related PR/CI evidence and push receipt (request ID / SHA):
+
+## Checkpoint log
+
+No checkpoints yet.
+
+### 2026-11-14 01:05:43 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["server/features/agent/seeSign.ts, src/features/walkguide/SignScan.tsx, openapi.json"],"completed":["The walk guide's Lost view can ask the server which sign a camera frame shows (pull request 175, on top of the walk guide in 174)"],"decisions":["no new decisions"],"evidence":["On the Pro: 20 unit tests, type check, lint on changed files, API spec check and the four layout cases pass; the camera itself is untried on a phone"],"next_action":"When 174 merges, point 175 at main and arm auto-merge; after it deploys, try the scan on a phone with ?flags=+walkGuide","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T01:05:43Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c5765362a7dd915537d82e4ead2361307f98b8c2eb668f34905af5bc74eebcec","request_id":"733e532af8334b0da4ca60d79620adb6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The walk guide's Lost view can ask the server which sign a camera frame shows (pull request 175, on top of the walk guide in 174)
+
+Evidence:
+- On the Pro: 20 unit tests, type check, lint on changed files, API spec check and the four layout cases pass; the camera itself is untried on a phone
+
+Decisions:
+- no new decisions
+
+Changed:
+- server/features/agent/seeSign.ts, src/features/walkguide/SignScan.tsx, openapi.json
+
+Blocked/uncertain:
+- none
+
+Next:
+- When 174 merges, point 175 at main and arm auto-merge; after it deploys, try the scan on a phone with ?flags=+walkGuide
+
+### 2026-11-14 01:05:57 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["server/features/agent/seeSign.ts, src/features/walkguide/SignScan.tsx, openapi.json"],"completed":["The walk guide's Lost view can ask the server which sign a camera frame shows (pull request 175, on top of the walk guide in 174)"],"decisions":["no new decisions"],"evidence":["On the Pro: 20 unit tests, type check, lint on changed files, API spec check and the four layout cases pass; the camera itself is untried on a phone"],"next_action":"When 174 merges, point 175 at main and arm auto-merge; after it deploys, try the scan on a phone with ?flags=+walkGuide","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T01:05:57Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c5765362a7dd915537d82e4ead2361307f98b8c2eb668f34905af5bc74eebcec","request_id":"d1eae45b8e70468999268715676fdf92","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The walk guide's Lost view can ask the server which sign a camera frame shows (pull request 175, on top of the walk guide in 174)
+
+Evidence:
+- On the Pro: 20 unit tests, type check, lint on changed files, API spec check and the four layout cases pass; the camera itself is untried on a phone
+
+Decisions:
+- no new decisions
+
+Changed:
+- server/features/agent/seeSign.ts, src/features/walkguide/SignScan.tsx, openapi.json
+
+Blocked/uncertain:
+- none
+
+Next:
+- When 174 merges, point 175 at main and arm auto-merge; after it deploys, try the scan on a phone with ?flags=+walkGuide
+
+### 2026-11-14 02:25:38 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["merge of main into feat/88-sign-scan, four conflicts kept on this branch's side because main's copies were the walk guide's"],"completed":["The walk guide merged as pull request 174; the camera scan branch took main in and pull request 175 is mergeable again with auto-merge armed"],"decisions":["no new decisions"],"evidence":["174 merged with every check green; 175 shows MERGEABLE after the merge commit, its checks are re-running"],"next_action":"After 175 merges and deploys, open the live site with ?flags=+walkGuide on a phone, tap Lost and try the camera on a sign; then refit the Union Sq places to the 2026-11-13 evening recording, which has positions on the mezzanine","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T02:25:38Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c24966addf42a9e73ae8c923473b06b93665f54b7bdd48f84f61842e6187dd95","request_id":"0f98c4cbc6524313a61c70b947706970","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The walk guide merged as pull request 174; the camera scan branch took main in and pull request 175 is mergeable again with auto-merge armed
+
+Evidence:
+- 174 merged with every check green; 175 shows MERGEABLE after the merge commit, its checks are re-running
+
+Decisions:
+- no new decisions
+
+Changed:
+- merge of main into feat/88-sign-scan, four conflicts kept on this branch's side because main's copies were the walk guide's
+
+Blocked/uncertain:
+- none
+
+Next:
+- After 175 merges and deploys, open the live site with ?flags=+walkGuide on a phone, tap Lost and try the camera on a sign; then refit the Union Sq places to the 2026-11-13 evening recording, which has positions on the mezzanine
+
+### 2026-11-14 03:11:03 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":["The check job fails on 175, 176 and main because one unrelated test (stationRoute, 14 s on the Pro) times out at 180 s on the shared CI machine, which is at load 18 on 12 cores; main's deploy was skipped for the same reason"],"changed":["server/features/agent/seeSign.ts, src/features/walkguide/signWords.ts, SignScan.tsx, WalkGuide.tsx"],"completed":["The camera scan now reads the sign's words and matches them in code (pull request 175); simulate mode is in pull request 176"],"decisions":["no new decisions"],"evidence":["Held-out frames: choosing from a list gave 3 wrong signs in 10, reading gave none; on the Pro the 24 scan and walk guide tests, type check, lint and four layout cases pass"],"next_action":"Re-run the check jobs once the CI machine is quieter; when 175 and 176 merge and main deploys, run Simulate the trip and the camera scan on the live site at laptop width","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T03:11:03Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"200aff593b4473297ecc10ee378523cd67f0de33ccb4b13db81ae51ea98e59a0","request_id":"a6c2bea9070b47058ad148f9ca1da1ab","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The camera scan now reads the sign's words and matches them in code (pull request 175); simulate mode is in pull request 176
+
+Evidence:
+- Held-out frames: choosing from a list gave 3 wrong signs in 10, reading gave none; on the Pro the 24 scan and walk guide tests, type check, lint and four layout cases pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- server/features/agent/seeSign.ts, src/features/walkguide/signWords.ts, SignScan.tsx, WalkGuide.tsx
+
+Blocked/uncertain:
+- The check job fails on 175, 176 and main because one unrelated test (stationRoute, 14 s on the Pro) times out at 180 s on the shared CI machine, which is at load 18 on 12 cores; main's deploy was skipped for the same reason
+
+Next:
+- Re-run the check jobs once the CI machine is quieter; when 175 and 176 merge and main deploys, run Simulate the trip and the camera scan on the live site at laptop width
+
+### 2026-11-14 03:54:58 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":[".size-limit.json"],"completed":["The scan branch's size check failed by 110 bytes on the station walk chunk; its budget goes to 708 kB"],"decisions":["no new decisions"],"evidence":["Measured 707.11 kB on the Pro; the check job now passes on 176 and 177"],"next_action":"Let 177 and 176 merge, bring main into 175, then verify simulate and the scan on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T03:54:58Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"bd4f549a0a970225f2e68b146d29ca8071f72bbcc5d1c2e78759b549ad103b66","request_id":"3f9c6697236c4617ae3a7f6d1d44dc58","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The scan branch's size check failed by 110 bytes on the station walk chunk; its budget goes to 708 kB
+
+Evidence:
+- Measured 707.11 kB on the Pro; the check job now passes on 176 and 177
+
+Decisions:
+- no new decisions
+
+Changed:
+- .size-limit.json
+
+Blocked/uncertain:
+- none
+
+Next:
+- Let 177 and 176 merge, bring main into 175, then verify simulate and the scan on the live site
+
+### 2026-11-14 04:19:50 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["merge of feat/88-simulate into feat/88-sign-scan; .size-limit.json all-JS budget 1237 kB"],"completed":["The camera scan branch now holds simulate mode too, so pull request 175 fits on top of 176"],"decisions":["no new decisions"],"evidence":["On the Pro, with both together: 29 scan and walk guide tests, type check, lint, four layout cases and the size budgets pass"],"next_action":"After 176 and 175 merge and deploy, run Simulate the trip and the camera scan on the live site at laptop width","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T04:19:50Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"ea7d5a8a1cd0c53deb2592701925eb03f0278b4fb674084f8dcac4d339b0557a","request_id":"3b4d251a7ca040a0a17c0fa780ac7dd6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The camera scan branch now holds simulate mode too, so pull request 175 fits on top of 176
+
+Evidence:
+- On the Pro, with both together: 29 scan and walk guide tests, type check, lint, four layout cases and the size budgets pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- merge of feat/88-simulate into feat/88-sign-scan; .size-limit.json all-JS budget 1237 kB
+
+Blocked/uncertain:
+- none
+
+Next:
+- After 176 and 175 merge and deploy, run Simulate the trip and the camera scan on the live site at laptop width
+
+### 2026-11-14 05:05:41 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["merge of main into feat/88-sign-scan"],"completed":["Simulate mode merged as pull request 176 with every check green; main is merged into the camera scan branch"],"decisions":["no new decisions"],"evidence":["176: check, size, lint, api and e2e all passed; 175 now differs from main only by the scan"],"next_action":"When 175's checks pass and it merges, run Simulate the trip and the camera scan on the live site at laptop width","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T05:05:41Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"226a485ffd3464f26fe28705a94c350cfe95a63828f92e274198140a733f2d81","request_id":"eb06da802bd844d0a14ed54c16d83451","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Simulate mode merged as pull request 176 with every check green; main is merged into the camera scan branch
+
+Evidence:
+- 176: check, size, lint, api and e2e all passed; 175 now differs from main only by the scan
+
+Decisions:
+- no new decisions
+
+Changed:
+- merge of main into feat/88-sign-scan
+
+Blocked/uncertain:
+- none
+
+Next:
+- When 175's checks pass and it merges, run Simulate the trip and the camera scan on the live site at laptop width
+
+### 2026-11-14 05:47:16 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["src/features/walkguide/walks.ts"],"completed":["Simulate mode ran the whole trip on the live site at 1440x900, Cortlandt St to the Union Sq street elevator; the camera scan merged as pull request 175; the Union Sq platform is moved onto the real track (pull request 178)"],"decisions":["no new decisions"],"evidence":["Live: header read Simulation, steps counted down about 6 a second, the dot followed Dey St and ended at 14th St and 4th Av; 175 and 176 merged with every check green"],"next_action":"When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T05:47:16Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"1705fd435c398f16431e96f140e02b52c3a9175a1fd3b7c0570946c14ece35de","request_id":"fbf4ae4ab87a4fee8da8e9984b4373c9","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Simulate mode ran the whole trip on the live site at 1440x900, Cortlandt St to the Union Sq street elevator; the camera scan merged as pull request 175; the Union Sq platform is moved onto the real track (pull request 178)
+
+Evidence:
+- Live: header read Simulation, steps counted down about 6 a second, the dot followed Dey St and ended at 14th St and 4th Av; 175 and 176 merged with every check green
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/walkguide/walks.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- When main deploys the scan, post held-out frames to the live /api/agent/see-sign and try the webcam scan in a browser; then check 178 on the live map
+
+### 2026-11-14 06:20:45 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["server/features/agent/seeSign.ts, seeSign.test.ts"],"completed":["The camera scan is live and was run against the real server; a sign is now taken only when its street numbers were read"],"decisions":["no new decisions"],"evidence":["Live /api/agent/see-sign: 7 of 8 sign frames right, 9 of 10 held-out frames matched nothing and the tenth matched the sign it showed, 2 to 12 s each; the one wrong answer is now a test case"],"next_action":"Add the face-blurred film as public/walks/trip.mp4, run the checks and layout case, open the pull request; then the 3D levels view with a follow camera","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T06:20:45Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b5ec6acdcd874a50cccb19bfe8c117e550bec75d24e6c519f645bb9f016bf540","request_id":"a22645e44df741aa9a5a6f43a3e97b0c","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The camera scan is live and was run against the real server; a sign is now taken only when its street numbers were read
+
+Evidence:
+- Live /api/agent/see-sign: 7 of 8 sign frames right, 9 of 10 held-out frames matched nothing and the tenth matched the sign it showed, 2 to 12 s each; the one wrong answer is now a test case
+
+Decisions:
+- no new decisions
+
+Changed:
+- server/features/agent/seeSign.ts, seeSign.test.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- Add the face-blurred film as public/walks/trip.mp4, run the checks and layout case, open the pull request; then the 3D levels view with a follow camera
+
+### 2026-11-14 06:40:31 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["public/walks/trip.mp4, trip.vtt, src/features/walkguide/WalkGuide.tsx, e2e/walk-guide.spec.ts, checkpoints/CURRENT.md"],"completed":["The walk guide can play or download the film of the trip, faces blurred, with captions (pull request 179)"],"decisions":["no new decisions"],"evidence":["On the Pro: 30 unit tests, type check, lint on changed files, four layout cases and the size budgets pass; a frame every 5.5 s of the blurred film was looked at"],"next_action":"After 179 merges and deploys, play and download the film on the live site; then build the 3D levels view with a follow camera","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T06:40:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"d06ff610b2f64ad8957c57d645ee8516e88239e9504480ff7fb41310175ade73","request_id":"7323eb252e404bde8c897de19b2043d6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The walk guide can play or download the film of the trip, faces blurred, with captions (pull request 179)
+
+Evidence:
+- On the Pro: 30 unit tests, type check, lint on changed files, four layout cases and the size budgets pass; a frame every 5.5 s of the blurred film was looked at
+
+Decisions:
+- no new decisions
+
+Changed:
+- public/walks/trip.mp4, trip.vtt, src/features/walkguide/WalkGuide.tsx, e2e/walk-guide.spec.ts, checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After 179 merges and deploys, play and download the film on the live site; then build the 3D levels view with a follow camera
+
+### 2026-11-14 15:12:11 UTC — agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/1d22e75c-03c4-4c1f-811a-26cfc8b712a5","blocked":[],"changed":["checkpoints/CURRENT.md"],"completed":["Main is merged into the film branch, so pull request 179 can merge again"],"decisions":["no new decisions"],"evidence":["One conflict, in checkpoints/CURRENT.md, resolved by keeping main's paragraph and adding this branch's sentences"],"next_action":"Finish the 1920x1080 big-screen film with the three-level view for the 2026-11-14 demo and send it to the owner; after 179 deploys, play and download the film on the live site","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T15:12:11Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"de85b47e0d4d204b7893cc13f41c091aee5816fbd8c3f698c04c295b45fbdf88","request_id":"fbdb30d4a17041aca5373401e3c6a6f9","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Main is merged into the film branch, so pull request 179 can merge again
+
+Evidence:
+- One conflict, in checkpoints/CURRENT.md, resolved by keeping main's paragraph and adding this branch's sentences
+
+Decisions:
+- no new decisions
+
+Changed:
+- checkpoints/CURRENT.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- Finish the 1920x1080 big-screen film with the three-level view for the 2026-11-14 demo and send it to the owner; after 179 deploys, play and download the film on the live site
+
+### 2026-11-14 16:04:08 UTC — agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235","blocked":[],"changed":["src/features/recorder/clean, src/features/recorder/replay, e2e/station-replay.spec.ts, scripts/derive-union-sq-walk.ts"],"completed":["Friday's Union Sq walk can now be replayed beside Google Maps' No GPS signal, behind ?flags=+stationReplay, with the barometer's three levels and a cleaned path on the map"],"decisions":["no new decisions"],"evidence":["tsc, lint, the boundary check and knip pass; 24 recorder unit tests and the station replay layout spec at five sizes pass"],"next_action":"After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check it plays","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T16:04:08Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"429b0f1472cd8a33a10fa006cfae5bfb229dbce9b84a65268ad222878c00ea03","request_id":"4440067ea6ab4282917a48699bf76933","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Friday's Union Sq walk can now be replayed beside Google Maps' No GPS signal, behind ?flags=+stationReplay, with the barometer's three levels and a cleaned path on the map
+
+Evidence:
+- tsc, lint, the boundary check and knip pass; 24 recorder unit tests and the station replay layout spec at five sizes pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder/clean, src/features/recorder/replay, e2e/station-replay.spec.ts, scripts/derive-union-sq-walk.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check it plays
+
+### 2026-11-14 16:13:07 UTC — agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/c8db7316-79c3-4b56-8086-ed847f9e5235","blocked":[],"changed":["none"],"completed":["The station replay now plays the trip film in step with the dot, offers 1x to 30x, and shows each Walk Guide sign as the rider reaches it"],"decisions":["no new decisions"],"evidence":["tsc, lint, boundaries, knip and size pass on the Pro; 25 recorder tests and the layout spec at five sizes pass"],"next_action":"After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check the film plays","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T16:13:07Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"a1f8d0c5fe20852d69a94476ca9ceebf83f7c057bb4ef90508126e38c248b58a","request_id":"34a062964e424389b17970d0e48aec31","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The station replay now plays the trip film in step with the dot, offers 1x to 30x, and shows each Walk Guide sign as the rider reaches it
+
+Evidence:
+- tsc, lint, boundaries, knip and size pass on the Pro; 25 recorder tests and the layout spec at five sizes pass
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After PR 184 merges and deploys, open the live site with ?flags=+stationReplay at 1920x1080 and check the film plays
+
+### 2026-11-14 17:59:31 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["docs/HACKATHON_GEOAI_2026.md"],"completed":["The hackathon had no submission write-up for the GeoAI 2026 judges; docs/HACKATHON_GEOAI_2026.md now covers the problem, personas, what works today, data and method, and credits (pull request 188, Job 3 of issue 186)."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After pull request 187 (the recorder page) and the cut-down replay page merge, re-read the two lines of the write-up that call them unmerged, then merge pull request 188","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T17:59:31Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"5d60f6df18005faefb2e0a61d5f9c87e6dae5f0e6405f4919cbcc5d61bbe5082","request_id":"b1cd4821a0624cf0b9976d8c5f2e9768","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The hackathon had no submission write-up for the GeoAI 2026 judges; docs/HACKATHON_GEOAI_2026.md now covers the problem, personas, what works today, data and method, and credits (pull request 188, Job 3 of issue 186).
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- docs/HACKATHON_GEOAI_2026.md
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 187 (the recorder page) and the cut-down replay page merge, re-read the two lines of the write-up that call them unmerged, then merge pull request 188
+
+### 2026-11-14 19:35:20 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["src/features/recorder/cloud/, src/App.tsx, e2e/station-3d.spec.ts"],"completed":["The demo had nothing to show for turning a walk video into a 3D station; a page at /station-3d now draws Fulton St as a cloud of 14,000 points that fills in along a walk (pull request 193). It is drawn from the existing station model and reads no video."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T19:35:20Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"96108736b92eca963ed99ad0393de087c53c6b599c89b154faa17e58ead13331","request_id":"d3bd6eabd82d440696d22e883051abd7","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The demo had nothing to show for turning a walk video into a 3D station; a page at /station-3d now draws Fulton St as a cloud of 14,000 points that fills in along a walk (pull request 193). It is drawn from the existing station model and reads no video.
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder/cloud/, src/App.tsx, e2e/station-3d.spec.ts
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play
+
+### 2026-11-14 21:19:55 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The follow-a-phone demo is served by the app at /live/phone.html and /live/screen.html with one code per phone and two in-memory routes; pull request 196 is open with auto-merge armed"],"decisions":["no new decisions"],"evidence":["Server tests pass with the new route tests (504 tests), the type check passes, and the pages showed a posted state when served with the API on a spare port; not walked on a real phone"],"next_action":"After pull request 196 merges and deploys, open /live/phone.html on an iPhone, type its code on /live/screen.html and walk ten steps","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T21:19:55Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"6aab1ad5f5cf0d507fa6f3c13d68901c797d6304dabca998128e25dbf4373c7d","request_id":"94800495fe7b46c58bbe358cda49201b","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The follow-a-phone demo is served by the app at /live/phone.html and /live/screen.html with one code per phone and two in-memory routes; pull request 196 is open with auto-merge armed
+
+Evidence:
+- Server tests pass with the new route tests (504 tests), the type check passes, and the pages showed a posted state when served with the API on a spare port; not walked on a real phone
+### 2026-11-14 20:53:00 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The replay map follows the film (dot waits on the Cortlandt St platform, line starts at the Broadway entrance by Dey St and turns north at Church St), the film plays its sound, the task row is away while the replay is open, and a red Record button on home opens /record; pull request 195 is open with auto-merge armed"],"decisions":["no new decisions"],"evidence":["Replay, recorder and walk guide unit tests pass (67 tests); lint and the type check are clean; the browser layout specs run in CI"],"next_action":"After pull request 195 merges and deploys, scrub the live replay to steps 1, 4, 7, 10 and 17 and press the Record button on a phone, then report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T20:53:00Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"b25ed292cbe9f8608b6f7596850b7d6556be5f958d39dc661eebd641f23905ea","request_id":"da9152e5b07a41f2a57ea3a0ffaf78af","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The replay map follows the film (dot waits on the Cortlandt St platform, line starts at the Broadway entrance by Dey St and turns north at Church St), the film plays its sound, the task row is away while the replay is open, and a red Record button on home opens /record; pull request 195 is open with auto-merge armed
+
+Evidence:
+- Replay, recorder and walk guide unit tests pass (67 tests); lint and the type check are clean; the browser layout specs run in CI
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 196 merges and deploys, open /live/phone.html on an iPhone, type its code on /live/screen.html and walk ten steps
+- After pull request 195 merges and deploys, scrub the live replay to steps 1, 4, 7, 10 and 17 and press the Record button on a phone, then report on issue 186
+
+### 2026-11-14 21:27:06 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["On a phone the new Record button landed on the answer card and the locate button when an answer or sheet was open (eight layout failures in CI on pull request 195); it now shows on the plain home screen only at phone widths"],"decisions":["no new decisions"],"evidence":["The fix is one CSS rule in src/index.css; the affected browser tests are re-running on the MacBook Pro and in CI, not yet seen green"],"next_action":"Read the re-run of the browser tests on pull request 195; once it merges and deploys, scrub the live replay to steps 1, 4, 7, 10 and 17 and press the Record button on a phone, then report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T21:27:06Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"a3dd33511b14e879ce57c3075b69195ace32e6b5b38523b631d561bc3fffdc5c","request_id":"1fbc8610b2f2474a889ca089562cfcdd","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- On a phone the new Record button landed on the answer card and the locate button when an answer or sheet was open (eight layout failures in CI on pull request 195); it now shows on the plain home screen only at phone widths
+
+Evidence:
+- The fix is one CSS rule in src/index.css; the affected browser tests are re-running on the MacBook Pro and in CI, not yet seen green
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Read the re-run of the browser tests on pull request 195; once it merges and deploys, scrub the live replay to steps 1, 4, 7, 10 and 17 and press the Record button on a phone, then report on issue 186
+
+### 2026-11-14 21:52:15 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["Asked for the inside walk between Fulton and Union Square, the chat said it could not map one; it now opens the film and map of that trip (pull request 195, with main merged in)"],"decisions":["no new decisions"],"evidence":["The question matcher has unit tests (2 pass) and the type check is clean; the browser tests run in CI and have not been seen green since the phone fix for the Record button"],"next_action":"Read the browser tests on pull request 195; once it merges and deploys, ask the live chat for the inside walk, scrub the replay to steps 1, 4, 7, 10 and 17, and press the Record button on a phone, then report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T21:52:15Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"cac58ad472cb56913b794e9c086adb12fccb2bd98bc9b8d80a396be5f4606bf7","request_id":"38d417f6400944efa60274b21b208ee6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Asked for the inside walk between Fulton and Union Square, the chat said it could not map one; it now opens the film and map of that trip (pull request 195, with main merged in)
+
+Evidence:
+- The question matcher has unit tests (2 pass) and the type check is clean; the browser tests run in CI and have not been seen green since the phone fix for the Record button
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Read the browser tests on pull request 195; once it merges and deploys, ask the live chat for the inside walk, scrub the replay to steps 1, 4, 7, 10 and 17, and press the Record button on a phone, then report on issue 186
+
+### 2026-11-14 22:30:36 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The recorder's own Record button was hidden on phones by the rule meant for the home button, because both used one test id (five browser test failures on pull request 195); the home button has its own id now, and the QR popup links to a new what-is-coming page"],"decisions":["no new decisions"],"evidence":["Lint and the type check are clean; the browser tests and the size check run in CI and have not been seen green on this commit"],"next_action":"Read the checks on pull request 195; once it merges and deploys, open the QR popup's link, ask the live chat for the inside walk, scrub the replay to steps 1, 4, 7, 10 and 17, and press the Record button on a phone, then report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T22:30:36Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"e9a8e8d24c25629324588ae06c038a6c51ed3b2e6f6598d4d8292670a9837152","request_id":"838c61f47a2b47609808cb96ccc55a53","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The recorder's own Record button was hidden on phones by the rule meant for the home button, because both used one test id (five browser test failures on pull request 195); the home button has its own id now, and the QR popup links to a new what-is-coming page
+
+Evidence:
+- Lint and the type check are clean; the browser tests and the size check run in CI and have not been seen green on this commit
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- Read the checks on pull request 195; once it merges and deploys, open the QR popup's link, ask the live chat for the inside walk, scrub the replay to steps 1, 4, 7, 10 and 17, and press the Record button on a phone, then report on issue 186
+
+### 2026-11-14 23:13:18 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["Pull request 195 merged (replay follows the film, sound, Record button, inside-walk question, what-is-coming link); pull request 197 adds search and sharing tags, a share image and a sitemap entry to the what-is-coming page"],"decisions":["no new decisions"],"evidence":["Pull request 195 passed its checks and merged; pull request 197 is open with auto-merge armed and its checks not yet run"],"next_action":"After pull requests 195 and 197 deploy, check on the live site: the QR popup's link and the page's tags and image, the Record button on a phone, the chat's inside-walk question, and the replay at steps 1, 4, 7, 10 and 17; then report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T23:13:18Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"751a51d50438d56639c43e653e513ac88e527ffbe9009673e4503ee91b6900ab","request_id":"732bc18adeb74eeba0b1586bec4fbc8f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- Pull request 195 merged (replay follows the film, sound, Record button, inside-walk question, what-is-coming link); pull request 197 adds search and sharing tags, a share image and a sitemap entry to the what-is-coming page
+
+Evidence:
+- Pull request 195 passed its checks and merged; pull request 197 is open with auto-merge armed and its checks not yet run
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull requests 195 and 197 deploy, check on the live site: the QR popup's link and the page's tags and image, the Record button on a phone, the chat's inside-walk question, and the replay at steps 1, 4, 7, 10 and 17; then report on issue 186
+
+### 2026-11-14 23:13:51 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["On a short screen the what-is-coming page hid its picture below a fixed-height body; it now grows and scrolls (pull request 197)"],"decisions":["no new decisions"],"evidence":["Seen on the live page in a short browser pane after pull request 195 deployed; the fix is not yet seen rendered"],"next_action":"After pull request 197 deploys, open the page on a phone-sized screen and check the picture shows, then check its tags and share image; report on issue 186","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T23:13:51Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"d9a8c2885449cc775a6873b6088160b7440262e4628fd673e46e503ae854b391","request_id":"650e721a96604eeb8479bfbaae43ce20","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- On a short screen the what-is-coming page hid its picture below a fixed-height body; it now grows and scrolls (pull request 197)
+
+Evidence:
+- Seen on the live page in a short browser pane after pull request 195 deployed; the fix is not yet seen rendered
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After pull request 197 deploys, open the page on a phone-sized screen and check the picture shows, then check its tags and share image; report on issue 186
+
+## Handoff
+
+Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

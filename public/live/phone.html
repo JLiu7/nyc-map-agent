@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Follow me without GPS</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05070d; color: #fff; font: 16px/1.4 system-ui, sans-serif; }
+  main { display: flex; flex-direction: column; gap: 14px; padding: 20px 16px; min-height: 100%; box-sizing: border-box; }
+  h1 { font-size: 20px; margin: 0; }
+  p { margin: 0; color: #cbd5e1; }
+  button { min-height: 52px; border: 0; border-radius: 14px; font: 600 17px system-ui, sans-serif; color: #fff; background: #2563eb; padding: 0 16px; }
+  button.quiet { background: #1e293b; }
+  button:disabled { opacity: .5; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row > * { flex: 1; }
+  .big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card { background: #0f172a; border-radius: 14px; padding: 14px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+  #chip { align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: #1e293b; font-weight: 600; font-size: 14px; }
+  #chip.on { background: #14532d; }
+  #note { color: #fbbf24; min-height: 1.4em; }
+  #map { height: 42vh; min-height: 260px; border-radius: 14px; overflow: hidden; background: #0f172a; }
+  .dot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dot .tag { padding: 2px 9px; border-radius: 999px; background: #0f172a; color: #fff; font: 700 13px system-ui, sans-serif; white-space: nowrap; }
+  .dot .pt { width: 20px; height: 20px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, .5); }
+  .truth { width: 14px; height: 14px; border-radius: 50%; background: #f59e0b; border: 3px solid #fff; }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+</head>
+<body>
+<main>
+  <h1>Follow me without GPS</h1>
+  <p>One location fix to start. After that, only this phone's steps and compass.</p>
+  <div class="card"><div class="label">Your code</div><div class="big" id="code" style="font-family:ui-monospace,Menlo,monospace;letter-spacing:.15em"></div>
+    <p style="margin-top:6px">On a big screen open <b>nyc.design-bakery.com/live/screen.html</b> and type this code.</p></div>
+  <span id="chip">Not started</span>
+  <div class="row">
+    <div class="card"><div class="label">Floor</div><div class="big" id="floor">7</div></div>
+    <button class="quiet" id="down">Down one floor</button>
+    <button class="quiet" id="up">Up one floor</button>
+  </div>
+  <button id="start">Start</button>
+  <div id="map"></div>
+  <div class="row">
+    <div class="card"><div class="label">Steps</div><div class="big" id="steps">0</div></div>
+    <div class="card"><div class="label">Walked</div><div class="big" id="metres">0 m</div></div>
+    <div class="card"><div class="label">Heading</div><div class="big" id="heading">–</div></div>
+  </div>
+  <button class="quiet" id="check" disabled>Check with location</button>
+  <p id="note"></p>
+</main>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script>
+// The map on the phone itself, so the phone alone shows the dot (and can be mirrored to a bigger screen).
+let map = null, dot = null, dotEl = null, truthMark = null, mapReady = false, framed = false;
+try {
+  map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/liberty", center: [-73.99, 40.74], zoom: 11, attributionControl: { compact: true } });
+  dotEl = document.createElement("div");
+  dotEl.className = "dot";
+  dotEl.innerHTML = '<span class="tag">Floor 7</span><span class="pt"></span>';
+  dot = new maplibregl.Marker({ element: dotEl, anchor: "bottom", offset: [0, 10] });
+  const t = document.createElement("div");
+  t.className = "truth";
+  truthMark = new maplibregl.Marker({ element: t });
+  map.on("load", () => {
+    map.addSource("trail", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+    map.addLayer({ id: "trail", type: "line", source: "trail", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#22c55e", "line-width": 5 } });
+    mapReady = true;
+    drawMap();
+  });
+} catch { /* no map: the numbers still work */ }
+
+function drawMap() {
+  if (!map || !mapReady || state.lon == null) return;
+  dotEl.querySelector(".tag").textContent = "Floor " + state.floor;
+  dot.setLngLat([state.lon, state.lat]).addTo(map);
+  map.getSource("trail").setData({ type: "Feature", geometry: { type: "LineString", coordinates: state.trail } });
+  if (!framed) { map.jumpTo({ center: [state.lon, state.lat], zoom: 19.5 }); framed = true; }
+  else map.easeTo({ center: [state.lon, state.lat], duration: 350 });
+  if (state.truth) truthMark.setLngLat(state.truth).addTo(map); else truthMark.remove();
+}
+
+const STRIDE_M = 0.7;
+// This phone's code: from the address, or a new one. A second screen types it to watch this phone.
+const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+let CODE = (new URLSearchParams(location.search).get("c") || "").toUpperCase();
+if (!/^[A-HJ-NP-Z2-9]{4,8}$/.test(CODE)) {
+  const r = crypto.getRandomValues(new Uint8Array(4));
+  CODE = Array.from(r, (n) => LETTERS[n % LETTERS.length]).join("");
+  history.replaceState(null, "", "?c=" + CODE);
+}
+const API = "/api/v1/live/" + CODE + "/";
+const $ = (id) => document.getElementById(id);
+const state = { started: false, lon: null, lat: null, start: null, accuracy: null, heading: null, steps: 0, floor: 7, trail: [], truth: null, offBy: null };
+let lastStepAt = 0, smooth = 9.81, above = false;
+
+const letter = (deg) => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
+const metres = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (b[1] - a[1]) * 110540);
+
+function show() {
+  $("floor").textContent = state.floor;
+  $("steps").textContent = state.steps;
+  $("metres").textContent = Math.round(state.steps * STRIDE_M) + " m";
+  $("heading").textContent = state.heading == null ? "–" : Math.round(state.heading) + "° " + letter(state.heading);
+  drawMap();
+}
+
+let sending = false, dirty = false;
+async function send() {
+  dirty = true;
+  if (sending) return;
+  sending = true;
+  while (dirty) {
+    dirty = false;
+    try { await fetch(API + "state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(state) }); } catch { /* the screen misses one update */ }
+  }
+  sending = false;
+}
+
+function step() {
+  if (state.lon == null || state.heading == null) return;
+  const h = state.heading * Math.PI / 180;
+  state.lat += (Math.cos(h) * STRIDE_M) / 110540;
+  state.lon += (Math.sin(h) * STRIDE_M) / (111320 * Math.cos(state.lat * Math.PI / 180));
+  state.steps += 1;
+  state.trail.push([+state.lon.toFixed(7), +state.lat.toFixed(7)]);
+  if (state.trail.length > 600) state.trail.shift();
+  show();
+  send();
+}
+
+// Walking has a rhythm; shaking the phone does not. A push counts as a step only when it comes at a
+// walking pace, is not violent, the phone is not being spun, and three pushes in a row keep time.
+let cand = [], spin = 0, recent = [], lastBeat = 0, shaking = false;
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null) return;
+  const mag = Math.hypot(a.x, a.y, a.z);
+  smooth = smooth * 0.9 + mag * 0.1;
+  const bump = mag - smooth;
+  const now = performance.now();
+  const r = e.rotationRate;
+  if (r && r.alpha != null) spin = spin * 0.8 + Math.hypot(r.alpha, r.beta, r.gamma) * 0.2;
+  recent.push(+bump.toFixed(2));
+  if (recent.length > 120) recent.shift();
+  const wild = Math.abs(bump) > 7 || spin > 140;
+  if (wild) { cand = []; shaking = true; lastStepAt = now; }
+  else if (now - lastStepAt > 900) shaking = false;
+  if (!wild && !above && bump > 1.3 && now - lastStepAt > 380) {
+    above = true;
+    const gap = now - lastStepAt;
+    lastStepAt = now;
+    if (gap > 1400) cand = [now];
+    else {
+      const prev = cand.length > 1 ? cand[cand.length - 1] - cand[cand.length - 2] : gap;
+      if (Math.abs(gap - prev) > prev * 0.4) cand = [now];
+      else cand.push(now);
+    }
+    if (cand.length === 3) { step(); step(); step(); }
+    else if (cand.length > 3) step();
+  }
+  if (above && bump < 0.3) above = false;
+  // The second screen draws the sensor itself: send it a few times a second.
+  if (state.started && now - lastBeat > 500) { lastBeat = now; state.motion = recent.slice(-80); state.shaking = shaking; send(); }
+}
+
+function onHeading(e) {
+  let h = null;
+  if (typeof e.webkitCompassHeading === "number") h = e.webkitCompassHeading;
+  else if (e.absolute && typeof e.alpha === "number") h = 360 - e.alpha;
+  if (h == null || Number.isNaN(h)) return;
+  if (state.heading == null) state.heading = h;
+  else {
+    // Smooth across the jump between 359 and 0.
+    const d = ((h - state.heading + 540) % 360) - 180;
+    state.heading = (state.heading + d * 0.25 + 360) % 360;
+  }
+  show();
+}
+
+const fix = () => new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }));
+
+$("start").onclick = async () => {
+  $("note").textContent = "";
+  try {
+    // An iPhone only shows these prompts inside the tap.
+    if (typeof DeviceMotionEvent !== "undefined" && DeviceMotionEvent.requestPermission) {
+      const m = await DeviceMotionEvent.requestPermission();
+      const o = await DeviceOrientationEvent.requestPermission();
+      if (m !== "granted" || o !== "granted") { $("note").textContent = "Motion is blocked. Allow motion for this site and press Start again."; return; }
+    }
+  } catch { $("note").textContent = "Could not ask for motion. Press Start again."; return; }
+  $("chip").textContent = "Getting one location fix…";
+  let pos;
+  try { pos = await fix(); } catch { $("chip").textContent = "Not started"; $("note").textContent = "No location. Allow location for this site and press Start again."; return; }
+  Object.assign(state, { started: true, lon: pos.coords.longitude, lat: pos.coords.latitude, accuracy: pos.coords.accuracy, steps: 0, truth: null, offBy: null });
+  state.start = [state.lon, state.lat];
+  state.trail = [[+state.lon.toFixed(7), +state.lat.toFixed(7)]];
+  framed = false;
+  window.addEventListener("devicemotion", onMotion);
+  window.addEventListener("deviceorientationabsolute", onHeading);
+  window.addEventListener("deviceorientation", onHeading);
+  try { await navigator.wakeLock?.request("screen"); } catch { /* the screen may dim */ }
+  $("chip").textContent = "Location off · following by steps";
+  $("chip").className = "on";
+  $("start").textContent = "Start again";
+  $("check").disabled = false;
+  show();
+  send();
+};
+
+$("check").onclick = async () => {
+  $("note").textContent = "Checking…";
+  try {
+    const pos = await fix();
+    state.truth = [pos.coords.longitude, pos.coords.latitude];
+    state.offBy = Math.round(metres([state.lon, state.lat], state.truth));
+    $("note").textContent = "Off by " + state.offBy + " m after " + state.steps + " steps (location is good to about " + Math.round(pos.coords.accuracy) + " m).";
+    send();
+  } catch { $("note").textContent = "No location fix this time."; }
+};
+
+$("code").textContent = CODE;
+// The big screen can move the dot to where the phone really is: carry on from there.
+let placedSeen = 0;
+try {
+  new EventSource(API + "watch").onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (!d.placed || d.placed <= placedSeen || d.placed === state.placed) return;
+      placedSeen = d.placed;
+      Object.assign(state, { lon: d.lon, lat: d.lat, start: [d.lon, d.lat], accuracy: 0, steps: 0, trail: [[d.lon, d.lat]], truth: null, offBy: null, placed: d.placed });
+      framed = false;
+      show();
+    } catch { /* skip a bad line */ }
+  };
+} catch { /* no stream: the dot cannot be moved from the screen */ }
+
+$("up").onclick = () => { state.floor += 1; show(); send(); };
+$("down").onclick = () => { state.floor -= 1; show(); send(); };
+show();
+</script>
+</body>
+</html>

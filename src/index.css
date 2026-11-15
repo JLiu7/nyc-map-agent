@@ -351,3 +351,7 @@
   background: rgba(148, 163, 184, 0.12);
   border-radius: 2px;
 }
+
+/* On a phone the quick bar has room for the Record button only on the plain home screen: once an answer, a sheet,
+   a walk or street view is up (the home task row is away), it would sit on that panel or on the locate button. */
+@media (max-width: 639px) { :root:not(:has([data-testid="home-tasks"])) [data-testid="open-recorder"] { display: none; } }

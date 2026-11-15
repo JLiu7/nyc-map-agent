@@ -6,6 +6,8 @@ import { walkEye } from "@/lib/map/walkEye";
 /** The planned trip as MapLibre line/circle layers on one GeoJSON source, plus a moving marker. */
 const SRC = "agent-trip";
 const MARKER = "agent-marker";
+/** The trip's own bus, a box on the road: pulling in to the stop, then carrying the rider. */
+const VEHICLE = "agent-vehicle";
 
 /** Official MTA bullet colours (mta.info brand guide), by route id. */
 const ROUTE_COLOR: Record<string, string> = {
@@ -18,6 +20,7 @@ function ensure(map: MapLibreMap): void {
   if (map.getSource(SRC)) return;
   map.addSource(SRC, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addSource(MARKER, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addSource(VEHICLE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "agent-walk", type: "line", source: SRC, filter: ["==", ["get", "kind"], "walk"], paint: { "line-color": "#2563eb", "line-width": 4, "line-dasharray": [1, 1.5] } });
   map.addLayer({ id: "agent-drive", type: "line", source: SRC, filter: ["==", ["get", "kind"], "drive"], paint: { "line-color": "#2563eb", "line-width": 6, "line-opacity": 0.85 } });
   map.addLayer({ id: "agent-ride", type: "line", source: SRC, filter: ["==", ["get", "kind"], "ride"], paint: { "line-color": ["get", "color"], "line-width": 6 } });
@@ -25,6 +28,7 @@ function ensure(map: MapLibreMap): void {
   // Where to change trains and stations the trip's lines skip, labelled on the route (#418).
   map.addLayer({ id: "agent-note", type: "circle", source: SRC, filter: ["has", "note"], paint: { "circle-radius": 8, "circle-color": ["match", ["get", "note"], "skip", "#d4183d", "#ffffff"], "circle-stroke-color": ["match", ["get", "note"], "skip", "#ffffff", "#111827"], "circle-stroke-width": 3 } });
   map.addLayer({ id: "agent-note-label", type: "symbol", source: SRC, filter: ["has", "note"], layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "left", "text-offset": [1.1, 0], "text-max-width": 14, "text-optional": true }, paint: { "text-color": "#111827", "text-halo-color": "#ffffff", "text-halo-width": 1.8 } });
+  map.addLayer({ id: VEHICLE, type: "fill-extrusion", source: VEHICLE, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-height": 3.2, "fill-extrusion-base": 0.35, "fill-extrusion-opacity": 0.95 } });
   map.addLayer({ id: "agent-marker", type: "circle", source: MARKER, paint: { "circle-radius": 8, "circle-color": ["coalesce", ["get", "color"], "#2563eb"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
 }
 
@@ -76,6 +80,24 @@ export function setMarker(map: MapLibreMap, at: LngLatTuple | null, route?: stri
   });
 }
 
+/** A city bus's footprint, metres: long, then wide. */
+const BUS = [12.2, 2.6];
+/** The bus as a box on the road at `at`, nose along `heading`; null takes it away. */
+export function busFootprint(at: LngLatTuple, heading: number): GeoJSON.Polygon {
+  const r = (heading * Math.PI) / 180, k = 111_320, kx = k * Math.cos((at[1] * Math.PI) / 180);
+  const [fx, fy, rx, ry] = [Math.sin(r), Math.cos(r), Math.cos(r), -Math.sin(r)];
+  const pt = (a: number, b: number): LngLatTuple => [at[0] + (fx * a + rx * b) / kx, at[1] + (fy * a + ry * b) / k];
+  const [l, w] = [BUS[0] / 2, BUS[1] / 2];
+  return { type: "Polygon", coordinates: [[pt(l, -w), pt(l, w), pt(-l, w), pt(-l, -w), pt(l, -w)]] };
+}
+export function setTripBus(map: MapLibreMap, bus: { at: LngLatTuple; heading: number; color: string } | null): void {
+  ensure(map);
+  void (map.getSource(VEHICLE) as GeoJSONSource).setData({
+    type: "FeatureCollection",
+    features: bus ? [{ type: "Feature", properties: { color: bus.color }, geometry: busFootprint(bus.at, bus.heading) }] : [],
+  });
+}
+
 /** Route colour by line id; grey for an unknown line. */
 export const routeColor = (route: string): string => ROUTE_COLOR[route.replace(/X$/, "")] ?? "#808183";
 
@@ -124,7 +146,7 @@ export function setXray(map: MapLibreMap, on: boolean): void {
 const dimmed = new Map<string, unknown>();
 /** While previewing, fade the data columns (not buildings) so the street stays visible. */
 export function setPreviewDim(map: MapLibreMap, on: boolean): void {
-  const ids = (map.getStyle()?.layers ?? []).filter((l) => l.type === "fill-extrusion" && !/building/i.test(l.id)).map((l) => l.id);
+  const ids = (map.getStyle()?.layers ?? []).filter((l) => l.type === "fill-extrusion" && !/building/i.test(l.id) && l.id !== VEHICLE).map((l) => l.id);
   for (const id of ids) {
     if (on && !dimmed.has(id)) {
       dimmed.set(id, map.getPaintProperty(id, "fill-extrusion-opacity") ?? 1);

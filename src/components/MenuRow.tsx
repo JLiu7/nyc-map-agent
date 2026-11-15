@@ -5,6 +5,7 @@ import {
   Leaf, Lightbulb, Cpu, LocateFixed, Lock, MessageSquare, Box, Palette, Settings, Shield, Signpost, SlidersHorizontal, Sun, TrainFront, Trash2, Volume2, Gauge, CloudSun, type LucideIcon,
 } from "lucide-react";
 import { LiveLayerRows, SwitchRow } from "@/components/LiveLayerRows";
+import { TrackerHealthLink } from "@/components/TrackerHealthLink";
 import { FEATURES } from "@/features";
 import { setAmbient, useAmbient, type LightingMode, type WeatherMode } from "@/lib/ambient";
 import { useAdvancedMode, useFlags } from "@/lib/flags";
@@ -256,6 +257,7 @@ function SettingsBody() {
       {flags.city3d ? <SwitchRow icon={<Box className={ICON} aria-hidden />} label={t("city3d")} on={city3d} onChange={setCity3d} /> : null}
       <SwitchRow icon={<Leaf className={ICON} aria-hidden />} label={t("eco")} on={eco} onChange={setEco} />
       <SwitchRow icon={<Gauge className={ICON} aria-hidden />} label={t("advanced")} on={advanced} onChange={setAdvanced} />
+      <TrackerHealthLink />
       <ModelChoice />
     </div>
   );

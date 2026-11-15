@@ -14,7 +14,8 @@ describe.each(STATIONS)("the %s model's walk geometry", (id) => {
     expect(toYUp(1, 2, 3)).toEqual([1, 3, -2]);
   });
 
-  it("draws every surface and gives the body something to collide with", { timeout: 60_000 }, () => {
+  // 65 s on a busy CI runner with the A/C level's walks (2026-11-13).
+  it("draws every surface and gives the body something to collide with", { timeout: 180_000 }, () => {
     const g = walkGeometry(model);
     expect(g.floors.uv.length / 2).toBe(g.floors.position.length / 3);
     expect(g.colliders.length).toBe(5);
@@ -27,7 +28,7 @@ describe.each(STATIONS)("the %s model's walk geometry", (id) => {
     expect(g.lowest).toBeLessThanOrEqual(Math.min(...model.walks.flatMap((w) => w.path.map((p) => p[2]))) + 0.1);
   });
 
-  it("has a floor or ramp under every point of every walk", { timeout: 60_000 }, () => {
+  it("has a floor or ramp under every point of every walk", { timeout: 180_000 }, () => {
     const parts = walkCollider(model, stationShell(model));
     const tris = [...parts.ground, ...parts.ramps];
     const missing: string[] = [];

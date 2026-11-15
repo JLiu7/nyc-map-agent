@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { Textarea } from "@/components/ui/textarea";
 import { setAmbient } from "@/lib/ambient";
 import { useFlag } from "@/lib/flags";
+import { asksForStationWalk, STATION_WALK_URL } from "./stationWalkAsk";
 import { getMapInstance } from "@/lib/map/mapInstance";
 import { useDataView } from "@/lib/store/DataViewContext";
 import { followTripRoute } from "@/lib/transit/routeFollow";
@@ -172,6 +173,8 @@ export default function AgentOverlay() {
   }, [chatOpen, closeAll]);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const driveOn = useFlag("agentDrive");
+  // The station replay fills the left column or the top of a phone: the task row has no room beside it.
+  const replayOn = useFlag("stationReplay");
   const [messages, setMessages] = useState<Msg[]>([]);
   // Who gets the screen is decided in one place (src/lib/screen/screenSpace.ts); this reports what is open.
   const openMenu = useOpenMenu();
@@ -418,6 +421,8 @@ export default function AgentOverlay() {
     heardLangRef.current = null;
     const askLang = heard ?? lang;
     if (!q) return;
+    // The one filmed trip: open its film and map instead of asking the model, which has no tool for it.
+    if (asksForStationWalk(q)) { window.location.assign(STATION_WALK_URL); return; }
     setNotice(null);
     setInput("");
     // A new question replaces the last answer: its trip card, the line it opened, a follow.
@@ -958,7 +963,7 @@ export default function AgentOverlay() {
     };
     const panelUp = panelContent !== null && !panelMinimized;
     const answerOpen = hasAnswer && answerView === "open";
-    const showIdle = !lost && !selectedLine && !stationHelpVisible && !followingRoute && !player.state.active && !walking && !streetViewOpen && !answerOpen && !busy && !handsFree && !drawerOpen && !panelUp && followed === null;
+    const showIdle = !lost && !selectedLine && !stationHelpVisible && !followingRoute && !player.state.active && !walking && !streetViewOpen && !answerOpen && !busy && !handsFree && !drawerOpen && !panelUp && followed === null && !replayOn;
     const chip = hasAnswer && answerView === "chip" ? (
       <button type="button" aria-label={tr(appLang, "showAnswer")} data-testid="answer-chip" onClick={() => sendScreen({ type: "SHOW_ANSWER" })}
         className="pointer-events-auto flex h-11 max-w-full items-center gap-2 self-start rounded-full border border-[#263449] bg-[#0b1220]/85 px-4 text-sm font-semibold text-slate-100 shadow-lg backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
@@ -1074,7 +1079,7 @@ export default function AgentOverlay() {
 /** 2x / 5x / 10x / 30x. A change keeps the camera where it is and changes the rate. */
 function SpeedPicker({ speed, onSpeed, label }: { speed: Speed; onSpeed: (s: Speed) => void; label: string }) {
   return (
-    <div className="flex items-center" role="group" aria-label={label}>
+    <div className="flex shrink-0 items-center" role="group" aria-label={label}>
       {PLAYBACK_SPEEDS.map((s) => (
         <Button key={s} type="button" size="sm" variant={speed === s ? "default" : "ghost"} className="h-8 rounded-full px-2 text-xs tabular-nums" aria-pressed={speed === s} onClick={() => onSpeed(s)}>
           {s}x
@@ -1090,16 +1095,16 @@ function PlaybackBar(p: { playing: boolean; speed: Speed; callout: string; step:
   const publish = useCssHeight("--playback-h");
   return (
     <div ref={publish} className="pointer-events-auto fixed bottom-4 left-1/2 z-[70] flex w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 flex-wrap items-center gap-1 rounded-2xl border bg-card/95 px-2 py-1 shadow-lg backdrop-blur-md sm:flex-nowrap sm:rounded-full" role="region" aria-label="Trip preview">
-      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label={p.playing ? "Pause preview" : "Play preview"} onClick={p.onToggle}>
+      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-full" aria-label={p.playing ? "Pause preview" : "Play preview"} onClick={p.onToggle}>
         {p.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </Button>
       <SpeedPicker speed={p.speed} onSpeed={p.onSpeed} label="Playback speed" />
-      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label="Skip to next leg" onClick={p.onSkip}><SkipForward className="h-4 w-4" /></Button>
+      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-full" aria-label="Skip to next leg" onClick={p.onSkip}><SkipForward className="h-4 w-4" /></Button>
       {/* On a phone the step's words get a line of their own above the controls, not cut to "W…". */}
       <div className="order-first min-w-0 basis-full px-1 pt-0.5 text-sm sm:order-none sm:flex-1 sm:basis-auto sm:truncate sm:pt-0" aria-live="polite">{p.callout}</div>
       <span className="flex-1 sm:hidden" aria-hidden />
       <Badge variant="secondary" className="tabular-nums max-[359px]:hidden">{p.step}</Badge>
-      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" aria-label="Close preview" onClick={p.onClose}><X className="h-4 w-4" /></Button>
+      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-full" aria-label="Close preview" onClick={p.onClose}><X className="h-4 w-4" /></Button>
     </div>
   );
 }

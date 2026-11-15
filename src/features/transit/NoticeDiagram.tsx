@@ -4,8 +4,8 @@ import { useSharedLocation } from "@/lib/geo/sharedLocation";
 import { useAppLang } from "@/lib/i18n/appLang";
 import { formatStationName } from "@/lib/streetName";
 import { say } from "@/lib/voice/say";
-import { alertDiagram, cleanAlertText, isGap, laterSteps, shortNotice, type AlertDiagram, type Corner, type DiagramStep, type StopState } from "./alertDiagram";
-import { setWalkFocus } from "./alertFocus";
+import { alertDiagram, cleanAlertText, hasMore, isGap, plainSteps, type AlertDiagram, type Corner, type DiagramStep, type StopState } from "./alertDiagram";
+import { setShuttleFocus, setWalkFocus } from "./alertFocus";
 import { useNoticeLines } from "./noticeLang";
 import type { TransitAlert } from "./hooks";
 import type { StaticSystem } from "./model";
@@ -155,7 +155,7 @@ function Tag({ label, bg, fg, shuttle }: { label: string; bg: string; fg: string
 /**
  * An open service notice: the affected stretch drawn as a line, the short steps under it, read
  * aloud with each step lit, and the MTA's own words folded below. A notice with no stations to
- * draw shows its first sentence or two instead.
+ * draw says its headline first: which train, where and what changes.
  */
 export default function NoticeDiagram({ alert, sys, route, color, auto }: { alert: TransitAlert; sys: StaticSystem | undefined; route: string; color: string; auto: boolean }) {
   // Start from the rider's nearest station when they share where they are; about 100 m is close enough.
@@ -164,8 +164,9 @@ export default function NoticeDiagram({ alert, sys, route, color, auto }: { aler
   const near = useMemo(() => (nearKey ? { lon: Number(nearKey.split(",")[0]), lat: Number(nearKey.split(",")[1]) } : null), [nearKey]);
   const diagram = useMemo(() => alertDiagram(alert, sys, route, near), [alert, sys, route, near]);
   const full = useMemo(() => cleanAlertText([alert.text, alert.description].filter(Boolean).join("\n\n")).replace(/\n{3,}/g, "\n\n").trim(), [alert]);
-  const short = useMemo(() => shortNotice(alert.description || alert.text), [alert]);
-  const english = useMemo(() => diagram?.steps ?? [{ text: short, ids: [] }, ...laterSteps(alert, sys, route)], [diagram, short, alert, sys, route]);
+  // Nothing to draw: the card still says which train, where and what changes before why and when (#198).
+  const english = useMemo(() => diagram?.steps ?? plainSteps(alert, sys, route), [diagram, alert, sys, route]);
+  const more = useMemo(() => hasMore(alert, Boolean(diagram)), [alert, diagram]);
   // One call translates the steps, the tags and the heading together (owner, 2026-11-08: "in user preffered language").
   const lang = useAppLang();
   const words = useMemo(() => [...english.map((s) => s.text), ...TAG_KEYS.map((k) => TAG[k]!.label), "Change here", diagram?.heading ?? ""], [english, diagram]);
@@ -176,10 +177,17 @@ export default function NoticeDiagram({ alert, sys, route, color, auto }: { aler
     return { ...Object.fromEntries(TAG_KEYS.map((k, i) => [k, t[i]])), transfer: t[TAG_KEYS.length], heading: diagram?.heading ? t[TAG_KEYS.length + 1] : "" } as Record<StopState, string> & { heading: string };
   }, [said.lines, english.length, diagram]);
   const walk = useNoticeWalk(steps, auto && said.ready, lang === "en" || said.failed ? "en-US" : lang);
-  const [more, setMore] = useState(false);
+  const [open, setOpen] = useState(false);
   const lit = walk.step !== null && steps[walk.step].ids.length ? new Set(steps[walk.step].ids) : null;
   // The map follows the walk: this step's stations, their shuttle bus corners, the buses a tip names.
   const corners = useMemo(() => new Map((diagram?.rows ?? []).flatMap((r) => (!isGap(r) && r.corners ? [[r.id, r.corners] as const] : []))), [diagram]);
+  // A shuttle notice: the bus's line and every stop stay on the map while the notice is open.
+  useEffect(() => {
+    if (!diagram?.bus) return;
+    const closed = new Set(diagram.rows.flatMap((r) => (!isGap(r) && (r.state === "shuttle" || r.state === "closed") ? [r.id] : [])));
+    setShuttleFocus({ stops: diagram.bus.map((id) => ({ id, change: !closed.has(id), corners: (corners.get(id) ?? []).map((c) => (c.note ? `${c.text} (${c.note})` : c.text)) })) });
+    return () => setShuttleFocus(null);
+  }, [diagram, corners]);
   const current = walk.step === null ? null : english[walk.step];
   useEffect(() => {
     if (!current) { setWalkFocus(null); return; }
@@ -209,13 +217,13 @@ export default function NoticeDiagram({ alert, sys, route, color, auto }: { aler
         <button type="button" className={btn} aria-pressed={walk.muted} aria-label={walk.muted ? "Voice off: turn on" : "Voice on: turn off"} onClick={() => walk.setMuted(!walk.muted)}>
           {walk.muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
         </button>
-        {full !== short ? (
-          <button type="button" className={`${btn} ml-auto border-transparent px-2 text-[#cbd5e1]`} aria-expanded={more} onClick={() => setMore((m) => !m)}>
-            Full notice <ChevronDown className="h-3.5 w-3.5 transition-transform" style={{ transform: `rotate(${more ? 180 : 0}deg)` }} aria-hidden />
+        {more ? (
+          <button type="button" className={`${btn} ml-auto border-transparent px-2 text-[#cbd5e1]`} aria-expanded={open} onClick={() => setOpen((m) => !m)}>
+            Full notice <ChevronDown className="h-3.5 w-3.5 transition-transform" style={{ transform: `rotate(${open ? 180 : 0}deg)` }} aria-hidden />
           </button>
         ) : null}
       </div>
-      {more ? <p data-testid="notice-full" className="whitespace-pre-line text-[13px] leading-[1.45] text-[#cbd5e1]">{full}</p> : null}
+      {open && more ? <p data-testid="notice-full" className="whitespace-pre-line text-[13px] leading-[1.45] text-[#cbd5e1]">{full}</p> : null}
     </div>
   );
 }

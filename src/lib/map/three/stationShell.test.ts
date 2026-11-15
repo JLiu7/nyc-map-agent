@@ -11,7 +11,8 @@ const load = (id: string) => JSON.parse(readFileSync(`public/transit/${id}-model
 
 describe.each(STATIONS)("the %s model's shell for walking inside", (id) => {
   const model = load(id);
-  it("has no opening a person could lean or step through, except over the track", { timeout: 180_000 }, () => {
+  // Fulton St with the A/C level took 187 s on a busy CI runner (29 s on the MacBook Pro), 2026-11-14.
+  it("has no opening a person could lean or step through, except over the track", { timeout: 360_000 }, () => {
     const gaps = shellOpenings(model, stationShell(model));
     expect(gaps.slice(0, 20), `${gaps.length} open points along floor and stair edges`).toEqual([]);
   });

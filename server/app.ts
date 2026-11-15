@@ -8,7 +8,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { apiRateLimit } from "./lib/apiRateLimit";
-import { AGENT_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
+import { AGENT_ROUTE, LIVE_STATE_ROUTE, LIVE_WATCH_ROUTE, SEE_SIGN_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
 import * as aggregate from "../api/aggregate";
 import * as area from "../api/area/[block]";
 import * as areas from "../api/areas";
@@ -28,13 +28,16 @@ import * as agent from "./features/agent/routes";
 import { transcribe } from "./features/agent/stt";
 import { speak, startVoiceKeeper } from "./features/agent/tts";
 import { translate } from "./features/agent/translate";
+import { seeSign } from "./features/agent/seeSign";
 import * as transit from "./features/transit/routes";
 import * as transitSegments from "./features/transit/segments";
 import * as transitLive from "./features/transit/live";
 import * as transitBusSegments from "./features/transit/busSegments";
+import * as transitHealth from "./features/transit/health";
 import * as events from "./features/events/routes";
 import * as placeToilets from "./features/place-toilets/routes";
 import * as storefronts from "./features/storefronts/routes";
+import * as live from "./features/live/routes";
 
 type Handler = { GET: (request: Request) => Promise<Response> };
 
@@ -62,6 +65,8 @@ const routes: Array<[string, Handler]> = [
   ["/api/transit-segments", transitSegments],
   ["/api/transit-live", transitLive],
   ["/api/transit-bus-segments", transitBusSegments],
+  ["/api/transit-health/coverage", { GET: transitHealth.GET_COVERAGE }],
+  ["/api/transit-health/accuracy", { GET: transitHealth.GET_ACCURACY }],
   ["/api/agent/health", agent.health],
   ["/api/agent/warm", agent.warm],
   ["/api/transit", transit],
@@ -90,7 +95,7 @@ app.use("/api/*", apiRateLimit());
 app.use("/api/*", async (c, next) => {
   // Tile ranges are already-compressed binary; gzip would break Content-Range.
   const p = c.req.path.replace(/^\/api\/v1\//, "/api/");
-  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent" || p === "/api/tts") return next(); // streams
+  if (p === "/api/city-tiles" || p === "/api/block-tiles" || p.startsWith("/api/vehicle-models/") || p === "/api/agent" || p === "/api/tts" || p.startsWith("/api/live/")) return next(); // streams
   return compress()(c, next);
 });
 // Canonical paths are /api/v1/*; /api/* stays as an alias (marked deprecated in the spec).
@@ -134,6 +139,22 @@ const translateHandler = async (c: Context) => {
 };
 app.openapi(toV1Route(TRANSLATE_ROUTE), translateHandler as never);
 app.openapi(legacyAlias(TRANSLATE_ROUTE), translateHandler as never);
+const seeSignHandler = async (c: Context) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  return seeSign(new Request(c.req.url, { method: "POST", headers: c.req.raw.headers, body: JSON.stringify(body), signal: c.req.raw.signal }));
+};
+app.openapi(toV1Route(SEE_SIGN_ROUTE), seeSignHandler as never);
+app.openapi(legacyAlias(SEE_SIGN_ROUTE), seeSignHandler as never);
+// The live phone demo (#186): a phone posts its state under a code, screens watch the code. A bad code is the handler's 400.
+const liveStateHandler = async (c: Context) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  return live.postState(c.req.param("code") ?? "", body, Number(c.req.header("content-length") ?? 0) || JSON.stringify(body ?? null).length);
+};
+const liveWatchHandler = (c: Context) => live.watch(c.req.param("code") ?? "", c.req.raw.signal);
+app.openapi(toV1Route(LIVE_STATE_ROUTE), liveStateHandler as never);
+app.openapi(legacyAlias(LIVE_STATE_ROUTE), liveStateHandler as never);
+app.openapi(toV1Route(LIVE_WATCH_ROUTE), liveWatchHandler as never);
+app.openapi(legacyAlias(LIVE_WATCH_ROUTE), liveWatchHandler as never);
 // Keep the speech server on our stack so the first spoken answer is not the one that waits for a model swap.
 startVoiceKeeper();
 

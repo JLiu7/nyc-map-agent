@@ -34,7 +34,35 @@ export function useWalkFocus(): WalkFocus | null {
   return useSyncExternalStore((f) => (walkSubs.add(f), () => walkSubs.delete(f)), () => walk, () => walk);
 }
 
+/**
+ * The open shuttle bus notice (owner, 2026-11-14: "it did not show the shuttle bus route"): the stations the
+ * bus calls at, in the order it runs, each with the corners it stops at there. `change` marks the stations
+ * that still have trains, where riders change between train and bus. The map draws the bus's line through
+ * them and marks every stop while the notice is open, not only while a step is being said.
+ */
+type ShuttleFocus = { stops: Array<{ id: string; change: boolean; corners: string[] }> };
+let shuttle: ShuttleFocus | null = null;
+const shuttleSubs = new Set<() => void>();
+export function setShuttleFocus(s: ShuttleFocus | null): void {
+  shuttle = s;
+  shuttleSubs.forEach((f) => f());
+}
+export function useShuttleFocus(): ShuttleFocus | null {
+  return useSyncExternalStore((f) => (shuttleSubs.add(f), () => shuttleSubs.delete(f)), () => shuttle, () => shuttle);
+}
+
 type Pos = [number, number];
+/** The bus's line and stops as map features. Pure, for tests: a stop the station list does not hold is left out. */
+export function shuttleFeatures(s: ShuttleFocus | null, at: (id: string) => Pos | undefined): { line: Pos[]; stops: Array<{ id: string; coord: Pos; label: string; change: boolean }>; bounds: [Pos, Pos] | null } {
+  // The map already names each station: the label adds only the corners, and "Change here" where trains still run.
+  const stops = (s?.stops ?? []).flatMap((x) => {
+    const coord = at(x.id);
+    return coord ? [{ id: x.id, coord, change: x.change, label: [...(x.change ? ["Change here"] : []), ...x.corners].join("\n") }] : [];
+  });
+  const xs = stops.map((p) => p.coord[0]), ys = stops.map((p) => p.coord[1]);
+  return { line: stops.length > 1 ? stops.map((p) => p.coord) : [], stops, bounds: stops.length ? [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]] : null };
+}
+
 export type AlertGeometry = {
   /** Affected stretch of each informed line. */
   affected: Array<{ route: string; coords: Pos[] }>;

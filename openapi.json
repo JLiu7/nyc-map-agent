@@ -3782,6 +3782,746 @@
         }
       }
     },
+    "/api/v1/transit-health/coverage": {
+      "get": {
+        "summary": "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them",
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "refreshedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "bands": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "band": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "used": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "sched",
+                          "band",
+                          "segments",
+                          "used",
+                          "solid",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "refreshedAt",
+                    "bands",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/coverage": {
+      "get": {
+        "summary": "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them (alias of /api/v1/transit-health/coverage)",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "refreshedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "bands": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "band": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "used": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "sched",
+                          "band",
+                          "segments",
+                          "used",
+                          "solid",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "refreshedAt",
+                    "bands",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transit-health/accuracy": {
+      "get": {
+        "summary": "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without",
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the views)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "route",
+                              "band",
+                              "lead",
+                              "samples"
+                            ]
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
+                    },
+                    "thin": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "dir": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "learnedN": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "dir",
+                          "from",
+                          "to",
+                          "n",
+                          "learnedN",
+                          "maeModel",
+                          "maeBase"
+                        ]
+                      }
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "runs": {
+                            "type": "integer"
+                          },
+                          "opened": {
+                            "type": "integer"
+                          },
+                          "resolved": {
+                            "type": "integer"
+                          },
+                          "unresolved": {
+                            "type": "integer"
+                          },
+                          "stored": {
+                            "type": "integer"
+                          },
+                          "first": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "runs",
+                          "opened",
+                          "resolved",
+                          "unresolved",
+                          "stored",
+                          "first",
+                          "last"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "rows",
+                    "thin",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/accuracy": {
+      "get": {
+        "summary": "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without (alias of /api/v1/transit-health/accuracy)",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the views)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "route",
+                              "band",
+                              "lead",
+                              "samples"
+                            ]
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
+                    },
+                    "thin": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "dir": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "learnedN": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "dir",
+                          "from",
+                          "to",
+                          "n",
+                          "learnedN",
+                          "maeModel",
+                          "maeBase"
+                        ]
+                      }
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "runs": {
+                            "type": "integer"
+                          },
+                          "opened": {
+                            "type": "integer"
+                          },
+                          "resolved": {
+                            "type": "integer"
+                          },
+                          "unresolved": {
+                            "type": "integer"
+                          },
+                          "stored": {
+                            "type": "integer"
+                          },
+                          "first": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "runs",
+                          "opened",
+                          "resolved",
+                          "unresolved",
+                          "stored",
+                          "first",
+                          "last"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "rows",
+                    "thin",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent/health": {
       "get": {
         "summary": "The default model profile and each smart provider's last health probe (no keys)",
@@ -5361,6 +6101,521 @@
           },
           "502": {
             "description": "The model failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/see-sign": {
+      "post": {
+        "summary": "Which one of a short list of station signs a photo shows, by the words read off it; the photo is passed to a vision model and not kept",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "maxLength": 800100
+                  },
+                  "signs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "sign": {
+                          "type": "string",
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sign"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 30
+                  }
+                },
+                "required": [
+                  "image",
+                  "signs"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The id of the sign whose words were read in the photo, or null, and the words read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "read": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "read"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a JPEG, too big, or no signs to choose from",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The model failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No model that can look at a photo is set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/see-sign": {
+      "post": {
+        "summary": "Which one of a short list of station signs a photo shows, by the words read off it; the photo is passed to a vision model and not kept (alias of /api/v1/agent/see-sign)",
+        "deprecated": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "maxLength": 800100
+                  },
+                  "signs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "sign": {
+                          "type": "string",
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sign"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 30
+                  }
+                },
+                "required": [
+                  "image",
+                  "signs"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The id of the sign whose words were read in the photo, or null, and the words read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "read": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "read"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a JPEG, too big, or no signs to choose from",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The model failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No model that can look at a photo is set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/live/{code}/state": {
+      "post": {
+        "summary": "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept and handed to the watchers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code, or not a JSON object under 200 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live/{code}/state": {
+      "post": {
+        "summary": "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code (alias of /api/v1/live/{code}/state)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept and handed to the watchers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code, or not a JSON object under 200 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/live/{code}/watch": {
+      "get": {
+        "summary": "Live phone demo: the phone's state now and then each change, as server-sent events",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One `data:` line of JSON per update",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many screens are watching this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live/{code}/watch": {
+      "get": {
+        "summary": "Live phone demo: the phone's state now and then each change, as server-sent events (alias of /api/v1/live/{code}/watch)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{4,8}$",
+              "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+              "example": "K7QF"
+            },
+            "required": true,
+            "description": "The code the phone page shows: 4 to 8 capital letters and digits",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One `data:` line of JSON per update",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many screens are watching this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many phones are being followed at once",
             "content": {
               "application/json": {
                 "schema": {

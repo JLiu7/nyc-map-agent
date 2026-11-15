@@ -65,7 +65,8 @@ export function walkCallouts(model: DollhouseModel, path: P3[], exitLine: string
   const along = (start[0] - track[0]) * ux + (start[1] - track[1]) * uy;
   // The train stands centred on that door (dollhouse.ts), so ask instead where the platform is:
   // how far the door is from the platform's ends, along the track.
-  const ends = model.edges.flatMap(([x1, y1, x2, y2]) => [(x1 - track[0]) * ux + (y1 - track[1]) * uy, (x2 - track[0]) * ux + (y2 - track[1]) * uy]);
+  // Only this platform's edges: Fulton St's model also has the A/C platform's, a level below.
+  const ends = model.edges.filter((e) => Math.abs(e[4] - start[2]) < 0.5).flatMap(([x1, y1, x2, y2]) => [(x1 - track[0]) * ux + (y1 - track[1]) * uy, (x2 - track[0]) * ux + (y2 - track[1]) * uy]);
   const lo = Math.min(...ends), hi = Math.max(...ends);
   // The train leaves toward +along: its front is the high end.
   const k = hi > lo ? (along - lo) / (hi - lo) : 0.5;

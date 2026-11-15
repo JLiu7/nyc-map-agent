@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { LngLat, type Map as MapLibreMap } from "maplibre-gl";
 import { getMapInstance } from "@/lib/map/mapInstance";
 import { keepInView } from "@/lib/map/keepInView";
 import { framePadding } from "@/lib/map/mapCover";
-import { ZoomKeeper, bindPreviewRelease, followMode, followRig, setFollowMode, setPreviewEye, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
+import { ZoomKeeper, bindPreviewRelease, followMode, followRig, publishFollowPos, setFollowMode, setPreviewEye, setPreviewMini, setPreviewing, stableHeading, type FollowMode } from "@/lib/transit/follow";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { readMap } from "@/lib/map/mapRead";
 import { getAppLang } from "@/lib/i18n/appLang";
@@ -14,9 +14,11 @@ import { along, buildTimeline, calloutInfoAt, cumulative, depthAt, moveAt, poseA
 import { blendCam, EYE_BLEND_S, eyeRig, usesEye, type Cam } from "./tripCamera";
 import { initialPlayback, isActive, playback, type Playback } from "./playback";
 import type { PlaybackSpeed, Trip } from "./schema";
-import { setMarker, setPreviewDim, setXray } from "./tripLayer";
+import { setMarker, setPreviewDim, setTripBus, setXray } from "./tripLayer";
+import { boardingAt } from "./busBoarding";
 import { walkLine, walkPlace } from "./walkPlace";
 import { dollhouseLeg } from "./dollhouseLeg";
+import { nextStopAt, tripMiniLine } from "./tripMini";
 import type { DollhouseView } from "@/lib/map/dollhousePreview";
 import type { DollhouseState } from "@/lib/map/three/dollhouse";
 import { useFlag } from "@/lib/flags";
@@ -130,6 +132,9 @@ function exitStreet(seg: Segment): string | undefined {
   return /\bexit (?:on|by) (.+?) at /.exec(seg.label)?.[1];
 }
 
+/** An MTA bus's blue, for a bus whose line colour the planner did not give. */
+const BUS_BLUE = "#0039A6";
+
 type StationEye = { lon: number; lat: number; bearing: number; pitch: number; z: number; fov?: number };
 
 export function usePlayer(onCallout?: (text: string) => void) {
@@ -148,6 +153,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
   const dest = useRef("");
   const segsRef = useRef(segs);
   segsRef.current = segs;
+  /** The trip's parts for the mini map, drawn again only when the legs change. */
+  const miniLine = useRef<GeoJSON.FeatureCollection | null>(null);
+  miniLine.current = useMemo(() => tripMiniLine(segs), [segs]);
   /** Seconds into the current leg, and the speed they were counted at. */
   const elapsed = useRef(0);
   const playedSpeed = useRef<Speed>(pb.speed);
@@ -185,7 +193,9 @@ export function usePlayer(onCallout?: (text: string) => void) {
   /** The follow camera last drawn, and the steadied heading and zoom it rides with. */
   const camMode = useRef<FollowMode>("map");
   /** Whether the last frame was drawn through the rider's eyes, so the next leg frames the map once. */
-  const camKind = useRef<"eye" | "other">("other");
+  const camKind = useRef<"eye" | "board" | "other">("other");
+  /** Whether the trip's bus is on the map, so other legs take it away once and not every frame. */
+  const busShown = useRef(false);
   const heading = useRef<{ bearing: number; streak: number } | null>(null);
   const zoomKeep = useRef(new ZoomKeeper());
   /**
@@ -321,6 +331,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
     setXray(map, false);
     setPreviewDim(map, false);
     setMarker(map, null);
+    setTripBus(map, null);
+    busShown.current = false;
+    publishFollowPos(null);
+    setPreviewMini(null);
     leaveEye(map);
     showStairs(null);
     hideInside();
@@ -476,7 +490,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
       const wait = waitAt(seg, f);
       const depth = depthAt(seg, fm);
       const pose = poseAt(seg, fm);
-      const mark = seg.kind === "ride" ? along(seg.coords, f) : pose.center;
+      // A bus ride starts at the stop: the bus pulls in, the rider steps on, then it drives off (owner, 2026-11-13).
+      const bus = seg.kind === "ride" && seg.mode === "bus";
+      const board = bus && wait !== null ? boardingAt(seg, wait) : null;
+      const mark = board ? board.rider : seg.kind === "ride" ? along(seg.coords, fm) : pose.center;
       const mode = followMode();
       const newLeg = styledSeg.current !== s.seg;
       if (newLeg) {
@@ -520,8 +537,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
         // A view picked from Change view: the camera rides the marker, leg after leg, until you pick Map.
         if (camMode.current !== mode) { heading.current = null; zoomKeep.current.reset(); }
         heading.current = stableHeading(heading.current?.bearing ?? null, pose.bearing, heading.current?.streak ?? 0);
-        rideAlong(map, mode, mark, heading.current.bearing, seg.underground && seg.kind !== "walk" ? UNDERGROUND_M : 0, zoomKeep.current);
-      } else if (newLeg || camMode.current !== "map" || camKind.current === "eye") {
+        rideAlong(map, mode, board ? seg.coords[0] : mark, board ? board.heading : heading.current.bearing, seg.underground && seg.kind !== "walk" ? UNDERGROUND_M : 0, zoomKeep.current);
+      } else if (board) {
+        // Hold on the stop, looking up the road the bus comes along, until it has left with the rider.
+        if (camKind.current !== "board") map.easeTo({ center: seg.coords[0], zoom: 18.2, pitch: 58, bearing: board.heading, duration: reduced ? 0 : 900 });
+      } else if (newLeg || camMode.current !== "map" || camKind.current !== "other") {
         // Each leg is framed once, top-down and north up, clear of the open panels.
         frameLeg(map, seg.coords, reduced);
       } else {
@@ -537,7 +557,11 @@ export function usePlayer(onCallout?: (text: string) => void) {
         if (view.canvas) view.canvas.style.display = eyeLeg && depth < INSIDE_M ? "" : "none";
       }
       camMode.current = mode;
-      camKind.current = eyeLeg ? "eye" : "other";
+      camKind.current = eyeLeg ? "eye" : board && mode === "map" ? "board" : "other";
+      // The bus: coming up to the stop, then carrying the rider along the route.
+      if (bus) setTripBus(map, { at: board ? board.bus : mark, heading: board ? board.heading : pose.bearing, color: seg.color ?? BUS_BLUE });
+      else if (busShown.current) setTripBus(map, null);
+      busShown.current = bus;
       setMarker(map, mark, seg.route);
       if (seg.kind === "walk" && !seg.underground && now - place.current.at >= PLACE_MS) {
         place.current.at = now;
@@ -561,6 +585,10 @@ export function usePlayer(onCallout?: (text: string) => void) {
         const all = segsRef.current.map((x) => (reduced ? 3 : wallSeconds(x, s.speed)));
         const sum = all.reduce((a, b) => a + b, 0) || 1;
         setProgress((all.slice(0, s.seg).reduce((a, b) => a + b, 0) + f * total) / sum);
+        // The mini map follows the rider, as it follows a train, at the same calm pace as the bar.
+        publishFollowPos({ lon: mark[0], lat: mark[1], bearing: pose.bearing });
+        const next = nextStopAt(segsRef.current, s.seg, f, dest.current || null);
+        if (s.tripId && miniLine.current) setPreviewMini({ key: s.tripId, line: miniLine.current, next: next && inLang(next) });
       }
       if (settling) {
         if (now < settleUntil) rafId.current = requestAnimationFrame(tick);

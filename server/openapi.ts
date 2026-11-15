@@ -17,6 +17,7 @@ import { HourQuery as WeatherHourQuery, Query as WeatherQuery } from "./features
 import { AllQuery as AllSegmentsQuery, AllResponse as AllSegmentsResponse, Query as SegmentsQuery, Response_ as SegmentsResponse } from "./features/transit/segments";
 import { Query as LiveQuery } from "./features/transit/live";
 import { Query as BusSegmentsQuery, Response_ as BusSegmentsResponse } from "./features/transit/busSegments";
+import { AccuracyResponse as HealthAccuracyResponse, CoverageResponse as HealthCoverageResponse } from "./features/transit/health";
 import { EventsResponse, Query as EventsQuery } from "./features/events/schema";
 import { PlaceToiletsResponse } from "./features/place-toilets/schema";
 import { RestroomsResponse } from "./features/restrooms/schema";
@@ -103,6 +104,59 @@ export const TRANSLATE_ROUTE = createRoute({
     400: { description: "No lines, too many, or not one of the app's other languages", content: { "application/json": { schema: ApiError } } },
     429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
     502: { description: "The model failed", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+/** POST /api/agent/see-sign: which of a walk's signs a rider's photo shows (#88). */
+export const SEE_SIGN_ROUTE = createRoute({
+  method: "post",
+  path: "/api/agent/see-sign",
+  summary: "Which one of a short list of station signs a photo shows, by the words read off it; the photo is passed to a vision model and not kept",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ image: z.string().max(800_100), signs: z.array(z.object({ id: z.string().max(60), sign: z.string().max(160) })).min(1).max(30) }) } },
+    },
+  },
+  responses: {
+    200: { description: "The id of the sign whose words were read in the photo, or null, and the words read", content: { "application/json": { schema: z.object({ id: z.string().nullable(), read: z.string() }) } } },
+    400: { description: "Not a JPEG, too big, or no signs to choose from", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
+    502: { description: "The model failed", content: { "application/json": { schema: ApiError } } },
+    503: { description: "No model that can look at a photo is set up", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+const LiveCode = z.object({ code: z.string().regex(/^[A-HJ-NP-Z2-9]{4,8}$/).openapi({ description: "The code the phone page shows: 4 to 8 capital letters and digits", example: "K7QF" }) });
+
+/** POST /api/live/{code}/state: where a phone in the live demo thinks it is (#186). */
+export const LIVE_STATE_ROUTE = createRoute({
+  method: "post",
+  path: "/api/live/{code}/state",
+  summary: "Live phone demo: the phone's newest position by steps and compass, kept in memory for the screens watching its code",
+  request: {
+    params: LiveCode,
+    body: { required: true, content: { "application/json": { schema: z.object({}).passthrough() } } },
+  },
+  responses: {
+    200: { description: "Kept and handed to the watchers", content: { "application/json": { schema: z.object({ ok: z.boolean() }) } } },
+    400: { description: "Not a code, or not a JSON object under 200 KB", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many requests", content: { "application/json": { schema: ApiError } } },
+    503: { description: "Too many phones are being followed at once", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+/** GET /api/live/{code}/watch: the stream a second screen reads. */
+export const LIVE_WATCH_ROUTE = createRoute({
+  method: "get",
+  path: "/api/live/{code}/watch",
+  summary: "Live phone demo: the phone's state now and then each change, as server-sent events",
+  request: { params: LiveCode },
+  responses: {
+    200: { description: "One `data:` line of JSON per update", content: { "text/event-stream": { schema: z.string() } } },
+    400: { description: "Not a code", content: { "application/json": { schema: ApiError } } },
+    429: { description: "Too many screens are watching this phone", content: { "application/json": { schema: ApiError } } },
+    503: { description: "Too many phones are being followed at once", content: { "application/json": { schema: ApiError } } },
   },
 });
 
@@ -211,6 +265,18 @@ export const ROUTES = {
     summary: "Learned bus stop-to-stop travel and stop dwell times (median seconds) for a route at an hour of the week",
     request: { query: BusSegmentsQuery },
     responses: { 200: { description: "OK", content: { "application/json": { schema: BusSegmentsResponse } } }, ...errors },
+  }),
+  "/api/transit-health/coverage": createRoute({
+    method: "get",
+    path: "/api/transit-health/coverage",
+    summary: "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them",
+    responses: { 200: { description: "OK (ready: false until the observer has built the view)", content: { "application/json": { schema: HealthCoverageResponse } } }, ...errors },
+  }),
+  "/api/transit-health/accuracy": createRoute({
+    method: "get",
+    path: "/api/transit-health/accuracy",
+    summary: "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without",
+    responses: { 200: { description: "OK (ready: false until the observer has built the views)", content: { "application/json": { schema: HealthAccuracyResponse } } }, ...errors },
   }),
   "/api/transit-live": createRoute({
     method: "get",

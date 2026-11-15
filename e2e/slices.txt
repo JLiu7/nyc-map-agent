@@ -1,0 +1,8 @@
+# Which end-to-end specs cover each folder under src/features/.
+# scripts/ci/e2e-select.sh reads this: a change that stays inside listed folders
+# runs only their specs and the smoke spec. A folder not listed here runs every spec,
+# so add a line only when these specs really are all that exercises the feature.
+# Format: <folder>: <spec file> <spec file> ...
+recorder: record.spec.ts station-replay.spec.ts
+walkguide: walk-guide.spec.ts
+signcam: sign-camera.spec.ts
