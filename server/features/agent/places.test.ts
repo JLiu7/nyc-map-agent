@@ -35,6 +35,14 @@ describe("geocode landmarks and stations", () => {
     expect(matchStation("Fulton St, Queens", fulton)).toBeNull();
   });
 
+  // "59 Street" with no borough went to Bay Ridge, Brooklyn (2026-11-12).
+  it("a name several boroughs share is Manhattan's unless a borough or train says otherwise", () => {
+    const fiftyNine = [{ ...st("59 St", [-74.0178, 40.6414]), id: "bk", borough: "Bk", routes: ["N", "R"] }, { ...st("59 St", [-73.9677, 40.7626]), id: "m", borough: "M", routes: ["4", "5", "6"] }];
+    expect(matchStation("59 Street", fiftyNine)?.id).toBe("m");
+    expect(matchStation("59 St, Brooklyn", fiftyNine)?.id).toBe("bk");
+    expect(matchStation("59 St (R train)", fiftyNine)?.id).toBe("bk");
+  });
+
   // Planning the trip, the model wrote "Fulton Street Station, Fulton Street & Broadway, Manhattan" (#79).
   it("a station named before its cross streets is that station; a bare name before a comma is left to the address search", () => {
     const fulton = [{ ...st("Fulton St", [-74.0076, 40.7104]), id: "m", borough: "M" }, { ...st("Fulton St", [-73.9754, 40.6872]), id: "bk", borough: "Bk" }];
@@ -77,6 +85,9 @@ describe("businesses by name", () => {
     expect(businessQuery("Aldi at Rego Park")).toBe("Aldi, Rego Park");
     expect(businessQuery("Trader Joe's near Union Square")).toBe("Trader Joe's, Union Square");
     expect(businessQuery("61-11 Junction Blvd")).toBeNull();
+    expect(businessQuery("55 Fulton St")).toBeNull();
+    // A store whose name starts with a number is still a store.
+    expect(businessQuery("55 Fulton Market")).toBe("55 Fulton Market");
   });
 
   it("uses the store over GeoSearch's nearest address when one is found", async () => {

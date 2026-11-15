@@ -94,8 +94,13 @@ export function matchStation(text: string, stations: Station[]): Station | null 
   const trains = TRAINS.exec(text)?.[1].split(" ").filter(Boolean) ?? [];
   const bare = text.replace(TRAINS, "");
   const borough = boroughOf(bare);
-  const named = (q: string) =>
-    q.length < 3 ? null : stations.find((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r)) && (!borough || !s.borough || s.borough === borough)) ?? null;
+  const named = (q: string) => {
+    if (q.length < 3) return null;
+    const hits = stations.filter((s) => norm(s.name) === q && trains.every((r) => s.routes.includes(r)) && (!borough || !s.borough || s.borough === borough));
+    // Several stations share a name ("59 St" is in Brooklyn and Manhattan): with no borough or train
+    // said, Manhattan's. A trip to "59 Street" went to Bay Ridge (2026-11-12).
+    return hits.find((s) => s.borough === "M") ?? hits[0] ?? null;
+  };
   // "Fulton Street Station, Fulton Street & Broadway, Manhattan": the part before the comma says
   // it is a station, so it is matched alone. Without "station" it may be an address, and is not.
   const head = norm(bare.split(",")[0]);

@@ -46,10 +46,13 @@ interface GeocodeDeps { stations?: () => Promise<Station[]>; geosearch?: (text: 
  */
 const POI = new Set(["shop", "amenity", "tourism", "leisure", "office", "craft", "healthcare"]);
 const nominatimSchema = z.array(z.object({ category: z.string(), name: z.string().optional(), display_name: z.string(), lon: z.coerce.number(), lat: z.coerce.number() }));
+const STREET_WORD = /\b(?:st|street|av|ave|avenue|blvd|boulevard|rd|road|pl|place|dr|drive|ln|lane|pkwy|parkway|ter|terrace|way|ct|court|sq|square|broadway|bowery|hwy|highway|plaza|expy|expressway|tpke|turnpike)\b/i;
 export function businessQuery(text: string): string | null {
   const t = text.trim();
-  // A house number means an address: GeoSearch is better at those.
-  if (/^\d/.test(t)) return null;
+  // A house number and a street ("61-11 Junction Blvd") is an address: GeoSearch is better at those.
+  // A number alone is not: "55 Fulton Market" is a grocery on Fulton St, and GeoSearch sent it to the
+  // Fulton Fish Market in the Bronx (owner's partner, 2026-11-12).
+  if (/^\d/.test(t) && STREET_WORD.test(t)) return null;
   return t.replace(/\s+(?:at|in|on|near|by)\s+/i, ", ");
 }
 async function nominatimBusiness(text: string): Promise<Place | null> {
