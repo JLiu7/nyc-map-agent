@@ -4,6 +4,9 @@ import { formatStreetText } from "../../../src/lib/streetName";
 import type { Leg, LngLatTuple, Trip, TripCore } from "../../../src/features/agent/schema";
 import { elevatorStatus, hazardsAt, reverseGeocode, routeWalk, serviceAlerts, stationServiceChanges, weatherAt, type WalkResult } from "./services";
 import { sameStation, type ServiceChange } from "../../../src/lib/transit/serviceChanges";
+import { applyNotices, matchWhere, type Corner, type StreetLine, type Unit } from "../../../src/lib/transit/stationAccess";
+import { parseCorner } from "../../../src/lib/transit/equipment";
+import { accessData, noticesFor, stepFreeFor, streetsNear, type AccessData } from "./access";
 import { distM, legStation, octant, openDataEntrances, stubPlanner, type AvoidStop, type Entrance, type Station, type StationEntrances, type TransitPlanner } from "./transit";
 
 export const TZ = "America/New_York";
@@ -39,17 +42,44 @@ const WALK_CANDIDATES = 3;
 const STREETISH = /\b(street|st|avenue|ave|av|boulevard|blvd|road|rd|place|pl|drive|dr|parkway|pkwy|lane|ln|way|terrace|court|plaza|square|broadway|bowery|row|slip|concourse|turnpike|expressway|highway)\b/i;
 export const onOrBy = (name: string): "on" | "by" => (STREETISH.test(name) ? "on" : "by");
 
+/** How the entrance is chosen beyond the nearest walk (#133). */
+export interface PortalOpts {
+  /** Elevators only: an elevator entrance whose elevator works, when the station has one. */
+  stepFree?: boolean;
+  /**
+   * The station's street elevators that are out, from the MTA's equipment list. Given, only their own
+   * entrances are skipped (matched by corner and street); absent, any elevator outage skips every
+   * elevator entrance, as before.
+   */
+  streetOut?: Unit[];
+  /** Street centrelines near the station, to match an elevator's corner to its entrance. */
+  streets?: StreetLine[];
+}
+
 /**
  * The entrance or exit to use (owner, 2026-10-26). An elevator-only one whose elevator is out is
- * skipped while there is another way in or out (the outage list names the station, not the entrance,
- * so any elevator outage counts). Of the nearest few, the shortest walk wins; the straight line
- * decides when the walking router is down.
+ * skipped while there is another way in or out. Of the nearest few, the shortest walk wins; the
+ * straight line decides when the walking router is down. With Elevators only on (#133) the pool
+ * is the working elevator entrances, when there are any.
  */
-export async function portalFor(st: Station, ents: Entrance[], toward: LngLatTuple, mode: "entry" | "exit", outages: string[], walk: ((a: LngLatTuple, b: LngLatTuple) => Promise<WalkResult>) | null = routeWalk) {
+export async function portalFor(st: Station, ents: Entrance[], toward: LngLatTuple, mode: "entry" | "exit", outages: string[], walk: ((a: LngLatTuple, b: LngLatTuple) => Promise<WalkResult>) | null = routeWalk, opts: PortalOpts = {}) {
   const usable = ents.filter((e) => (mode === "entry" ? e.entry : e.exit));
+  const isLift = (e: Entrance) => /elevator/i.test(e.type);
   const liftOut = outages.some((o) => /^elevator out/i.test(o));
-  const open = (usable.length ? usable : ents).filter((e) => !(liftOut && /elevator/i.test(e.type)));
-  const pool = (open.length ? open : usable.length ? usable : ents).sort((a, b) => distM(a.at, toward) - distM(b.at, toward)).slice(0, WALK_CANDIDATES);
+  const dead = new Set<Entrance>();
+  if (opts.streetOut) {
+    const lifts = ents.filter(isLift);
+    for (const u of opts.streetOut) {
+      const c = parseCorner(u.serving);
+      const corner = c?.corner as Corner | undefined;
+      const hit = (c ? matchWhere({ streets: c.streets, corner }, lifts, opts.streets ?? []) ?? matchWhere({ streets: [], corner }, lifts, []) : null) ?? (lifts.length === 1 ? [0] : []);
+      for (const i of hit) dead.add(lifts[i]);
+    }
+  } else if (liftOut) for (const e of ents) if (isLift(e)) dead.add(e);
+  const open = (usable.length ? usable : ents).filter((e) => !dead.has(e));
+  let pool = open.length ? open : usable.length ? usable : ents;
+  if (opts.stepFree && pool.some(isLift)) pool = pool.filter(isLift);
+  pool = [...pool].sort((a, b) => distM(a.at, toward) - distM(b.at, toward)).slice(0, WALK_CANDIDATES);
   const walked = walk && pool.length > 1
     ? await Promise.all(pool.map((e) => safe(walk(mode === "exit" ? e.at : toward, mode === "exit" ? toward : e.at).then((w) => w.distanceM), Infinity)))
     : [];
@@ -60,12 +90,40 @@ export async function portalFor(st: Station, ents: Entrance[], toward: LngLatTup
   const street = await reverseGeocode(at);
   const type = pick?.type ?? "Station";
   const elevatorOnly = /elevator/i.test(type);
-  const outage = elevatorOnly ? outages.find((o) => /^elevator out/i.test(o)) ?? null : null;
+  const outage = elevatorOnly && pick && dead.has(pick) ? outages.find((o) => /^elevator out/i.test(o)) ?? null : null;
   const word = mode === "entry" ? "entrance" : "exit";
-  return { lon: at[0], lat: at[1], type, elevatorOnly, outage, label: `${dir} ${word}${street ? ` ${onOrBy(street)} ${street}` : ""}${elevatorOnly ? " (elevator)" : ""}` };
+  return {
+    lon: at[0], lat: at[1], type, elevatorOnly, outage,
+    label: `${dir} ${word}${street ? ` ${onOrBy(street)} ${street}` : ""}${elevatorOnly ? " (elevator)" : ""}`,
+    ...(opts.stepFree ? { stepFree: elevatorOnly && !dead.has(pick) } : {}),
+  };
 }
 
-export interface TripDeps { planner?: TransitPlanner; entrances?: StationEntrances; changes?: ServiceChange[] }
+/**
+ * The entrance or exit with the day's station notices applied and, with Elevators only on, the
+ * station's elevators checked (#133). `note` tells the rider what moved the choice. Without access
+ * data it is portalFor as before.
+ */
+export async function openPortal(st: Station, ents: Entrance[], toward: LngLatTuple, mode: "entry" | "exit", outages: string[], d: AccessData | null, stepFree: boolean) {
+  if (!d) return { ...(await portalFor(st, ents, toward, mode, outages)), note: null as string | null };
+  const notices = noticesFor(st, d);
+  const access = stepFreeFor(st, d);
+  const streets = notices.length || access.streetOut.length ? await safe(streetsNear(st.at), [] as StreetLine[]) : [];
+  const opened = applyNotices(ents, notices, streets);
+  const p = await portalFor(st, opened.doors, toward, mode, outages, routeWalk, { stepFree, streetOut: d.units.length ? access.streetOut : undefined, streets });
+  const notes = [...opened.applied, ...opened.unplaced].map((n) => n.replace(/\.?$/, "."));
+  if (stepFree && !access.ok && access.why) notes.unshift(access.why);
+  else if (stepFree && p.stepFree === false) notes.unshift(`${st.name} has no working street elevator listed, so this way in may have stairs.`);
+  return { ...p, note: notes.length ? notes.slice(0, 2).join(" ") : null };
+}
+
+export interface TripDeps {
+  planner?: TransitPlanner; entrances?: StationEntrances; changes?: ServiceChange[];
+  /** Closures and elevators (./access); null skips them, absent loads them. */
+  access?: AccessData | null;
+  /** Elevators only (#133). */
+  stepFree?: boolean;
+}
 
 const MIDTOWN: LngLatTuple = [-73.985, 40.758];
 /** "Queens-bound", "Brooklyn-bound": roughly where each borough's trains are heading. */
@@ -173,11 +231,16 @@ export async function buildTrip(
   const stubbed = ["transit_plan: MTA open-data stations + straight-line ride (live transit #56 not merged; GTFS shapes/realtime pending)"];
   const changes = deps.changes ?? await safe(stationServiceChanges(Math.floor(depart.getTime() / 1000)), [] as ServiceChange[]);
   const allStations = changes.length ? await safe(entrancesSrc.stations(), [] as Station[]) : [];
-  const [plan, weather, hazards] = await Promise.all([
-    safe(planner.plan(origin.at, destination.at, depart, avoidFor(changes, allStations)), null),
+  const access = deps.access === undefined ? await accessData(Math.floor(depart.getTime() / 1000), entrancesSrc) : deps.access;
+  const skip = avoidFor(changes, allStations);
+  // Elevators only: never board or get off where no working elevator reaches the platform, when another way exists.
+  const avoid: AvoidStop = deps.stepFree && access ? (st, route, from, to) => skip(st, route, from, to) || !stepFreeFor(st, access).ok : skip;
+  const [plan0, weather, hazards] = await Promise.all([
+    safe(planner.plan(origin.at, destination.at, depart, avoid), null),
     safe(weatherAt(origin.at, toNyLocal(depart)), null),
     safe(hazardsAt(origin.at), [] as string[]),
   ]);
+  const plan = plan0 ?? (avoid !== skip ? await safe(planner.plan(origin.at, destination.at, depart, skip), null) : null);
   const legs: Leg[] = [];
   const elevators: string[] = [];
   let exitAdvice: string | null = null;
@@ -193,8 +256,8 @@ export async function buildTrip(
     const [inOut, outOut] = await Promise.all([safe(elevatorStatus(first.from.name), []), safe(elevatorStatus(last.to.name), [])]);
     elevators.push(...inOut, ...outOut);
     const [entIn, entOut] = await Promise.all([safe(entrancesSrc.entrances(first.from.complexId), []), safe(entrancesSrc.entrances(last.to.complexId), [])]);
-    const enter = await portalFor(first.from, entIn, origin.at, "entry", inOut);
-    const exit = await portalFor(last.to, entOut, destination.at, "exit", outOut);
+    const enter = await openPortal(first.from, entIn, origin.at, "entry", inOut, access, !!deps.stepFree);
+    const exit = await openPortal(last.to, entOut, destination.at, "exit", outOut, access, !!deps.stepFree);
     const [w1, w2] = await Promise.all([
       safe(routeWalk(origin.at, [enter.lon, enter.lat]), straight(origin.at, [enter.lon, enter.lat])),
       safe(routeWalk([exit.lon, exit.lat], destination.at), straight([exit.lon, exit.lat], destination.at)),
@@ -205,14 +268,14 @@ export async function buildTrip(
       const n = platformNotes(changes, r.from, r.route, r.from, r.to, allStations);
       return n.length ? `. ${n.join(". ")}` : "";
     };
-    legs.push({ kind: "enter", station: ref(first.from), portal: enter, label: `Enter ${first.from.name} at the ${enter.label}${note(first)}` });
+    legs.push({ kind: "enter", station: ref(first.from), portal: enter, label: `Enter ${first.from.name} at the ${enter.label}${note(first)}${enter.note ? `. ${enter.note}` : ""}` });
     plan.rides.forEach((r, i) => {
       if (i > 0) legs.push(walkLeg("transfer", `Transfer to the ${r.route} at ${r.from.name}${note(r)}`, straight(plan.rides[i - 1].to.at, r.from.at)));
       legs.push({ kind: "ride", mode: "subway", fromStop: r.from.name, toStop: r.to.name, numStops: r.stops.length || undefined, route: r.route, label: `${r.route} train ${r.from.name} → ${r.to.name}`, coords: r.coords, durationS: r.durationS, stops: r.stops, underground: !/elevated|viaduct|embankment/i.test(r.from.structure), geometrySource: r.geometrySource });
     });
-    legs.push({ kind: "exit", station: ref(last.to), portal: exit, label: `Use the ${exit.label} at ${last.to.name}` });
+    legs.push({ kind: "exit", station: ref(last.to), portal: exit, label: `Use the ${exit.label} at ${last.to.name}${exit.note ? `. ${exit.note}` : ""}` });
     legs.push(walkLeg("walk", lastWalkLabel(last.to.name, formatStreetText(destination.label)), w2));
-    exitAdvice = `Use the ${exit.label} at ${last.to.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}${exit.outage ? ` Heads up: ${exit.outage}.` : ""}`;
+    exitAdvice = `Use the ${exit.label} at ${last.to.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}${exit.outage ? ` Heads up: ${exit.outage}.` : ""}${exit.note ? ` ${exit.note}` : ""}`;
     alerts = await safe(serviceAlerts(routes, Math.floor(depart.getTime() / 1000)), []);
   }
   const waitS = plan ? 240 : 0; // average headway wait, stub until GTFS-rt arrivals

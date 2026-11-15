@@ -110,6 +110,20 @@ describe("OTP glue", () => {
     expect(blocked.impacts).toEqual([{ route: "7", text: "The 7 won't stop at Flushing-Main St, so you can't get off there.", blocks: true }]);
     expect(tripBrief(trip).alternatives[0].blocked).toBe(true);
   });
+  // #133: a rider who uses only elevators is not sent to a station with none.
+  it("with Elevators only, asks for wheelchair routing and ranks a trip through a station with no elevator last", async () => {
+    const stA = (name: string, lon: number, lat: number, ada: string): Station => ({ id: name, complexId: name, gtfsId: name, name, routes: ["A", "R"], structure: "Subway", at: [lon, lat], ada });
+    const ents: StationEntrances = { stations: () => Promise.resolve([stA("Elmhurst Av", -73.882, 40.742, "1"), stA("Jay St", -73.98, 40.69, "1"), stA("Beach 98 St", -73.82, 40.585, "0")]), entrances: () => Promise.resolve([]) };
+    const wheel: Array<boolean | undefined> = [];
+    const otp = { plan: (_o: unknown, _d: unknown, _l: unknown, _a: unknown, _p: unknown, w?: boolean) => { wheel.push(w); return Promise.resolve([subIt, busIt]); } };
+    const o = { label: "A", at: [-73.882, 40.742] as [number, number] }, d = { label: "B", at: [-73.8197, 40.5833] as [number, number] };
+    const access = { stations: await ents.stations(), units: [], outages: [], notices: [], at: 1 };
+    const trip = await planTrip(o, d, "2026-10-23T09:00", false, { otp, entrances: ents, changes: [], access }, "fastest", { stepFree: true });
+    expect(wheel.every((w) => w === true)).toBe(true);
+    expect(trip.routes).toEqual(["Q53+"]);
+    const plain = await planTrip(o, d, "2026-10-23T09:00", false, { otp, entrances: ents, changes: [], access });
+    expect(plain.impacts).toEqual([]);
+  });
   it("says nothing when the day's changes miss the stations the trip uses", async () => {
     const st7 = (name: string, lon: number): Station => ({ id: name, complexId: name, name, routes: ["7"], structure: "Elevated", at: [lon, 40.745] });
     const ents: StationEntrances = { stations: () => Promise.resolve([st7("52 St", -73.912), st7("Queensboro Plaza", -73.94), st7("Junction Blvd", -73.8692)]), entrances: () => Promise.resolve([]) };

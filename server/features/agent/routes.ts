@@ -137,7 +137,7 @@ export async function POST(request: Request, opts: { model?: LanguageModel; deps
       const nowLocal = toNyLocal(clock);
       // Data sources and their age, plus the "no guessing" check (#375); one "sources" line before "done".
       const audit = new AnswerAudit([nowLocal, contextLine(context) ?? "", ...messages.filter((m) => m.role === "user").map((m) => m.content)]);
-      const tools = makeTools({ location, now: clock, emit: (command) => { run.command(command); send({ type: "command", command }); }, actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, replying: isShortReply(messages), answered: questionsAnswered(messages), say: (line, language) => { closing.line = line; closing.lang = riderLanguage(lastAsked, language); }, drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
+      const tools = makeTools({ location, now: clock, emit: (command) => { run.command(command); send({ type: "command", command }); }, actions: (a) => actions.add(a), sources: audit.ledger, deps: opts.deps, followedTrain: context?.followedTrain ?? null, stepFree: parsed.data.stepFree === true, replying: isShortReply(messages), answered: questionsAnswered(messages), say: (line, language) => { closing.line = line; closing.lang = riderLanguage(lastAsked, language); }, drive: resolveFlags({ env: process.env.VITE_FLAGS, advancedMode: false }).agentDrive });
       // Restrooms and line status still get a real answer with no model (#199).
       const lastAsked = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
       run.input = lastAsked;

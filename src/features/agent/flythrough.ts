@@ -32,6 +32,8 @@ export interface Segment {
    * Fulton St: its wall-clock seconds, the first `waitS` of them on the platform.
    */
   paced?: { seconds: number; waitS: number };
+  /** Elevators only (#133): the rider takes the elevator, so no stair or corridor walk is drawn. */
+  elevator?: boolean;
   /** A ride's vehicle ("bus", "subway"...) and its line colour, from the planner. */
   mode?: string;
   color?: string;
@@ -141,7 +143,8 @@ export function buildTimeline(trip: Trip): Segment[] {
     } else if (leg.kind === "enter") {
       const p: LngLatTuple = [leg.portal.lon, leg.portal.lat];
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
-      segs.push({ kind: "descend", label: leg.label, coords: [p, s], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: leg.label }] });
+      const lift = leg.portal.stepFree === true;
+      segs.push({ kind: "descend", label: leg.label, coords: [p, s], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: lift ? `${leg.label}. Take the elevator down to the platform` : leg.label }], ...(lift ? { elevator: true } : {}) });
     } else if (leg.kind === "ride") {
       const board = leg.mode === "bus" ? boardShare(leg.durationS) : undefined;
       // At the stop first: "Wait for the M55 bus at Broadway/Fulton St", then the ride's own line once it leaves.
@@ -151,7 +154,9 @@ export function buildTimeline(trip: Trip): Segment[] {
       const p: LngLatTuple = [leg.portal.lon, leg.portal.lat];
       const s: LngLatTuple = [leg.station.lon, leg.station.lat];
       const outage = leg.portal.outage ? ` ${leg.portal.outage}` : "";
-      segs.push({ kind: "ascend", label: leg.label, coords: [s, p], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: `${leg.label}.${outage}` }] });
+      const lift = leg.portal.stepFree === true;
+      const up = lift ? " Take the elevator up to the street." : "";
+      segs.push({ kind: "ascend", label: leg.label, coords: [s, p], realS: 60, underground: true, station: leg.station.id, callouts: [{ f: 0, text: `${leg.label}.${up}${outage}` }], ...(lift ? { elevator: true } : {}) });
     }
   }
   // Join the parts first, then place each callout on the line it ended up on.

@@ -7,9 +7,10 @@
 import { lastWalkLabel } from "./arrivalWalk";
 import { z } from "zod";
 import type { Leg, LngLatTuple, TripCore } from "../../../src/features/agent/schema";
-import { elevatorStatus, serviceAlerts } from "./services";
+import { elevatorStatus, routeWalk, serviceAlerts } from "./services";
+import { noticesFor, stationOn, type AccessData } from "./access";
 import { distM, legStation, openDataEntrances, type Station, type StationEntrances } from "./transit";
-import { nyLocalToDate, portalFor, safe, toNyLocal } from "./trip";
+import { nyLocalToDate, openPortal, safe, toNyLocal } from "./trip";
 import { decodePolyline } from "./polyline";
 import { OTP_CONTAINER, waker } from "./sablier";
 
@@ -69,22 +70,28 @@ const BUS_ONLY = { transit: { transit: [{ mode: "BUS" }] } };
  */
 export type TripPrefer = "fastest" | "subway" | "bus" | "ferry" | "less-walking";
 
-export interface OtpClient { plan(o: LngLatTuple, d: LngLatTuple, local: string, arriveBy: boolean, prefer?: TripPrefer): Promise<OtpItinerary[]> }
+/** `wheelchair`: the rider uses elevators only (#133); OTP then avoids stairs on the street and prefers accessible stops. */
+export interface OtpClient { plan(o: LngLatTuple, d: LngLatTuple, local: string, arriveBy: boolean, prefer?: TripPrefer, wheelchair?: boolean): Promise<OtpItinerary[]> }
+
+/** The plan query with OTP's wheelchair routing switched on. */
+export const WHEELCHAIR_QUERY = QUERY.replace("modes: $modes,", "modes: $modes, preferences: { accessibility: { wheelchair: { enabled: true } } },");
 
 export const httpOtp: OtpClient = {
-  async plan(o, d, local, arriveBy, prefer = "fastest") {
+  async plan(o, d, local, arriveBy, prefer = "fastest", wheelchair = false) {
     // Not ready in time: ask anyway; if it is down, planTrip falls back to the built-in router.
     if (!(await waker.ready(OTP_CONTAINER, OTP_WAKE_S))) console.warn(`[otp] not ready after ${OTP_WAKE_S} s of waking`);
     const loc =([lon, lat]: LngLatTuple) => ({ location: { coordinate: { latitude: lat, longitude: lon } } });
     const dt = arriveBy ? { latestArrival: nyIso(local) } : { earliestDeparture: nyIso(local) };
-    const ask = async (modes?: unknown) => {
+    const once = async (query: string, modes?: unknown) => {
       const res = await fetch(`${OTP_URL}/otp/gtfs/v1`, {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(12000),
-        body: JSON.stringify({ query: QUERY, variables: { o: loc(o), d: loc(d), dt, modes } }),
+        body: JSON.stringify({ query, variables: { o: loc(o), d: loc(d), dt, modes } }),
       });
       if (!res.ok) throw new Error(`OTP returned ${res.status}`);
       return response.parse(await res.json()).data.planConnection.edges.map((e) => e.node);
     };
+    // Wheelchair routing first when asked; an OTP that rejects it still plans the trip, and the app's own step-free check ranks it.
+    const ask = (modes?: unknown) => (wheelchair ? once(WHEELCHAIR_QUERY, modes).catch(() => once(QUERY, modes)) : once(QUERY, modes));
     if (prefer === "subway") return ask(RAIL_ONLY);
     if (prefer === "bus") return ask(BUS_ONLY);
     // All modes, plus a rail-only search so a strong bus option cannot crowd the
@@ -96,7 +103,7 @@ export const httpOtp: OtpClient = {
 
 const transit = (i: OtpItinerary) => i.legs.filter((l) => l.route);
 /** Route bullet: MTA SBS "Q53-SBS" → "Q53+"; ferries use the route name. */
-function bullet(l: z.infer<typeof otpLeg>): string {
+export function bullet(l: Pick<z.infer<typeof otpLeg>, "mode" | "route">): string {
   const r = l.route!;
   // NYC Ferry short names are codes ("RS"); riders know the route name ("Rockaway").
   if (l.mode === "FERRY" && r.longName) return r.longName.replace(/\s+(Route|Ferry Route)$/i, "");
@@ -147,11 +154,13 @@ export async function itineraryToTrip(
   origin: { label: string; at: LngLatTuple },
   destination: { label: string; at: LngLatTuple },
   src: StationEntrances = openDataEntrances,
+  access: { data: AccessData | null; stepFree: boolean } = { data: null, stepFree: false },
 ): Promise<TripCore> {
   const legs: Leg[] = [];
   const elevators: string[] = [];
   const routes: string[] = [];
   let exitAdvice: string | null = null;
+  let exitFrom: LngLatTuple | null = null;
   const lastTransit = it.legs.reduce((k, l, i) => (l.route ? i : k), -1);
   for (let i = 0; i < it.legs.length; i++) {
     const l = it.legs[i];
@@ -159,6 +168,12 @@ export async function itineraryToTrip(
     const geom: LngLatTuple[] = coords.length >= 2 ? coords : [ll(l.from), ll(l.to)];
     if (!l.route) {
       const prev = it.legs[i - 1]; const next = it.legs[i + 1];
+      if (exitFrom && prev && !next) {
+        const from = exitFrom;
+        const w = await safe(routeWalk(from, destination.at), { coords: [from, destination.at], distanceM: distM(from, destination.at), durationS: distM(from, destination.at) / 1.35, turns: [] });
+        legs.push({ kind: "walk", label: lastWalkLabel(stopName(prev.to.stop?.name ?? prev.to.name ?? "the stop"), destination.label), coords: w.coords.length >= 2 ? w.coords : [from, destination.at], durationS: w.durationS, distanceM: w.distanceM, turns: w.turns });
+        continue;
+      }
       const toName = next ? stopName(next.from.stop?.name ?? next.from.name ?? "the stop") : destination.label;
       const label = !prev ? `Walk to ${toName}` : !next ? lastWalkLabel(stopName(prev.to.stop?.name ?? prev.to.name ?? "the stop"), destination.label) : `Transfer: walk to ${toName}`;
       legs.push({ kind: prev && next ? "transfer" : "walk", label, coords: geom, durationS: l.duration, distanceM: l.distance,
@@ -171,17 +186,34 @@ export async function itineraryToTrip(
     const toStop = stopName(l.to.stop?.name ?? l.to.name ?? "");
     const stops = (l.intermediateStops ?? []).map((s) => ({ at: [s.lon, s.lat] as LngLatTuple, text: stopName(s.name) }));
     if (mode === "subway") elevators.push(...(await safe(elevatorStatus(fromStop), [])), ...(await safe(elevatorStatus(toStop), [])));
+    // The way in, when it matters (#133): with Elevators only on, or a notice closing one of the station's entrances.
+    // Other trips keep OTP's walk to the platform, as before.
+    const firstRide = !legs.some((x) => x.kind === "ride");
+    const inSt = firstRide && mode === "subway" && access.data ? stationOn(access.data.stations, b, ll(l.from), fromStop) : undefined;
+    if (inSt && access.data && (access.stepFree || noticesFor(inSt, access.data).length)) {
+      const enter = await openPortal(inSt, await safe(src.entrances(inSt.complexId), []), origin.at, "entry", elevators, access.data, access.stepFree);
+      const portalAt: LngLatTuple = [enter.lon, enter.lat];
+      const prev = legs[legs.length - 1];
+      if (prev && prev.kind === "walk") {
+        const w = await safe(routeWalk(prev.coords[0], portalAt), { coords: [prev.coords[0], portalAt], distanceM: distM(prev.coords[0], portalAt), durationS: distM(prev.coords[0], portalAt) / 1.35, turns: [] });
+        legs[legs.length - 1] = { ...prev, coords: w.coords.length >= 2 ? w.coords : [prev.coords[0], portalAt], distanceM: w.distanceM, durationS: w.durationS, turns: w.turns };
+      }
+      legs.push({ kind: "enter", station: legStation(inSt), portal: enter, label: `Enter ${inSt.name} at the ${enter.label}${enter.note ? `. ${enter.note}` : ""}` });
+    }
     legs.push({
       kind: "ride", route: b, mode, fromStop, toStop, numStops: stops.length + 1, color: l.route.color ? `#${l.route.color}` : undefined, headsign: l.headsign ?? undefined,
       label: `${b} ${NOUN[mode]} ${fromStop} → ${toStop}${l.headsign ? ` (toward ${l.headsign})` : ""}`,
       coords: geom, durationS: l.duration, stops, underground: mode === "subway", geometrySource: "gtfs-shape",
     });
     if (i === lastTransit && mode === "subway") {
-      const st = await safe(nearestStation(ll(l.to), src), null);
+      const st = (access.data ? stationOn(access.data.stations, b, ll(l.to), toStop) : undefined) ?? await safe(nearestStation(ll(l.to), src), null);
       if (st) {
-        const exit = await portalFor(st, await safe(src.entrances(st.complexId), []), destination.at, "exit", elevators);
-        legs.push({ kind: "exit", station: legStation(st), portal: exit, label: `Use the ${exit.label} at ${st.name}` });
-        exitAdvice = `Use the ${exit.label} at ${st.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}`;
+        const exit = await openPortal(st, await safe(src.entrances(st.complexId), []), destination.at, "exit", elevators, access.data, access.stepFree);
+        legs.push({ kind: "exit", station: legStation(st), portal: exit, label: `Use the ${exit.label} at ${st.name}${exit.note ? `. ${exit.note}` : ""}` });
+        exitAdvice = `Use the ${exit.label} at ${st.name}.${exit.elevatorOnly ? " It is elevator-only." : ""}${exit.note ? ` ${exit.note}` : ""}`;
+        // The walk on from the exit starts at that exit when a closure or Elevators only moved it.
+        const next = it.legs[i + 1];
+        if (next && !next.route && (access.stepFree || exit.note)) exitFrom = [exit.lon, exit.lat];
       }
     }
   }

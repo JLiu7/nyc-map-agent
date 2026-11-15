@@ -48,6 +48,8 @@ export interface ToolContext {
   now?: Date;
   /** Questions the rider just answered in a row (ask.ts), so a detail is not asked about forever. */
   answered?: number;
+  /** Elevators only is on in Settings (#133): every trip is planned step-free without asking. */
+  stepFree?: boolean;
   /** The app's own sentence for this answer (ask.ts): the question before planning, or the follow-up after; the route says it, in the language the model named. */
   say?: (line: Line, language: string) => void;
 }
@@ -253,13 +255,16 @@ function allTools(ctx: ToolContext) {
       description: "Door-to-door public transit search across subway, bus (incl. SBS), LIRR, Metro-North, ferry and SIR: the best itinerary plus up to 2 alternatives (each with depart/arrive, legs, stops), weather, planned work, elevator outages, recommended exit. Returns a tripId for map tools.",
       inputSchema: args.transit_plan,
       execute: sourced(async ({ from, to, depart, arriveBy, prefer, language, ...said }: z.infer<typeof args.transit_plan>) => {
+        // Elevators only in Settings answers the access question before it is asked.
+        if (ctx.stepFree) said.access = "step-free";
         const details = { from, to, ...said };
         // Missing or vague: one question back, and the route lets the next step only write it (#625).
         const ask = askFor(details, { hasLocation: !!ctx.location, answered: ctx.answered ?? 0 });
         if (ask) { ctx.say?.({ kind: ask.ask, place: ask.place }, language); return ask; }
         const [o, d] = await Promise.all([resolve(from), resolve(to)]);
         const way = preferFrom(details, prefer);
-        const t = schedule(await planTrip(o, d, localTime(depart), arriveBy, ctx.deps, way));
+        const stepFree = said.access === "step-free";
+        const t = schedule(await planTrip(o, d, localTime(depart), arriveBy, ctx.deps, way, { stepFree }));
         trips.set(t.id, t);
         for (const a of t.alternatives) trips.set(a.id, { ...a, alternatives: [] });
         offer(tripActions(t));
@@ -268,7 +273,9 @@ function allTools(ctx: ToolContext) {
         return {
           ...tripBrief(t),
           ...(way === "ferry" && !t.legs.some((l) => l.kind === "ride" && l.mode === "ferry") ? { noFerry: "No ferry goes there at that time; this is the fastest way. Say so first." } : {}),
-          ...(said.access === "step-free" ? { stepFree: "The planner cannot pick step-free stations yet: call elevator_status for the stations this trip uses and say which have no working elevator." } : {}),
+          ...(stepFree ? { stepFree: t.impacts.some((i) => i.blocks && /^Not step-free/.test(i.text))
+            ? "Planned for elevators only, but no way found has working elevators at every station: say first which station and why (affectsThisTrip), with the MTA's suggestion, then the trip."
+            : "Planned for elevators only: it enters and leaves by elevator where the station has one. Say so in a few words." } : {}),
         };
       }),
     }),

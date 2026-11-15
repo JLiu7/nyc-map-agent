@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onOrBy, portalFor } from "./trip";
 import type { Entrance, Station } from "./transit";
+import type { Unit } from "../../../src/lib/transit/stationAccess";
 import type { LngLatTuple } from "../../../src/features/agent/schema";
 
 const st: Station = { id: "631", complexId: "610", name: "Grand Central-42 St", routes: ["4"], structure: "Subway", at: [-73.9768, 40.7518] };
@@ -37,6 +38,41 @@ describe("portalFor", () => {
   it("falls back to the straight line when the walking router is down", async () => {
     const p = await portalFor(st, [nw, se], dest, "exit", [], () => Promise.reject(new Error("down")));
     expect([p.lon, p.lat]).toEqual(nw.at);
+  });
+});
+
+describe("portalFor with Elevators only (#133)", () => {
+  // The SE stair is the shorter walk; the rider uses only elevators.
+  const far = new Map<string, number>([[String(lift.at), 500], [String(se.at), 150]]);
+  const walkFar = (a: LngLatTuple) => Promise.resolve({ coords: [a, dest], distanceM: far.get(String(a)) ?? 999, durationS: 60, turns: [] });
+
+  it("takes the elevator even when a stair is closer", async () => {
+    expect((await portalFor(st, [lift, se], dest, "exit", [], walkFar)).type).toBe("Stair");
+    const p = await portalFor(st, [lift, se], dest, "exit", [], walkFar, { stepFree: true });
+    expect(p.type).toBe("Elevator");
+    expect(p.stepFree).toBe(true);
+  });
+
+  it("says when no working elevator entrance is left", async () => {
+    const p = await portalFor(st, [se], dest, "exit", [], walkFar, { stepFree: true });
+    expect(p.stepFree).toBe(false);
+  });
+
+  it("leaves stepFree off the portal when the setting is off, so trips stay as they were", async () => {
+    expect("stepFree" in (await portalFor(st, [lift, se], dest, "exit", [], walkFar))).toBe(false);
+  });
+
+  it("drops only the elevator the outage names", async () => {
+    const ne: Entrance = { complexId: "610", at: [-73.9750, 40.7530], type: "Elevator", entry: true, exit: true };
+    const sw: Entrance = { complexId: "610", at: [-73.9770, 40.7510], type: "Elevator", entry: true, exit: true };
+    const unit: Unit = { id: "EL1", type: "EL", station: "Grand Central-42 St", stops: ["631"], serving: "42 St & Park Av (NE corner) to mezzanine", ada: true, redundant: false };
+    const out = ["Elevator out at Grand Central-42 St (42 St & Park Av NE corner)"];
+    // The old rule took every elevator out; matched by corner, the SW one stays.
+    expect((await portalFor(st, [ne, sw], dest, "exit", out, null, { stepFree: true })).stepFree).toBe(false);
+    const p = await portalFor(st, [ne, sw], dest, "exit", out, null, { stepFree: true, streetOut: [unit] });
+    expect([p.lon, p.lat]).toEqual(sw.at);
+    expect(p.stepFree).toBe(true);
+    expect(p.outage).toBeNull();
   });
 });
 

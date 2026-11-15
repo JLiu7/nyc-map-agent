@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type Reac
 import {
   BarChart3, BusFront, Building2, CalendarDays, ChevronRight, CircleDot, Database, Ear, History, House, Info, Languages, Layers,
   Leaf, Lightbulb, Cpu, LocateFixed, Lock, MessageSquare, Box, Palette, Settings, Shield, Signpost, SlidersHorizontal, Sun, TrainFront, Trash2, Volume2, Gauge, CloudSun, type LucideIcon,
+  Accessibility,
 } from "lucide-react";
 import { LiveLayerRows, SwitchRow } from "@/components/LiveLayerRows";
 import { TrackerHealthLink } from "@/components/TrackerHealthLink";
@@ -23,6 +24,7 @@ import { useSelectedLine } from "@/lib/transit/selectedLine";
 import { APP_LANGS, LANG_LABELS, setLangPref, useLangPref, type AppLang } from "@/lib/voice/langPref";
 import { setVoicePrefs, useVoicePrefs } from "@/lib/voice/voicePrefs";
 import { useMenuT, type MenuKey } from "@/lib/i18n/menuText";
+import { setStepFreePref, useStepFreePref } from "@/lib/stepFreePref";
 import { setProfilePref, useProfilePref, useSmartHealth, healthLine } from "@/lib/modelProfile";
 
 /**
@@ -240,6 +242,7 @@ function SettingsBody() {
   const ambient = useAmbient();
   const theme = useTheme();
   const { eco, setEco, city3d, setCity3d } = useMapState();
+  const stepFree = useStepFreePref();
   const t = useMenuT();
   return (
     <div data-testid="settings-panel">
@@ -256,6 +259,7 @@ function SettingsBody() {
       <Divider />
       {flags.city3d ? <SwitchRow icon={<Box className={ICON} aria-hidden />} label={t("city3d")} on={city3d} onChange={setCity3d} /> : null}
       <SwitchRow icon={<Leaf className={ICON} aria-hidden />} label={t("eco")} on={eco} onChange={setEco} />
+      <SwitchRow icon={<Accessibility className={ICON} aria-hidden />} label={t("elevatorsOnly")} on={stepFree} onChange={setStepFreePref} testId="elevators-only-menu" />
       <SwitchRow icon={<Gauge className={ICON} aria-hidden />} label={t("advanced")} on={advanced} onChange={setAdvanced} />
       <TrackerHealthLink />
       <ModelChoice />

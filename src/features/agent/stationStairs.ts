@@ -202,7 +202,7 @@ const STATION_PACE = 0.9;
  */
 export function withStairs(segs: Segment[], xray: Record<string, StationInside>): Segment[] {
   return segs.map((seg) => {
-    if ((seg.kind !== "descend" && seg.kind !== "ascend") || !seg.station) return seg;
+    if ((seg.kind !== "descend" && seg.kind !== "ascend") || !seg.station || seg.elevator) return seg;
     const down = seg.kind === "descend";
     const street = down ? seg.coords[0] : seg.coords[seg.coords.length - 1];
     const train = down ? seg.coords[seg.coords.length - 1] : seg.coords[0];

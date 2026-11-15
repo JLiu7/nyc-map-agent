@@ -150,6 +150,15 @@
   }
 }
 
+/* Phones: a pull sheet at full height reaches the foot of the map's button rail, and the Record
+   button (the lowest in the rail) showed half under the sheet's Close button: a tap on it closed
+   the sheet. It steps aside while a sheet is fully up and comes back when the sheet is lowered. */
+@media (max-width: 639px) {
+  body:has(.pull-sheet[data-level="2"]) [data-testid="open-recorder"] {
+    display: none;
+  }
+}
+
 /* Phones: Center on my location owns the bottom right, so the map credits move
    to the left and ride above a pull sheet (--pull-sheet-h) like it does. */
 @media (max-width: 639px) {

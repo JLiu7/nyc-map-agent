@@ -185,7 +185,7 @@ export function trainPart(f: number): string {
 export async function withStationWalks(segs: Segment[]): Promise<Segment[]> {
   const walked = await Promise.all(
     segs.map((seg, i) => {
-      if ((seg.kind !== "descend" && seg.kind !== "ascend") || !seg.station) return Promise.resolve(null);
+      if ((seg.kind !== "descend" && seg.kind !== "ascend") || !seg.station || seg.elevator) return Promise.resolve(null);
       const ride = segs[seg.kind === "descend" ? i + 1 : i - 1];
       return walkThrough(seg, ride?.kind === "ride" ? ride : undefined).catch(() => null);
     }),

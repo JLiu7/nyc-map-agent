@@ -10,7 +10,7 @@ const NEAR_M = 220;
  * train's platform. Every other leg stays first person.
  */
 export function dollhouseLeg(seg: Segment, ride: Segment | undefined): StationModelId | null {
-  if (seg.kind !== "ascend" || ride?.kind !== "ride") return null;
+  if (seg.kind !== "ascend" || seg.elevator || ride?.kind !== "ride") return null;
   const from = ride.coords[0], to = ride.coords[ride.coords.length - 1];
   if (!from || !to || to[1] >= from[1]) return null; // these trains end south of where they began
   for (const m of STATION_MODELS) {

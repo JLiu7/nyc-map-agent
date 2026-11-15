@@ -21,6 +21,10 @@ export const portal = z.object({
   elevatorOnly: z.boolean().default(false),
   /** Active elevator/escalator outage text at this station, if any. */
   outage: z.string().nullable().default(null),
+  /** With Elevators only on: true when this way in or out is a working elevator (#133). */
+  stepFree: z.boolean().optional(),
+  /** Why this way was chosen when a closure or an elevator moved it: the MTA notice, in a sentence or two (#133). */
+  note: z.string().nullable().default(null),
 });
 
 export const walkLeg = z.object({
@@ -293,6 +297,8 @@ export const requestBody = z.object({
   heard: z.object({ confidence: z.number().min(0).max(1) }).optional(),
   /** Which model profile answers (#35): "smart" (hosted models, health-ordered) or "dev" (the small model). The server's default when absent. */
   profile: z.enum(["smart", "dev"]).optional(),
+  /** Elevators only, from Settings (#133): every trip enters and leaves by working elevators and avoids stairs. */
+  stepFree: z.boolean().optional(),
   /** Where the person is in the underground helper (riding, or at a station finding an exit). Never stored. */
   underground: z.object({
     stage: z.enum(["riding", "at-station", "lost"]),

@@ -244,6 +244,35 @@ for (const size of SIZES) {
       expect(sent.at(-1)?.profile).toBe("dev");
     });
 
+    // Settings → Elevators only (#133): kept on the phone, sent with each question as stepFree.
+    test("the Elevators only switch in Settings", async ({ page }) => {
+      await open(page);
+      const sent: Array<{ stepFree?: boolean }> = [];
+      await page.route("**/api/agent", (r) => {
+        sent.push(r.request().postDataJSON() as { stepFree?: boolean });
+        return r.fulfill({ contentType: "application/x-ndjson", body: stream([{ type: "text", text: "Planned for elevators only." }, { type: "done" }]) });
+      });
+      const phone = size.width < 640;
+      await page.getByTestId(phone ? "settings-chip" : "menu-settings").click();
+      const panel = page.getByTestId(phone ? "settings-sheet" : "settings-panel");
+      // On a phone Settings opens as a short pull sheet. At 320×568 no row is clear of its header until
+      // the sheet is pulled up, so the test pulls it up as a rider would.
+      if (phone) await panel.getByTestId("sheet-grip").click();
+      const sw = panel.getByRole("switch", { name: "Elevators only" });
+      await expect(sw).toBeVisible();
+      await expect(sw).toHaveAttribute("aria-checked", "false");
+      await expectLayout(page);
+      await sw.click();
+      await expect(sw).toHaveAttribute("aria-checked", "true");
+      await expectLayout(page);
+      if (phone) await panel.getByRole("button", { name: /^Close/ }).click();
+      else await page.keyboard.press("Escape");
+      await ask(page, "Get me to Fulton St");
+      await expect(page.getByText("Planned for elevators only.")).toBeVisible();
+      expect(sent.at(-1)?.stepFree).toBe(true);
+      expect(await page.evaluate(() => localStorage.getItem("nma.stepFree"))).toBe("1");
+    });
+
     // Language is one tap from the home screen on every size: the rail's chip (#54 on phones, #124 on wider screens).
     test("changing the language", async ({ page }) => {
       await open(page);
