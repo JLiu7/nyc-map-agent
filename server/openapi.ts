@@ -17,7 +17,8 @@ import { HourQuery as WeatherHourQuery, Query as WeatherQuery } from "./features
 import { AllQuery as AllSegmentsQuery, AllResponse as AllSegmentsResponse, Query as SegmentsQuery, Response_ as SegmentsResponse } from "./features/transit/segments";
 import { Query as LiveQuery } from "./features/transit/live";
 import { Query as BusSegmentsQuery, Response_ as BusSegmentsResponse } from "./features/transit/busSegments";
-import { AccuracyResponse as HealthAccuracyResponse, CoverageResponse as HealthCoverageResponse } from "./features/transit/health";
+import { AccuracyResponse as HealthAccuracyResponse, CoverageResponse as HealthCoverageResponse, HoursQuery as HealthHoursQuery, HoursResponse as HealthHoursResponse } from "./features/transit/health";
+import { Query as HealthBusSpeedsQuery, Response_ as HealthBusSpeedsResponse } from "./features/transit/busSpeeds";
 import { EventsResponse, Query as EventsQuery } from "./features/events/schema";
 import { PlaceToiletsResponse } from "./features/place-toilets/schema";
 import { RestroomsResponse } from "./features/restrooms/schema";
@@ -277,6 +278,20 @@ export const ROUTES = {
     path: "/api/transit-health/accuracy",
     summary: "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without",
     responses: { 200: { description: "OK (ready: false until the observer has built the views)", content: { "application/json": { schema: HealthAccuracyResponse } } }, ...errors },
+  }),
+  "/api/transit-health/hours": createRoute({
+    method: "get",
+    path: "/api/transit-health/hours",
+    summary: "Learned-time samples per single hour of each schedule, for one line or bus route or summed over the system",
+    request: { query: HealthHoursQuery },
+    responses: { 200: { description: "OK (ready: false until the observer has built the view)", content: { "application/json": { schema: HealthHoursResponse } } }, ...errors },
+  }),
+  "/api/transit-health/bus-speeds": createRoute({
+    method: "get",
+    path: "/api/transit-health/bus-speeds",
+    summary: "The MTA's published average bus travel times between timepoints (data.ny.gov kufs-yh3x) for a route at a schedule and hour, from a bounded import",
+    request: { query: HealthBusSpeedsQuery },
+    responses: { 200: { description: "OK (ready: false until the route has been imported)", content: { "application/json": { schema: HealthBusSpeedsResponse } } }, ...errors },
   }),
   "/api/transit-live": createRoute({
     method: "get",

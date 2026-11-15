@@ -34,6 +34,7 @@ import * as transitSegments from "./features/transit/segments";
 import * as transitLive from "./features/transit/live";
 import * as transitBusSegments from "./features/transit/busSegments";
 import * as transitHealth from "./features/transit/health";
+import * as transitBusSpeeds from "./features/transit/busSpeeds";
 import * as events from "./features/events/routes";
 import * as placeToilets from "./features/place-toilets/routes";
 import * as storefronts from "./features/storefronts/routes";
@@ -67,6 +68,8 @@ const routes: Array<[string, Handler]> = [
   ["/api/transit-bus-segments", transitBusSegments],
   ["/api/transit-health/coverage", { GET: transitHealth.GET_COVERAGE }],
   ["/api/transit-health/accuracy", { GET: transitHealth.GET_ACCURACY }],
+  ["/api/transit-health/hours", { GET: transitHealth.GET_HOURS }],
+  ["/api/transit-health/bus-speeds", transitBusSpeeds],
   ["/api/agent/health", agent.health],
   ["/api/agent/warm", agent.warm],
   ["/api/transit", transit],

@@ -166,6 +166,144 @@ Blocked/uncertain:
 Next:
 - After the direction fix deploys, pick the 1 on the live page; then the station view with per-hour counts, stored conditions, the pooling comparison and the MTA bus speeds comparison
 
+### 2026-11-15 05:25:18 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["Scores store notice, weather and traffic; the accuracy answer splits by them and lists stops; an endpoint gives samples per hour"],"decisions":["no new decisions"],"evidence":["68 unit tests in the transit server folder pass; the migration ran on the VPS database in a rolled-back transaction; a subway backtest found band and hour pooling equal"],"next_action":"After it merges, run nyc-job.sh update on the VPS between runs and read the first rows with conditions; then show the splits, stops and hours on the page","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T05:25:18Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"53f41c6bc6a9760581831a2ddccf5e625596d601ebc9974ad695ad8aaab6761b","request_id":"f6634b0c494849069b354eb604b2dbe0","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- Scores store notice, weather and traffic; the accuracy answer splits by them and lists stops; an endpoint gives samples per hour
+
+Evidence:
+- 68 unit tests in the transit server folder pass; the migration ran on the VPS database in a rolled-back transaction; a subway backtest found band and hour pooling equal
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- After it merges, run nyc-job.sh update on the VPS between runs and read the first rows with conditions; then show the splits, stops and hours on the page
+
+### 2026-11-15 05:39:32 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The conditions migration now reverses cleanly, which the migrations check failed on"],"decisions":["no new decisions"],"evidence":["Up, down, up ran on the VPS database in a rolled-back transaction"],"next_action":"When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T05:39:32Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"2940e306f423241efaa5d8477241fa2999bf0a382d7870e464334a32d95b1674","request_id":"3c8b806d78104eb98fea7969a8539847","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The conditions migration now reverses cleanly, which the migrations check failed on
+
+Evidence:
+- Up, down, up ran on the VPS database in a rolled-back transaction
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions
+
+### 2026-11-15 06:35:29 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The accuracy answer keeps its existing groups; condition splits are a new list"],"decisions":["no new decisions"],"evidence":["68 unit tests pass; the API check failed only on the added group names, which are no longer added"],"next_action":"When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T06:35:29Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"dc899fe75222cfeb4ba650c540c945efb61f36da023217deaa7c34ff6da60c26","request_id":"b814c69497ba4033bc33032da0d86b19","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The accuracy answer keeps its existing groups; condition splits are a new list
+
+Evidence:
+- 68 unit tests pass; the API check failed only on the added group names, which are no longer added
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions
+
+### 2026-11-15 06:35:38 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The accuracy answer keeps its existing groups; condition splits are a new list"],"decisions":["no new decisions"],"evidence":["68 unit tests pass; the API check failed only on the added group names, which are no longer added"],"next_action":"When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T06:35:38Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"dc899fe75222cfeb4ba650c540c945efb61f36da023217deaa7c34ff6da60c26","request_id":"6baa4366d2d64baaa57adc15e64f4e39","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The accuracy answer keeps its existing groups; condition splits are a new list
+
+Evidence:
+- 68 unit tests pass; the API check failed only on the added group names, which are no longer added
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions
+
+### 2026-11-15 06:36:20 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The bus speeds branch carries the API fix and current main"],"decisions":["no new decisions"],"evidence":["72 unit tests pass and the API spec is regenerated"],"next_action":"When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T06:36:20Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c7f24326c71a420ca7c4d01f4894892ff1f1e5e4a2104d225d6474302b4dbcdf","request_id":"30c2fb635a6e42d3b7871e9647afd2d3","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The bus speeds branch carries the API fix and current main
+
+Evidence:
+- 72 unit tests pass and the API spec is regenerated
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull requests 214 and 215 merge, merge main into 216 and 217, run nyc-job.sh update on the VPS between runs, and read the first rows with conditions
+
+### 2026-11-15 07:13:14 UTC — agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/452cd4bc-f008-4a98-a16c-13cbabce5e68","blocked":[],"changed":["none"],"completed":["The server branch (conditions, per-hour counts, MTA bus speeds) is up to date with main and first in line"],"decisions":["no new decisions"],"evidence":["72 unit tests pass after merging the bus session's estimator change; the API spec is current"],"next_action":"When pull request 217 merges, run nyc-job.sh update on the VPS between runs, then bring pull request 216 up to date with main","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0060","timestamp":"2026-11-15T07:13:14Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"09ee4cdb4865c9d6e699256f577d67a678da4c6224d6b8f099ff6e9f3ef0e60b","request_id":"a2d994a949094771b014912c1894cce6","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0060"} -->
+
+Completed:
+- The server branch (conditions, per-hour counts, MTA bus speeds) is up to date with main and first in line
+
+Evidence:
+- 72 unit tests pass after merging the bus session's estimator change; the API spec is current
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull request 217 merges, run nyc-job.sh update on the VPS between runs, then bring pull request 216 up to date with main
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.

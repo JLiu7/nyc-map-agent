@@ -4231,13 +4231,155 @@
                           "last"
                         ]
                       }
+                    },
+                    "stops": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "stop": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          },
+                          "w60Model": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "stop",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model"
+                        ]
+                      }
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "ready",
                     "rows",
                     "thin",
-                    "runs"
+                    "runs",
+                    "stops",
+                    "conditions"
                   ]
                 }
               }
@@ -4487,13 +4629,681 @@
                           "last"
                         ]
                       }
+                    },
+                    "stops": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "stop": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          },
+                          "w60Model": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "stop",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model"
+                        ]
+                      }
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "ready",
                     "rows",
                     "thin",
-                    "runs"
+                    "runs",
+                    "stops",
+                    "conditions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transit-health/hours": {
+      "get": {
+        "summary": "Learned-time samples per single hour of each schedule, for one line or bus route or summed over the system",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "subway",
+                "bus"
+              ]
+            },
+            "required": true,
+            "name": "system",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+]{1,6}$"
+            },
+            "required": false,
+            "name": "route",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "system": {
+                      "type": "string",
+                      "enum": [
+                        "subway",
+                        "bus"
+                      ]
+                    },
+                    "route": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "cells": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "hour": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "enough": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sched",
+                          "hour",
+                          "segments",
+                          "solid",
+                          "enough",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "system",
+                    "route",
+                    "cells"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/hours": {
+      "get": {
+        "summary": "Learned-time samples per single hour of each schedule, for one line or bus route or summed over the system (alias of /api/v1/transit-health/hours)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "subway",
+                "bus"
+              ]
+            },
+            "required": true,
+            "name": "system",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+]{1,6}$"
+            },
+            "required": false,
+            "name": "route",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "system": {
+                      "type": "string",
+                      "enum": [
+                        "subway",
+                        "bus"
+                      ]
+                    },
+                    "route": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "cells": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "hour": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "enough": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "sched",
+                          "hour",
+                          "segments",
+                          "solid",
+                          "enough",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "system",
+                    "route",
+                    "cells"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transit-health/bus-speeds": {
+      "get": {
+        "summary": "The MTA's published average bus travel times between timepoints (data.ny.gov kufs-yh3x) for a route at a schedule and hour, from a bounded import",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{1,3}\\d{1,3}[A-Za-z+]{0,2}$"
+            },
+            "required": true,
+            "name": "route",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "required": false,
+            "name": "dow",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 23
+            },
+            "required": false,
+            "name": "hour",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the route has been imported)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "route": {
+                      "type": "string"
+                    },
+                    "dow": {
+                      "type": "integer"
+                    },
+                    "hour": {
+                      "type": "integer"
+                    },
+                    "since": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "importedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "segments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "direction": {
+                            "type": "string"
+                          },
+                          "order": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "seconds": {
+                            "type": "number"
+                          },
+                          "metres": {
+                            "type": "number"
+                          },
+                          "trips": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "direction",
+                          "order",
+                          "from",
+                          "to",
+                          "seconds",
+                          "metres",
+                          "trips"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "route",
+                    "dow",
+                    "hour",
+                    "since",
+                    "importedAt",
+                    "segments"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/bus-speeds": {
+      "get": {
+        "summary": "The MTA's published average bus travel times between timepoints (data.ny.gov kufs-yh3x) for a route at a schedule and hour, from a bounded import (alias of /api/v1/transit-health/bus-speeds)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{1,3}\\d{1,3}[A-Za-z+]{0,2}$"
+            },
+            "required": true,
+            "name": "route",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "required": false,
+            "name": "dow",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 23
+            },
+            "required": false,
+            "name": "hour",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the route has been imported)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "route": {
+                      "type": "string"
+                    },
+                    "dow": {
+                      "type": "integer"
+                    },
+                    "hour": {
+                      "type": "integer"
+                    },
+                    "since": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "importedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "segments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "direction": {
+                            "type": "string"
+                          },
+                          "order": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "seconds": {
+                            "type": "number"
+                          },
+                          "metres": {
+                            "type": "number"
+                          },
+                          "trips": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "direction",
+                          "order",
+                          "from",
+                          "to",
+                          "seconds",
+                          "metres",
+                          "trips"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "route",
+                    "dow",
+                    "hour",
+                    "since",
+                    "importedAt",
+                    "segments"
                   ]
                 }
               }

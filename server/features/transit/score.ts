@@ -56,7 +56,10 @@ export type Score = {
   /** Fewest samples behind any learned time used; null when none was used (then model = base). */
   learnedN: number | null;
   /** 0: the feed's last listed arrival; 1: the vehicle's "stopped at" report; 2: the bus seen leaving. */
-  truth: 0 | 1 | 2;
+  truth: 0 | 1 | 2;  /** The conditions at the time (conditions.ts), added by the observer before storing; absent in older rows. */
+  notice?: boolean | null;
+  weather?: string | null;
+  traffic?: number | null;
 };
 export type Tally = { opened: number; resolved: number; unresolved: number };
 
@@ -155,6 +158,8 @@ type BusRoute = {
   dwell: Map<string, { median: number; n: number }>;
   /** The stops each direction really serves (a line passes the stops on both kerbs). */
   served: Map<number, Set<string>>;
+  /** Where each stop is: [lon, lat]. */
+  points: Map<string, [number, number]>;
 };
 type BusOpen = { to: string } & Pred;
 
@@ -183,9 +188,12 @@ export class BusScorer {
       set.add(s.from).add(s.to);
       served.set(s.dir, set);
     }
-    this.routes.set(geom.route, { shapes, travel, dwell, served });
+    const points = new Map<string, [number, number]>(geom.stops.map((st) => [stopKey(st.id), [st.lon, st.lat]]));
+    this.routes.set(geom.route, { shapes, travel, dwell, served, points });
   }
   has(route: string) { return this.routes.has(route); }
+  /** Where a stop of a scored route is, for the traffic near it. */
+  stopPoint(route: string, stop: string): [number, number] | undefined { return this.routes.get(route)?.points.get(stopKey(stop)); }
 
   /** The stops after `from` on the line that reaches `next` soonest, as the client would walk them. */
   private ahead(r: BusRoute, from: string, next: string): Array<{ id: string; s: number }> {
