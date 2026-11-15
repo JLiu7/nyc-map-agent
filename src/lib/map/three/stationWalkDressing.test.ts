@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { type DollhouseModel, type P3 } from "./dollhouse";
 import { fultonCorner } from "@/lib/map/fultonCorners";
 import { inWall, stationShell, walkPoints, type Shell } from "./stationShell";
-import { boardsOverlap, fareRows, inFront, walkSignPlans, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
+import { boardsOverlap, deadEnds, fareRows, forkBoards, inFront, walkSignPlans, walkDressing, type Board, type Placed, type WalkDressing } from "./stationWalkDressing";
 
 const model = JSON.parse(readFileSync("public/transit/fulton-model.json", "utf8")) as DollhouseModel;
 
@@ -112,7 +112,9 @@ describe("Fulton St's dressing for walking inside", () => {
     const twice = all.flatMap((a, i) => all.slice(i + 1).filter((b) => b.head === a.head && Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) < 3 && Math.abs(b.p.z - a.p.z) < 1).map(() => a.head));
     expect(twice).toEqual([]);
     // The A/C level's walks add their own stairs' boards (42 with them, 2026-11-13).
-    expect(all.length).toBeLessThan(48);
+    // 42 along the walks (the A/C level's included) and on the platforms, then one at each fork and
+    // each dead end: 59 in all on 2026-11-15.
+    expect(all.length).toBeLessThan(64);
   });
 
   it("hangs each stair's board at the stair's foot, facing whoever walks up to it", () => {
@@ -129,6 +131,33 @@ describe("Fulton St's dressing for walking inside", () => {
       if (turn > Math.PI / 6 + 1e-6 || !inFront(s.position.x - aim[0], s.position.y - aim[1], plan.heading)) off.push(`${key} at ${s.position.x.toFixed(1)},${s.position.y.toFixed(1)}`);
     }
     expect(off).toEqual([]);
+  });
+
+  it("names where each way goes at every fork, facing whoever comes to it", () => {
+    // Owner, 2026-11-13: "no idea where these lead".
+    const forks = forkBoards(model, fultonCorner);
+    expect(forks.length).toBeGreaterThanOrEqual(4);
+    for (const f of forks) {
+      const key = JSON.stringify(f.lines);
+      const s = signs().find((o) => (o.userData.sign as { key: string }).key === key);
+      expect(s, key).toBeDefined();
+      expect(f.lines.every((l) => l?.arrow && l.text?.startsWith("Exit"))).toBe(true);
+      expect(new Set(f.lines.map((l) => l?.text)).size).toBe(2);
+      const turn = Math.atan2(Math.sin(-s!.rotation.z - f.heading), Math.cos(-s!.rotation.z - f.heading));
+      expect(Math.abs(turn)).toBeLessThan(Math.PI / 6 + 1e-6);
+    }
+  });
+
+  it("turns the walker round at the end of every dead end, on the end wall where they stuck", () => {
+    // Owner, 2026-11-13, at (46.8, 13.9) looking south-east: "actually im stuck here its a deadend".
+    const ends = deadEnds(model, shell);
+    const back = signs().filter((o) => (o.userData.sign as { key: string }).key.includes('"back"'));
+    expect(back.length).toBe(ends.length);
+    const theirs = back.filter((o) => Math.hypot(o.position.x - 53.2, o.position.y - 6.3) < 4 && Math.abs(o.position.z - -6) < 1);
+    expect(theirs).toHaveLength(1);
+    // Flat on the end wall, read looking the way they looked.
+    expect(theirs[0].children).toHaveLength(2);
+    expect(Math.abs(-theirs[0].rotation.z - (129 * Math.PI) / 180)).toBeLessThan(Math.PI / 6);
   });
 
   it("puts a sign near a wall flat on it, facing out", () => {

@@ -380,7 +380,7 @@ export function wallTexture(): THREE.Texture {
 }
 
 /** One line of a sign: an arrow, route bullets, then words, left to right. */
-type SignLine = { arrow?: "up" | "down"; bullets?: Array<[string, string]>; text?: string };
+export type SignLine = { arrow?: "up" | "down" | "left" | "right" | "back"; bullets?: Array<[string, string]>; text?: string };
 /** A sign to hang: where (the panel's middle), the way the walker faces when reading it, and its big and small lines. */
 export type SignPlan = { at: P3; heading: number; lines: [SignLine, SignLine | null]; small?: boolean };
 
@@ -398,15 +398,25 @@ function signLine(g: CanvasRenderingContext2D, line: SignLine, x: number, mid: n
   const gap = size * 0.3;
   const items: number[] = [];
   if (line.arrow) {
-    const w = size * 0.72, h = size * 0.92;
-    if (draw) {
-      const dir = line.arrow === "up" ? -1 : 1, tip = mid + (dir * h) / 2, base = mid - (dir * h) / 2, neck = tip - dir * w * 0.55;
+    const w = size * 0.72, h = size * 0.92, aw = line.arrow === "left" || line.arrow === "right" ? h : w;
+    if (draw && line.arrow === "back") {
+      // Turn around: up the right, over the top and back down the left to a head pointing down.
+      const t = w * 0.24;
+      g.strokeStyle = "#fff"; g.fillStyle = "#fff"; g.lineWidth = t;
+      g.beginPath(); g.moveTo(cx + w - t / 2, mid + h / 2); g.lineTo(cx + w - t / 2, mid - h * 0.1);
+      g.arc(cx + w / 2, mid - h * 0.1, w / 2 - t / 2, 0, Math.PI, true); g.lineTo(cx + t / 2, mid + h * 0.12); g.stroke();
+      g.beginPath(); g.moveTo(cx + t / 2, mid + h / 2); g.lineTo(cx + t / 2 + w * 0.34, mid + h * 0.12); g.lineTo(cx + t / 2 - w * 0.34, mid + h * 0.12); g.closePath(); g.fill();
+    } else if (draw) {
+      // Drawn pointing up, turned for down, left and right.
+      g.save(); g.translate(cx + aw / 2, mid); g.rotate({ up: 0, down: Math.PI, left: -Math.PI / 2, right: Math.PI / 2, back: 0 }[line.arrow]);
+      const tip = -h / 2, base = h / 2, neck = tip + w * 0.55;
       g.fillStyle = "#fff";
       g.beginPath();
-      g.moveTo(cx + w / 2, tip); g.lineTo(cx + w, neck); g.lineTo(cx + w * 0.64, neck); g.lineTo(cx + w * 0.64, base);
-      g.lineTo(cx + w * 0.36, base); g.lineTo(cx + w * 0.36, neck); g.lineTo(cx, neck); g.closePath(); g.fill();
+      g.moveTo(0, tip); g.lineTo(w / 2, neck); g.lineTo(w * 0.14, neck); g.lineTo(w * 0.14, base);
+      g.lineTo(-w * 0.14, base); g.lineTo(-w * 0.14, neck); g.lineTo(-w / 2, neck); g.closePath(); g.fill();
+      g.restore();
     }
-    items.push(w);
+    items.push(aw);
   }
   const bullets = line.bullets ?? [];
   if (bullets.length) {
@@ -456,7 +466,7 @@ export function signMesh(lines: [SignLine, SignLine | null], clip: THREE.Plane[]
   const w = Math.max(inner / PX + 2 * pad, small ? 0.7 : 1.4), h = (top + row1 + row2) / PX + 0.06;
   const [c, g] = canvas2d(Math.round(w * PX), Math.round(h * PX));
   // Exit boards in MTA green, the rest MTA black (owner, 2026-11-13: "exit sign doesnt have mta colors").
-  const bg = lines[0].text?.startsWith("Exit") ? 0x00933c : 0x111214;
+  const bg = lines.some((l) => l?.text?.startsWith("Exit")) ? 0x00933c : 0x111214;
   g.fillStyle = `#${bg.toString(16).padStart(6, "0")}`; g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = "#f4f4f2"; g.fillRect(0, ruleAt, c.width, Math.max(2, 0.012 * PX));
   signLine(g, lines[0], pad * PX, top + row1 / 2, big, true);

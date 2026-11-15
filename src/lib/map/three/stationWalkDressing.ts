@@ -8,7 +8,7 @@
 import * as THREE from "three";
 import {
   CAR_M, CARS, DOORS_ALONG_M, dispose, planSigns, signMesh, trainCars, turnstile, walkPlaces,
-  type DollhouseModel, type P3, type SignPlan,
+  type DollhouseModel, type P3, type SignLine, type SignPlan,
 } from "./dollhouse";
 import { gatePanels, inWalkWay, inWall, surfaceFinder, walkPoints, type Shell, type ShellWall } from "./stationShell";
 /** From the platform's edge to the middle of the track beside it. */
@@ -132,7 +132,7 @@ export function platformBoards(model: DollhouseModel): SignPlan[] {
  * Every sign the walk hangs: each walk's own (planSigns) but its platform-name board, which hangs
  * from the platform's edge instead, and the platforms' (platformBoards).
  */
-export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): Array<SignPlan & { stair?: boolean }> {
+export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, number]) => string | null): Plan[] {
   // One board for each way at each decision point (owner, 2026-11-13: "multiple signboards for same
   // exit"): walks that share a stair share its sign. When their streets differ, it names the street
   // they have in common ("Broadway"), else only the way.
@@ -152,8 +152,142 @@ export function walkSignPlans(model: DollhouseModel, corner: (exit: [number, num
     const common = same.seconds.map((n) => n.split(/ & | · /)).reduce((a, b) => a.filter((part) => b.includes(part)));
     same.lines = [same.lines[0], common.length ? { text: common[0] } : null];
   }
-  return [...out.map(({ at, heading, lines, small, stair }) => ({ at, heading, lines, small, stair })), ...platformBoards(model)];
+  return [...out.map(({ at, heading, lines, small, stair }) => ({ at, heading, lines, small, stair })), ...forkBoards(model, corner), ...platformBoards(model)];
 }
+
+/** A plan for a board facing the walker: on a wall only if that wall faces them, within a metre of where planned ("near") or anywhere along it ("wall"). */
+type Plan = SignPlan & { stair?: boolean; facing?: "near" | "wall"; spots?: P3[] };
+
+/**
+ * Where walks part, a board 2 m short of the fork, facing the way in, with a line for each way and
+ * where it leads (owner, 2026-11-13: "no idea where these lead"). Walks part where, having run
+ * within 1 m of each other, they end up more than 2.5 m apart. Two ways to exits of the same name
+ * say which side each is on.
+ */
+export function forkBoards(model: DollhouseModel, corner: (exit: [number, number]) => string | null): Plan[] {
+  const pts = model.walks.map((w) => walkPoints(w.path, 0.25).map(([x, y, z]): P3 => [x, y, z]));
+  const d3 = (p: P3, q: P3) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  const forks: Array<{ at: P3; walks: Set<number> }> = [];
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+    const a = pts[i], b = pts[j];
+    let jb = 0, last = -1, parted = false;
+    for (let k = 0; k < a.length && !parted; k++) {
+      // The nearest of b's points, searched near the last one found.
+      let best = Infinity;
+      for (let m = Math.max(0, jb - 12); m < Math.min(b.length, jb + 40); m++) { const d = d3(a[k], b[m]); if (d < best) { best = d; jb = m; } }
+      if (best < 1) last = k;
+      else if (k === 0) break;
+      else if (best > 2.5) parted = true;
+    }
+    if (!parted || last < 0) continue;
+    const f = forks.find((o) => d3(o.at, a[last]) < 4);
+    if (f) f.walks.add(i).add(j); else forks.push({ at: a[last], walks: new Set([i, j]) });
+  }
+  const out: Plan[] = [];
+  for (const { at, walks } of forks) {
+    const ways: Array<{ to: P3; rel: number; walks: number[] }> = [];
+    let into = 0, from: P3 = at, spots: P3[] = [];
+    for (const w of walks) {
+      const p = pts[w], k = p.reduce((bi, q, m) => (d3(q, at) < d3(p[bi], at) ? m : bi), 0);
+      from = p[Math.max(0, k - 8)];
+      spots = [8, 12, 16, 24, 32].map((n) => p[Math.max(0, k - n)]);
+      into = Math.atan2(at[0] - from[0], at[1] - from[1]);
+      const to = p[Math.min(p.length - 1, k + 24)];
+      const way = ways.find((o) => d3(o.to, to) < 2.5);
+      if (way) way.walks.push(w); else ways.push({ to, rel: 0, walks: [w] });
+    }
+    for (const way of ways) way.rel = Math.atan2(Math.sin(Math.atan2(way.to[0] - at[0], way.to[1] - at[1]) - into), Math.cos(Math.atan2(way.to[0] - at[0], way.to[1] - at[1]) - into));
+    ways.sort((p, q) => p.rel - q.rel);
+    // A way to one street corner names it; a way to several, the streets the other way does not reach.
+    const corners = ways.map((way) => [...new Set(way.walks.map((w) => corner(model.walks[w].exit) ?? "street"))]);
+    const parts = corners.map((c) => new Set(c.flatMap((n) => n.split(" & "))));
+    const names = corners.map((c, n) => (c.length === 1 ? c[0] : [...parts[n]].filter((t) => !parts.some((o, m) => m !== n && o.has(t))).join(" · ") || c[0]));
+    const lines = ways.slice(0, 2).map((way, n): SignLine => {
+      const turn = Math.abs(way.rel) < (25 * Math.PI) / 180 ? "up" : way.rel < 0 ? "left" : "right";
+      let name = names[n];
+      if (names.filter((o) => o === name).length > 1) {
+        // The same street corner both ways: which side of the corner's first street this way's exit is
+        // on, from where the other's is ("Fulton St, south side").
+        const [e, o] = [model.walks[way.walks[0]].exit, model.walks[ways[1 - n].walks[0]].exit];
+        const de = (e[0] - o[0]) * 84_000, dn = (e[1] - o[1]) * 111_000;
+        name = `${name.split(" & ")[0]}, ${Math.abs(dn) > Math.abs(de) ? (dn > 0 ? "north" : "south") : de > 0 ? "east" : "west"} side`;
+      }
+      return { arrow: turn, text: `${corners[n].length > 1 ? "Exits" : "Exit"} ${name}` };
+    });
+    if (lines.length === 2 && lines[0].arrow === lines[1].arrow) [lines[0].arrow, lines[1].arrow] = ["left", "right"];
+    // Over the walk 2 m short of the fork, or farther back where the ceiling there is too low.
+    out.push({ at: [from[0], from[1], from[2] + 2.4], heading: into, lines: [lines[0], lines[1] ?? null], facing: "near", spots });
+  }
+  return out;
+}
+
+/**
+ * The far ends of the walkable floor's dead ends off the walks (owner, 2026-11-13: "im stuck here
+ * its a deadend"): flooding the floor out from the walks in 0.5 m cells, a cell farther than any
+ * cell round it, 5 to 20 m off a walk, whose floor stays level back to half that distance and goes
+ * no farther. Platform ends are left out. Each comes with the way a walker faces arriving there.
+ */
+export function deadEnds(model: DollhouseModel, shell: Shell): Array<{ at: P3; heading: number; mouth: P3 }> {
+  const under = surfaceFinder(trisOf([...shell.floors, ...shell.stairs, ...shell.bridges]));
+  const C = 0.5, walk = model.walks.flatMap((w) => walkPoints(w.path, 0.25));
+  const xs = walk.map((p) => p[0]), ys = walk.map((p) => p[1]);
+  const x0 = Math.min(...xs) - 25, y0 = Math.min(...ys) - 25;
+  const nx = Math.ceil((Math.max(...xs) + 25 - x0) / C), ny = Math.ceil((Math.max(...ys) + 25 - y0) / C);
+  const cells: number[][] = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) cells.push(under(x0 + (i + 0.5) * C, y0 + (j + 0.5) * C));
+  const key = (i: number, j: number, h: number) => `${i},${j},${h.toFixed(2)}`;
+  const dist = new Map<string, number>(), par = new Map<string, string>(), q: Array<[number, number, number]> = [];
+  const next = (i: number, j: number, h: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].flatMap(([di, dj]): Array<[number, number, number]> =>
+    i + di < 0 || j + dj < 0 || i + di >= nx || j + dj >= ny ? [] : cells[(j + dj) * nx + i + di].filter((g) => Math.abs(g - h) < 0.35).map((g) => [i + di, j + dj, g]));
+  for (const [x, y, z] of walk) {
+    const i = Math.floor((x - x0) / C), j = Math.floor((y - y0) / C);
+    for (const h of cells[j * nx + i]) if (Math.abs(h - z) < 0.5 && !dist.has(key(i, j, h))) { dist.set(key(i, j, h), 0); q.push([i, j, h]); }
+  }
+  for (let n = 0; n < q.length; n++) {
+    const [i, j, h] = q[n], d = dist.get(key(i, j, h))!;
+    for (const [a, b, g] of next(i, j, h)) if (!dist.has(key(a, b, g))) { dist.set(key(a, b, g), d + C); par.set(key(a, b, g), key(i, j, h)); q.push([a, b, g]); }
+  }
+  /** Level back to half its distance, and nothing past it. */
+  const closed = (i: number, j: number, h: number, d: number) => {
+    const seen = new Set([key(i, j, h)]), list: Array<[number, number, number]> = [[i, j, h]];
+    for (let n = 0; n < list.length; n++) for (const [a, b, g] of next(...list[n])) {
+      const k = key(a, b, g), dd = dist.get(k);
+      if (seen.has(k) || dd == null || dd < d / 2) continue;
+      if (dd > d || Math.abs(g - h) > 0.3) return false;
+      seen.add(k); list.push([a, b, g]);
+    }
+    return true;
+  };
+  const tips: Array<{ i: number; j: number; h: number; d: number }> = [];
+  for (const [k, d] of dist) {
+    if (d < 5 || d > 20) continue;
+    const [i, j, h] = k.split(",").map(Number);
+    if (next(i, j, h).some(([a, b, g]) => (dist.get(key(a, b, g)) ?? 0) > d)) continue;
+    const x = x0 + (i + 0.5) * C, y = y0 + (j + 0.5) * C;
+    if (model.edges.some(([ax, ay, bx, by, ez]) => Math.abs(ez - h) < 0.5 && segDist(x, y, { a: [ax, ay], b: [bx, by] } as ShellWall) < 8)) continue;
+    tips.push({ i, j, h, d });
+  }
+  tips.sort((p, o) => o.d - p.d);
+  const out: Array<{ at: P3; heading: number; mouth: P3 }> = [];
+  const kept: typeof tips = [];
+  for (const t of tips) {
+    if (kept.some((o) => Math.abs(o.h - t.h) < 1 && Math.hypot(o.i - t.i, o.j - t.j) * C < 8) || !closed(t.i, t.j, t.h, t.d)) continue;
+    kept.push(t);
+    // Back along the flood to the walk: there it opens off it, and from there a walker comes in.
+    let k = key(t.i, t.j, t.h);
+    while (par.has(k)) k = par.get(k)!;
+    const [mi, mj, mh] = k.split(",").map(Number);
+    out.push({ at: [x0 + (t.i + 0.5) * C, y0 + (t.j + 0.5) * C, t.h], heading: Math.atan2(t.i - mi, t.j - mj), mouth: [x0 + (mi + 0.5) * C, y0 + (mj + 0.5) * C, mh] });
+  }
+  return out;
+}
+
+/** How near a walk comes to a point. */
+const walkGap = (w: { path: P3[] }, p: P3) => Math.min(...w.path.slice(1).map((b, i) => {
+  const a = w.path[i];
+  if (Math.abs(a[2] - p[2]) > 1.5 && Math.abs(b[2] - p[2]) > 1.5) return Infinity;
+  return segDist(p[0], p[1], { a: [a[0], a[1]], b: [b[0], b[1]] } as ShellWall);
+}));
 
 /** A board as hung: where, which way, and its box at the scale it hangs. */
 export type Placed = { at: P3; heading: number; b: Board };
@@ -178,7 +312,7 @@ export const boardsOverlap = (p: Placed, q: Placed) => boardInWall(p.b, p.at, p.
 export const inFront = (dx: number, dy: number, heading: number) =>
   Math.abs(dx * Math.cos(heading) - dy * Math.sin(heading)) <= 1 && dx * Math.sin(heading) + dy * Math.cos(heading) < 0.3;
 
-function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = [], over: (x: number, y: number) => number[] = () => [], stair = false): { at: P3; heading: number; flat: boolean; scale: number } {
+function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWall[], walkNear: (x: number, y: number, r: number) => P3[], placed: Placed[] = [], over: (x: number, y: number) => number[] = () => [], face: Plan["facing"] = undefined): { at: P3; heading: number; flat: boolean; scale: number } {
   const near0 = placed.filter((q) => Math.hypot(q.at[0] - at[0], q.at[1] - at[1]) < q.b.half + b.half + 8), slabs = near0.map(slabOf);
   // Clear of every board hung, and under every ceiling, stair and floor overhead: none between the
   // board's foot and 2 cm over its top, across its width and over both faces.
@@ -197,7 +331,8 @@ function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWal
     const dx = w.b[0] - w.a[0], dy = w.b[1] - w.a[1], L = Math.hypot(dx, dy);
     const tx = dx / L, ty = dy / L;
     // The face on the sign's side: the normal points from the wall's centre line toward the sign.
-    const side = Math.sign((at[0] - w.a[0]) * -ty + (at[1] - w.a[1]) * tx) || 1;
+    // A board that faces the walker goes on the face toward them, whichever side its spot fell.
+    const side = (face ? -Math.sign(Math.sin(heading) * -ty + Math.cos(heading) * tx) : Math.sign((at[0] - w.a[0]) * -ty + (at[1] - w.a[1]) * tx)) || 1;
     const nx = -ty * side, ny = tx * side;
     // Facing out along n: the board's front faces -(sin h, cos h).
     const h = Math.atan2(-nx, -ny);
@@ -218,21 +353,22 @@ function placeSign(b: Board, rods: Board, at: P3, heading: number, all: ShellWal
       });
       // A stair's board goes flat only on a wall facing whoever walks up to the stair, beside its mouth
       // (owner, 2026-11-13: "right at the stair, facing them"), never along a side wall.
-      const facing = !stair || (Math.cos(h - heading) > Math.cos(Math.PI / 6) && inFront(c[0] - at[0], c[1] - at[1], heading));
+      const facing = !face || (Math.cos(h - heading) > Math.cos(Math.PI / 6) && (face === "wall" || inFront(c[0] - at[0], c[1] - at[1], heading)));
       if (facing && !door && !boardInWall(b, c, h, walls) && clear(c, h, b)) return { at: c, heading: h, flat: true, scale: 1 };
     }
   }
   // Hung on its rods where planned, or the nearest spot round it (out to 3 m, up to 0.8 m lower) that
   // clears every wall and every board already hung; smaller only when none does.
-  for (const scale of [1, 0.75, 0.5, 0.3]) {
+  // Within a metre a little smaller before farther off at full size: a board belongs where it was planned.
+  for (const [scale, reach] of [[1, 1], [0.75, 1], [0.5, 1], [1, 3], [0.75, 3], [0.5, 3], [0.3, 3]]) {
     const sb = { half: rods.half * scale, y0: rods.y0, y1: rods.y1, z0: rods.z0 * scale, z1: rods.z1 * scale };
     // Lower only when no spot at its height fits: above a head first. A stair's board moves back along
     // the walk, still in front of the stair, before it moves aside, and never on toward the stair.
-    const back = stair ? [0.5, 1].map((d): [number, number] => [-Math.sin(heading) * d, -Math.cos(heading) * d]) : [];
-    const round = [0, 0.5, 1, 1.5, 2, 2.5, 3].flatMap((r) => Array.from({ length: r ? 8 : 1 }, (_, i): [number, number] => [r * Math.cos((i * Math.PI) / 4), r * Math.sin((i * Math.PI) / 4)]));
+    const back = face ? [0.5, 1].map((d): [number, number] => [-Math.sin(heading) * d, -Math.cos(heading) * d]) : [];
+    const round = [0, 0.5, 1, 1.5, 2, 2.5, 3].filter((r) => r <= reach).flatMap((r) => Array.from({ length: r ? 8 : 1 }, (_, i): [number, number] => [r * Math.cos((i * Math.PI) / 4), r * Math.sin((i * Math.PI) / 4)]));
     // A ceiling lower than planned takes the rods' tops just under it.
     const roof = (x: number, y: number) => Math.min(...[-1, -0.5, 0, 0.5, 1].flatMap((k) => over(x + Math.cos(heading) * sb.half * k, y - Math.sin(heading) * sb.half * k)).filter((z) => z > at[2] + sb.z0 - 0.8)) - sb.z1 - 0.02 - at[2];
-    for (const up of [0, NaN, -0.4, -0.8]) for (const [dx, dy] of [...round.slice(0, 1), ...back, ...round.slice(1).filter(([x, y]) => !stair || inFront(x, y, heading))]) {
+    for (const up of [0, NaN, -0.4, -0.8]) for (const [dx, dy] of [...round.slice(0, 1), ...back, ...round.slice(1).filter(([x, y]) => !face || inFront(x, y, heading))]) {
       const lift = Number.isNaN(up) ? roof(at[0] + dx, at[1] + dy) : up;
       if (!(lift <= 0 && lift >= -0.8)) continue;
       const c: P3 = [at[0] + dx, at[1] + dy, at[2] + lift];
@@ -387,12 +523,14 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
   const placed: Placed[] = [];
   // A stair's board hangs over the middle of the stair, not over the walk, which may climb at one side
   // (owner, 2026-11-13: the Broadway & John St board hung off to the left of its stair).
-  const steps = shell ? surfaceFinder(trisOf(shell.stairs)) : null;
-  const stairMiddle = (at: P3, h: number): P3 => {
-    if (!steps) return at;
+  // A fork's or a turn's board hangs across the middle of the floor it is over.
+  const steps = shell ? surfaceFinder(trisOf(shell.stairs)) : null, ground = shell ? surfaceFinder(trisOf([...shell.floors, ...shell.bridges])) : null;
+  const stairMiddle = (at: P3, h: number, level = false): P3 => {
+    const find = level ? ground : steps;
+    if (!find) return at;
     const fx = Math.sin(h), fy = Math.cos(h), ux = Math.cos(h), uy = -Math.sin(h), foot = at[2] - 2.4;
-    for (let d = 1; d <= 6; d += 0.25) {
-      const on = (o: number) => steps(at[0] + fx * d + ux * o, at[1] + fy * d + uy * o).some((z) => Math.abs(z - foot) < 1.5);
+    for (let d = level ? 0 : 1; d <= (level ? 0 : 6); d += 0.25) {
+      const on = (o: number) => find(at[0] + fx * d + ux * o, at[1] + fy * d + uy * o).some((z) => Math.abs(z - foot) < (level ? 0.3 : 1.5));
       if (!on(0)) continue;
       let a = 0, b = 0;
       while (a > -4 && on(a - 0.1)) a -= 0.1;
@@ -403,13 +541,38 @@ export function walkDressing(model: DollhouseModel, corner: (exit: [number, numb
     return at;
   };
   const overhead = shell ? surfaceFinder(trisOf([...shell.ceiling, ...shell.floors, ...shell.stairs])) : () => [];
-  for (const plan of walkSignPlans(model, corner)) {
+  // At the far end of each dead end, a board on the end wall: turn round for the exit and the trains.
+  const ends: Plan[] = shell ? deadEnds(model, shell).map(({ at, heading, mouth }) => {
+    const w = model.walks.reduce((a, b) => (walkGap(b, mouth) < walkGap(a, mouth) ? b : a));
+    const street = corner(w.exit);
+    return { at: [at[0], at[1], at[2] + 2.4], heading, lines: [{ arrow: "back", bullets: model.lines, text: "Exit & trains" }, street ? { text: street } : null], facing: "wall" };
+  }) : [];
+  // Where a walk turns off and a dead end goes straight on, a board says which way the exit is
+  // (owner, 2026-11-13: "no idea where these lead").
+  const turns: Plan[] = shell ? deadEnds(model, shell).flatMap(({ at, mouth }): Plan[] => {
+    const near = model.walks.filter((w) => walkGap(w, mouth) < 1.5);
+    const p = near[0] && walkPoints(near[0].path, 0.25).map(([x, y, z]): P3 => [x, y, z]);
+    if (!p) return [];
+    const k = p.reduce((bi, q, m) => (Math.hypot(q[0] - mouth[0], q[1] - mouth[1]) < Math.hypot(p[bi][0] - mouth[0], p[bi][1] - mouth[1]) ? m : bi), 0);
+    // The way in over the last 6 m, the board 3 m short of the turn, its street on a second line
+    // so it fits a narrow passage.
+    const from = p[Math.max(0, k - 24)], hang = p[Math.max(0, k - 12)], to = p[Math.min(p.length - 1, k + 12)];
+    const into = Math.atan2(p[k][0] - from[0], p[k][1] - from[1]);
+    const rel = (h: number) => Math.atan2(Math.sin(h - into), Math.cos(h - into));
+    const on = rel(Math.atan2(to[0] - p[k][0], to[1] - p[k][1])), spur = rel(Math.atan2(at[0] - mouth[0], at[1] - mouth[1]));
+    if (Math.abs(spur) > Math.PI / 4 || Math.abs(on) < (25 * Math.PI) / 180) return [];
+    const streets = [...new Set(near.map((w) => corner(w.exit)).filter((c): c is string => !!c))];
+    return [{ at: [hang[0], hang[1], hang[2] + 2.4], heading: into, lines: [{ arrow: on < 0 ? "left" : "right", text: "Exit" }, streets.length ? { text: streets.join(" · ") } : null], facing: "near" }];
+  }) : [];
+  for (const plan of [...walkSignPlans(model, corner), ...ends, ...turns]) {
     const key = JSON.stringify(plan.lines);
     if (!fresh(key, plan.at)) continue;
     const flat = signMesh(plan.lines, [], plan.small, false), hung = signMesh(plan.lines, [], plan.small);
     const flatB = boardOf(flat), hungB = boardOf(hung);
-    const aim = plan.stair ? stairMiddle(plan.at, plan.heading) : plan.at;
-    const spot = placeSign(flatB, hungB, aim, plan.heading, walls, walkNear, placed, overhead, plan.stair);
+    const room = (p: P3) => overhead(p[0], p[1]).every((z) => z < p[2] + 0.5 || z > p[2] + 2.9);
+    const spot0 = plan.spots?.find(room);
+    const aim = plan.stair ? stairMiddle(plan.at, plan.heading) : plan.facing === "near" ? stairMiddle(spot0 ? [spot0[0], spot0[1], spot0[2] + 2.4] : plan.at, plan.heading, true) : plan.at;
+    const spot = placeSign(flatB, hungB, aim, plan.heading, walls, walkNear, placed, overhead, plan.facing ?? (plan.stair ? "near" : undefined));
     // On a wall it is fixed flat; hung from the ceiling, on its rods.
     const sign = spot.flat ? flat : hung;
     dispose(spot.flat ? hung : flat);
