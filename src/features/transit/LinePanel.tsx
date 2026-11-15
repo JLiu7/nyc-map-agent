@@ -206,9 +206,9 @@ export function LinePanel({ map, route, onFollow, trains = () => [] }: { map: Ma
                     style={{ borderColor: open ? "rgba(96,165,250,0.6)" : "rgba(148,163,184,0.16)", background: open ? "rgba(37,99,235,0.22)" : "rgba(15,23,42,0.35)" }}>
                     <NoticeIcon kind={noticeKind(`${n.title} ${n.body}`, { kind: n.alert?.kind ?? (n.tone === "delay" ? "delay" : undefined), reroute: n.alert?.reroute })} color={tone.dot} className="mt-[2px] h-4 w-4 shrink-0" />
                     <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      {/* Closed: one line each; the full text opens on tap. */}
-                      <span className={`font-semibold ${open ? "" : "truncate"}`}>{n.title}</span>
-                      {n.meta ? <span className={`text-[13px] text-[#cbd5e1] ${open ? "" : "truncate"}`}>{n.meta}</span> : null}
+                      {/* Closed: one line each; the full text opens on tap. An open alert keeps its one-line label: its card says it all, the dates too (#198). */}
+                      <span className={`font-semibold ${open && !n.alert ? "" : "truncate"}`}>{n.title}</span>
+                      {n.meta && !(open && n.alert?.period) ? <span className={`text-[13px] text-[#cbd5e1] ${open ? "" : "truncate"}`}>{n.meta}</span> : null}
                       {open && !n.alert && n.body !== n.title ? <span className="mt-1 whitespace-pre-line text-[13px] leading-[1.45] text-[#e2e8f0]">{n.body}</span> : null}
                     </span>
                     <span aria-hidden className="mt-0.5 text-[#a5b4cb] transition-transform" style={{ transform: `rotate(${open ? 180 : 0}deg)` }}>⌄</span>

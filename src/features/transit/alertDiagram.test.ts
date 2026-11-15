@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { alertDiagram, cleanAlertText, isGap, laterSteps, periodWords, shortNotice, shuttleCorners, travelTips, type AlertDiagram, type DiagramStop } from "./alertDiagram";
+import { alertDiagram, causeOf, cleanAlertText, hasMore, isGap, laterSteps, periodWords, plainSteps, shortNotice, shuttleCorners, travelTips, type AlertDiagram, type DiagramStop } from "./alertDiagram";
 import type { TransitAlert } from "./hooks";
 import type { StaticSystem } from "./model";
 
@@ -161,5 +161,111 @@ describe("notice text", () => {
   it("trims a long notice to its first sentences", () => {
     const text = "[A] trains are running with delays in both directions while we conduct track maintenance along the line in Manhattan. Planned work reminder: in Manhattan, uptown A local skips 72 St, 81 St and 86 St. Expect longer waits.";
     expect(shortNotice(text)).toBe("A trains are running with delays in both directions while we conduct track maintenance along the line in Manhattan.");
+  });
+});
+
+// Notices with nothing to draw, as the live site served them on 2026-11-14 (#198). The card and the voice
+// used to start from the description alone: "What's happening? Technical issue".
+describe("plainSteps", () => {
+  const notice = (over: Partial<TransitAlert>): TransitAlert => ({ id: "t", kind: "notice", type: "", reroute: false, text: "", agency: "MTASBWY", routes: ["1"], stops: [], ...over });
+  const lines = (a: TransitAlert, route: string) => plainSteps(a, sys, route).map((s) => s.text);
+
+  it("says which train, where and what changes before why and when", () => {
+    const a = notice({
+      type: "Information Outage", stops: ["117", "118", "119"], period: "Nov 14 - 16, Sat 12:01 AM to Mon 5:00 AM",
+      text: "Downtown [1] trains are stopping at 116 St-Columbia University, Cathedral Pkwy-110 St, and 103 St, but real-time arrival information may be unavailable",
+      description: "What's happening?\nTechnical issue",
+    });
+    expect(alertDiagram(a, sys, "1")).toBeNull();
+    expect(lines(a, "1")).toEqual([
+      "Downtown 1 trains are stopping at 116 Street-Columbia University, Cathedral Parkway-110 Street, and 103 Street.",
+      "Live arrival times may be missing there.",
+      "Why: Technical issue.",
+      "When: November 14 to 16, Saturday 12:01 AM to Monday 5:00 AM.",
+    ]);
+    // The first line lights the notice's own stations; the MTA's words add nothing, so no "Full notice".
+    expect(plainSteps(a, sys, "1")[0].ids).toEqual(["117", "118", "119"]);
+    expect(hasMore(a, false)).toBe(false);
+  });
+
+  it("keeps the headline when the description gives advice", () => {
+    const a = notice({
+      type: "Boarding Change", routes: ["M"], period: "Nov 14 - 16 and Nov 21 - 23, Sat 12:01 PM to Mon 5:00 AM",
+      text: "In Brooklyn, all [M] trains at Central Av and Knickerbocker Av board from the Manhattan-bound platform",
+      description: "Please listen carefully to announcements and check the destination displayed on the train before boarding.\n\nNote: No [M] between Myrtle Av (Broadway) and Delancey St-Essex St during this time.\n\nWhat's happening?\nWe're replacing tracks",
+    });
+    expect(lines(a, "M")).toEqual([
+      "In Brooklyn, all M trains at Central Avenue and Knickerbocker Avenue board from the Manhattan-bound platform.",
+      "Please listen carefully to announcements and check the destination displayed on the train before boarding.",
+      "Why: We're replacing tracks.",
+      "When: November 14 to 16 and November 21 to 23, Saturday 12:01 PM to Monday 5:00 AM.",
+    ]);
+    // The note about the M's other change is only in the MTA's words.
+    expect(hasMore(a, false)).toBe(true);
+  });
+
+  it("reads a run of line bullets as a list", () => {
+    const a = notice({
+      kind: "planned", type: "Reduced Service", routes: ["2", "3"], text: "[2][3] runs every 12 minutes",
+      description: "[2][3] service operates on a modified schedule because [1][2] and [3] trains are sharing a track in Manhattan.\n\nWhat's happening?\nStructural maintenance",
+    });
+    expect(lines(a, "2")).toEqual([
+      "2 and 3 runs every 12 minutes.",
+      "2 and 3 service operates on a modified schedule because 1, 2 and 3 trains are sharing a track in Manhattan.",
+      "Why: Structural maintenance.",
+    ]);
+  });
+
+  it("gives each headline line its own step, and a delay's reason from 'What Happened?'", () => {
+    const a = notice({
+      kind: "delay", type: "Delays", routes: ["A", "C", "E"],
+      text: "Uptown [C][E] trains are running with delays.\n[A] trains are running with delays in both directions.",
+      description: "What Happened?\nWe requested EMS for a person in need on a train at 42 St-Port Authority Bus Terminal\n.\nPlanned Work Reminder:\n \nIn Brooklyn and Lower Manhattan, no Inwood-bound [A] at High St, Fulton St, Chambers St, Canal St, and Spring St.",
+    });
+    expect(lines(a, "A")).toEqual([
+      "Uptown C and E trains are running with delays.",
+      "A trains are running with delays in both directions.",
+      "Why: We requested EMS for a person in need on a train at 42 Street-Port Authority Bus Terminal.",
+    ]);
+    // The planned work reminder stays one tap away.
+    expect(hasMore(a, false)).toBe(true);
+  });
+
+  it("says a headline once when there is no description, and no reason when the MTA gives none", () => {
+    const a = notice({ kind: "delay", type: "Delays", routes: ["4", "5"], text: "Downtown [4][5] trains are delayed while we request EMS for someone in need at 138 St-Grand Concourse." });
+    expect(lines(a, "4")).toEqual(["Downtown 4 and 5 trains are delayed while we request EMS for someone in need at 138 Street-Grand Concourse."]);
+    expect(hasMore(a, false)).toBe(false);
+    expect(causeOf("When crushed by train wheels, fallen leaves leave a slippery residue on the rails.")).toBe("");
+  });
+
+  it("starts a delay with the delay, not with the planned work its description recalls", () => {
+    const a = notice({
+      kind: "delay", type: "Delays", stops: ["116S"],
+      text: "Uptown [1] trains are running with delays after we conducted an investigation at 96 St.",
+      description: "Planned Work Reminder\nDowntown [1] skips 125 St.",
+      changes: [{ alertId: "t", route: "1", kind: "skip", names: ["125 St"], toward: "Downtown", notice: "Skipped Downtown-bound" }], skipNames: ["125 St"],
+    });
+    const d = alertDiagram(a, sys, "1")!;
+    expect(d.steps.map((s) => s.text)).toEqual([
+      "Uptown 1 trains are running with delays after we conducted an investigation at 96 Street.",
+      "Downtown 1 trains skip 125 Street.",
+    ]);
+  });
+
+  it("keeps a drawn notice's second headline line, after its opening step", () => {
+    const a = notice({
+      kind: "planned", type: "Planned - Stops Skipped", reroute: true, routes: ["7"], stops: [],
+      text: "In Queens, Flushing-bound [7] skips 52 St and 69 St\nAll trains at Woodside-61 St board from the Manhattan-bound platform",
+      changes: [{ alertId: "t", route: "7", kind: "skip", names: ["52 St", "69 St"], toward: "Flushing", notice: "Skipped Flushing-bound" }], skipNames: ["52 St", "69 St"],
+    });
+    expect(alertDiagram(a, sys, "7")!.steps.map((s) => s.text)).toEqual([
+      "Flushing-bound 7 trains skip 52 Street and 69 Street.",
+      "All trains at Woodside-61 Street board from the Manhattan-bound platform.",
+    ]);
+  });
+
+  it("adds the reason to a drawn notice, before when", () => {
+    const steps = laterSteps(notice({ kind: "planned", description: "For service to this station, take the [1] to 116 St.\n\nWhat's happening?\nWe're making station improvements\n\n[accessibility icon] This service change affects one or more ADA accessible stations.", period: "Through December 2026" }), sys, "1");
+    expect(steps.map((s) => s.text)).toEqual(["Why: We're making station improvements.", "When: Through December 2026."]);
   });
 });

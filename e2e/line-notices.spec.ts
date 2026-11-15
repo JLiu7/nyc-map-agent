@@ -132,6 +132,61 @@ for (const size of SIZES) {
   });
 }
 
+// Owner, 2026-11-14: a notice with nothing to draw said only "What's happening? Technical issue" and the dates,
+// "it doesn't say the other part, what train is it, what's affected". The card and the voice say all of it (#198).
+for (const size of SIZES) {
+  test(`a notice with nothing to draw says which train and stations, then why and when, at ${size.width}×${size.height}`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    // A voice that finishes each line at once, so the whole summary is spoken.
+    await page.addInitScript(() => {
+      const said: string[] = [];
+      Object.assign(window, { __said: said });
+      Object.defineProperty(window, "speechSynthesis", { configurable: true, value: {
+        speaking: false, paused: false, pending: false, getVoices: () => [], addEventListener: () => undefined, removeEventListener: () => undefined,
+        speak: (u: SpeechSynthesisUtterance) => { said.push(u.text); setTimeout(() => { u.onend?.(new Event("end") as SpeechSynthesisEvent); u.dispatchEvent(new Event("end")); }, 20); },
+        cancel: () => undefined, pause: () => undefined, resume: () => undefined,
+      } });
+    });
+    await mockNetwork(page);
+    const body = JSON.parse(liveNow()) as { alerts: { alerts: unknown[] } };
+    body.alerts.alerts.push({
+      id: "lmm:planned_work:e2e-info", kind: "notice", type: "Information Outage", reroute: false, agency: "MTASBWY", routes: ["2"], stops: ["127", "128"],
+      text: "Downtown [2] trains are stopping at Times Sq-42 St and 34 St-Penn Station, but real-time arrival information may be unavailable",
+      description: "What's happening?\nTechnical issue", period: "Nov 14 - 16, Sat 12:01 AM to Mon 5:00 AM", changes: [], skipNames: [],
+    });
+    await page.route("**/api/transit-live*", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(body) }));
+    await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: false }) }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "My train" }).click({ timeout: slow(15_000) });
+    await page.getByRole("button", { name: /^7 Avenue Express/ }).first().click({ timeout: slow(15_000) });
+    const panel = page.getByTestId("line-panel");
+    const notice = panel.locator("[data-notice]", { hasText: "real-time arrival" });
+    await notice.scrollIntoViewIfNeeded();
+    // Closed, the row carries the dates.
+    await expect(notice).toContainText("Nov 14 - 16");
+    await notice.click();
+
+    const walk = panel.getByTestId("notice-walk");
+    const summary = [
+      "Downtown 2 trains are stopping at Times Square-42 Street and 34 Street-Penn Station.",
+      "Live arrival times may be missing there.",
+      "Why: Technical issue.",
+      "When: November 14 to 16, Saturday 12:01 AM to Monday 5:00 AM.",
+    ];
+    await expect(walk.getByTestId("notice-step")).toHaveText(summary);
+    await expect(walk.getByTestId("notice-diagram")).toHaveCount(0);
+    // "Read it to me" is the same summary, start to end (the browser voice takes it in pieces, cut at each colon).
+    const packed = (t: string[]) => t.join("").replace(/\s+/g, "");
+    await expect.poll(async () => packed(await page.evaluate(() => (window as unknown as { __said: string[] }).__said)), { timeout: slow(10_000) }).toBe(packed(summary));
+    await expect(walk.getByRole("button", { name: "Read it to me" })).toBeVisible();
+    // Open, the row is a one-line label: the card has the dates, and the MTA's words add nothing here.
+    await expect(notice).not.toContainText("Nov 14 - 16");
+    expect((await notice.locator("span.font-semibold").boundingBox())!.height).toBeLessThan(30);
+    await expect(walk.getByRole("button", { name: "Full notice" })).toHaveCount(0);
+    await expectLayout(page);
+  });
+}
+
 /** A 2-line shuttle notice with the MTA's station notes, as the feed carries them (#55). */
 function shuttleAlert() {
   return {
