@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the phone is, without GPS</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<style>
+  html, body, #map { margin: 0; height: 100%; }
+  body { font: 16px/1.4 system-ui, sans-serif; color: #fff; background: #05070d; }
+  #panel { position: absolute; left: 20px; top: 20px; width: 300px; background: rgba(15, 23, 42, .92); border-radius: 18px; padding: 18px; box-shadow: 0 6px 24px rgba(0, 0, 0, .4); }
+  #panel h1 { font-size: 18px; margin: 0 0 4px; }
+  #chip { display: inline-block; margin: 6px 0 12px; padding: 5px 12px; border-radius: 999px; background: #1e293b; font-weight: 600; font-size: 14px; }
+  #chip.on { background: #14532d; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+  .big { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #off { margin-top: 12px; color: #fbbf24; font-weight: 600; min-height: 1.4em; }
+  .dot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dot span.tag { padding: 2px 9px; border-radius: 999px; background: #0f172a; font: 700 14px system-ui, sans-serif; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+  .dot span.pt { width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, .5); }
+  .truth { width: 16px; height: 16px; border-radius: 50%; background: #f59e0b; border: 3px solid #fff; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Where the phone is</h1>
+  <span id="chip">Waiting for the phone…</span>
+  <div class="grid">
+    <div><div class="label">Floor</div><div class="big" id="floor">–</div></div>
+    <div><div class="label">Heading</div><div class="big" id="heading">–</div></div>
+    <div><div class="label">Steps</div><div class="big" id="steps">0</div></div>
+    <div><div class="label">Walked</div><div class="big" id="metres">0 m</div></div>
+  </div>
+  <div id="off"></div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const letter = (deg) => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
+const map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/liberty", center: [-73.99, 40.74], zoom: 12 });
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+const el = document.createElement("div");
+el.className = "dot";
+el.innerHTML = '<span class="tag" id="tag">Floor –</span><span class="pt"></span>';
+const dot = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, 11] });
+const truthEl = document.createElement("div");
+truthEl.className = "truth";
+const truth = new maplibregl.Marker({ element: truthEl });
+let onMap = false, truthOn = false, framed = false, ready = false, pending = null;
+
+map.on("load", () => {
+  map.addSource("trail", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+  map.addLayer({ id: "trail", type: "line", source: "trail", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#22c55e", "line-width": 5 } });
+  ready = true;
+  if (pending) draw(pending);
+});
+
+function draw(s) {
+  if (!ready) { pending = s; return; }
+  if (s.lon == null) return;
+  $("chip").textContent = s.started ? "Location off · following by steps" : "Waiting for the phone…";
+  $("chip").className = s.started ? "on" : "";
+  $("floor").textContent = s.floor;
+  el.querySelector(".tag").textContent = "Floor " + s.floor;
+  $("steps").textContent = s.steps;
+  $("metres").textContent = Math.round(s.steps * 0.7) + " m";
+  $("heading").textContent = s.heading == null ? "–" : Math.round(s.heading) + "° " + letter(s.heading);
+  dot.setLngLat([s.lon, s.lat]);
+  if (!onMap) { dot.addTo(map); onMap = true; }
+  map.getSource("trail").setData({ type: "Feature", geometry: { type: "LineString", coordinates: s.trail || [] } });
+  if (s.steps === 0) framed = false;
+  if (!framed) { map.jumpTo({ center: [s.lon, s.lat], zoom: 19.5 }); framed = true; }
+  else map.easeTo({ center: [s.lon, s.lat], duration: 400 });
+  if (s.truth) {
+    truth.setLngLat(s.truth);
+    if (!truthOn) { truth.addTo(map); truthOn = true; }
+    $("off").textContent = "Location says: off by " + s.offBy + " m after " + s.steps + " steps";
+  } else {
+    if (truthOn) { truth.remove(); truthOn = false; }
+    $("off").textContent = "";
+  }
+}
+
+const source = new EventSource("watch");
+source.onmessage = (e) => { try { draw(JSON.parse(e.data)); } catch { /* skip a bad line */ } };
+</script>
+</body>
+</html>

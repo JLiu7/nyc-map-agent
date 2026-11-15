@@ -396,6 +396,52 @@ Blocked/uncertain:
 Next:
 - After pull request 193 merges and deploys, open the live site at /station-3d on a phone and a laptop and press Play
 
+### 2026-11-14 20:32:47 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["docs/demo/live-two-screen/"],"completed":["The laptop at the venue could not connect to the relay, so the phone page of the two-screen demo now shows its own map with the dot and trail (pull request 194)."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Walk with the phone page on a real iPhone, mirror it to the laptop, and note whether steps and compass register","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T20:32:47Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"4a55efb0d38248f539d5bff0c53b67c2d64a24f9fc46e89be8cddff21b93c085","request_id":"bad85cd4676640809cadc410d49a24f1","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The laptop at the venue could not connect to the relay, so the phone page of the two-screen demo now shows its own map with the dot and trail (pull request 194).
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- docs/demo/live-two-screen/
+
+Blocked/uncertain:
+- none
+
+Next:
+- Walk with the phone page on a real iPhone, mirror it to the laptop, and note whether steps and compass register
+
+### 2026-11-14 20:27:41 UTC — claude-code
+
+<!-- continuity:checkpoint {"agent":"claude-code","blocked":[],"changed":["docs/demo/live-two-screen/"],"completed":["The pitch had nothing on a laptop that moves as a phone is carried around; the two-screen demo (a relay, a phone page that follows by steps and compass after one location fix, and a screen page with the dot and trail) is now in docs/demo/live-two-screen (pull request 194)."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Walk with the phone page on a real iPhone and note whether steps and compass register, then how far Check with location says it drifted","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T20:27:41Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"3d1dd4b3f859a31b2880dd0e3729b91cea557b0056d2bf033fa31de172fd7320","request_id":"a24d214a32524ff4978a4ea797e3b80a","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The pitch had nothing on a laptop that moves as a phone is carried around; the two-screen demo (a relay, a phone page that follows by steps and compass after one location fix, and a screen page with the dot and trail) is now in docs/demo/live-two-screen (pull request 194).
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- docs/demo/live-two-screen/
+
+Blocked/uncertain:
+- none
+
+Next:
+- Walk with the phone page on a real iPhone and note whether steps and compass register, then how far Check with location says it drifted
+
 ### 2026-11-14 21:19:55 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
 
 <!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The follow-a-phone demo is served by the app at /live/phone.html and /live/screen.html with one code per phone and two in-memory routes; pull request 196 is open with auto-merge armed"],"decisions":["no new decisions"],"evidence":["Server tests pass with the new route tests (504 tests), the type check passes, and the pages showed a posted state when served with the API on a spare port; not walked on a real phone"],"next_action":"After pull request 196 merges and deploys, open /live/phone.html on an iPhone, type its code on /live/screen.html and walk ten steps","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-14T21:19:55Z"} -->
