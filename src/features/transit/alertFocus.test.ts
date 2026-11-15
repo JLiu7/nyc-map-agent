@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { alertGeometry, isSkipped, lineStatus, namedStations, skippedStations, stationChanges, suspendedBetween } from "./alertFocus";
+import { alertGeometry, isSkipped, namedStations, skippedStations, stationChanges, suspendedBetween } from "./alertFocus";
 import type { TransitAlert } from "./hooks";
 import type { StaticSystem } from "./model";
 
@@ -63,13 +63,6 @@ describe("alert focus geometry", () => {
   it("highlights the whole line for a line-wide delay", () => {
     const g = alertGeometry({ ...base, kind: "delay", reroute: false, routes: ["Q"] }, sub);
     expect(g.affected[0].coords).toHaveLength(sub.shapes.Q.c.length);
-  });
-  it("ranks line status: delays, then detour, then planned work", () => {
-    const d: TransitAlert = { ...base, kind: "delay", reroute: false, text: "Delays after a sick passenger" };
-    expect(lineStatus([], "F")).toBe("Good service");
-    expect(lineStatus([{ ...base, reroute: false }], "F")).toBe("Planned work");
-    expect(lineStatus([base], "F")).toBe("Detour");
-    expect(lineStatus([base, d], "F")).toBe("Delays");
   });
 });
 

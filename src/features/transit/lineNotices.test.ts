@@ -18,19 +18,19 @@ const sys = {
 const alert = (over: Partial<TransitAlert>): TransitAlert => ({ id: "x", kind: "notice", type: "", reroute: false, text: "", agency: "MTASBWY", routes: ["A"], stops: [], ...over });
 
 describe("lineNotices", () => {
-  it("keeps only this line's subway alerts, delays first, and rings a delay's named station", () => {
+  it("keeps only this line's subway alerts, the skip ahead of the delay, and rings a delay's named station", () => {
     const out = lineNotices("A", [
-      alert({ id: "w", kind: "planned", text: "Downtown [A] skips 34 St-Penn Station", stops: ["A28S"], skipNames: ["34 St-Penn Station"], period: "Sat and Sun" }),
       alert({ id: "d", kind: "delay", text: "[A] trains are delayed while we fix a signal problem at 42 St-Port Authority Bus Terminal.", start: 100 }),
+      alert({ id: "w", kind: "planned", text: "Downtown [A] skips 34 St-Penn Station", stops: ["A28S"], skipNames: ["34 St-Penn Station"], period: "Sat and Sun" }),
       alert({ id: "other", kind: "delay", routes: ["6"], text: "6 delays" }),
       alert({ id: "mnr", agency: "MNR", text: "A" }),
     ], [], sys, 200);
-    expect(out.map((n) => n.id)).toEqual(["d", "w"]);
-    expect(out[0].title).toContain("A trains are delayed");
-    expect(out[0].stations.map((s) => s.label)).toEqual(["Delays"]);
-    expect(out[0].stations[0].id).toBe("A27");
-    expect(out[1].meta).toBe("Planned work · Sat and Sun");
-    expect(out[1].stations).toEqual([{ id: "A28", name: "34 St-Penn Station", coord: [-73.993, 40.75], label: "34 St-Penn Station · Downtown skipped" }]);
+    expect(out.map((n) => n.id)).toEqual(["w", "d"]);
+    expect(out[1].title).toContain("A trains are delayed");
+    expect(out[1].stations.map((s) => s.label)).toEqual(["Delays"]);
+    expect(out[1].stations[0].id).toBe("A27");
+    expect(out[0].meta).toBe("Planned work · Sat and Sun");
+    expect(out[0].stations).toEqual([{ id: "A28", name: "34 St-Penn Station", coord: [-73.993, 40.75], label: "34 St-Penn Station · Downtown skipped" }]);
   });
 
   it("turns an elevator outage into an access notice ringed at its station", () => {

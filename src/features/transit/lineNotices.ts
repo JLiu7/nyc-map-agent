@@ -2,6 +2,7 @@ import type { HeldTrain } from "@/lib/transit/holds";
 import { lineOf } from "@/lib/transit/selectedLine";
 import { plainAlertText, stationsNamedIn, type TroubleStation } from "@/lib/transit/trouble";
 import { alertGeometry } from "./alertFocus";
+import { alertTrouble, byRank, RANK, type Trouble } from "./noticeRank";
 import type { Outage, TransitAlert } from "./hooks";
 import { stationOf, type StaticSystem } from "./model";
 
@@ -20,6 +21,12 @@ export interface LineNotice {
   meta: string;
   body: string;
   stations: NoticeStation[];
+  /** How disruptive, 1 the most (noticeRank.ts): the list is sorted by it. */
+  rank: number;
+  /** What it does to the trains; absent for an elevator or escalator. */
+  trouble?: Trouble;
+  /** When it starts, in seconds, when the feed says. */
+  start?: number;
   /** The MTA alert behind it, so the map can draw the affected stretch (alert focus). */
   alert?: TransitAlert;
 }
@@ -34,7 +41,6 @@ export const TONE: Record<NoticeTone, { dot: string; color: string; glow: string
 
 /** Most stations a notice rings; a whole-line notice rings none. */
 const MAX_RINGS = 12;
-const ORDER: Record<NoticeTone, number> = { delay: 0, work: 1, access: 2, notice: 3 };
 
 const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const day = (t: number) => new Date(t * 1000).toLocaleDateString([], { month: "short", day: "numeric" });
@@ -125,6 +131,7 @@ function outageNotice(list: Outage[], sys: StaticSystem): LineNotice | null {
     const until = o.back ? ` · until ${o.back}` : "";
     return {
       id: `outage:${o.id}`,
+      rank: RANK.outage,
       tone: "access",
       title: `${o.equipment} out at ${o.station}`,
       meta: `${where}${until}`,
@@ -139,6 +146,7 @@ function outageNotice(list: Outage[], sys: StaticSystem): LineNotice | null {
   const alternatives = [...new Set(list.map((x) => x.alternative).filter(Boolean))];
   return {
     id: `outage:${o.station}:${list.map((x) => x.id).join(",")}`,
+    rank: RANK.outage,
     tone: "access",
     title: `${equipmentWords(list)} out at ${o.station}`,
     meta: days.length === 1 ? `until ${days[0]}` : days.length ? `until ${days[0]} to ${days.at(-1)}` : "",
@@ -161,7 +169,8 @@ export function lineNotices(route: string, alerts: TransitAlert[], outages: Outa
     const meta = [a.direction, label, whenOf(a, nowS)].filter(Boolean).join(" · ");
     const body = a.description ? plainAlertText(a.description) : title;
     const rings = alertStations(a, sys, route, tone, stations);
-    out.push({ id: a.id, tone, title, meta, body, stations: rings.length > MAX_RINGS ? [] : rings, alert: a });
+    const trouble = alertTrouble(a, route);
+    out.push({ id: a.id, tone, title, meta, body, stations: rings.length > MAX_RINGS ? [] : rings, alert: a, trouble, rank: RANK[trouble], ...(a.start ? { start: a.start } : {}) });
   }
   // The MTA lists every unit on its own, often one per direction; the card is per station.
   const outageSeen = new Set<string>();
@@ -175,7 +184,7 @@ export function lineNotices(route: string, alerts: TransitAlert[], outages: Outa
     const n = outageNotice(list, sys);
     if (n) out.push(n);
   }
-  return out.sort((x, y) => ORDER[x.tone] - ORDER[y.tone]);
+  return byRank(out, nowS);
 }
 
 /**
@@ -203,12 +212,14 @@ export function heldNotices(route: string, held: Iterable<HeldTrain>, sys: Stati
         ? `The live feed shows this train stopped at ${name} for ${min} min, past its expected time.`
         : `The live feed shows this train has not reached ${name} for ${min} min; its arrival time keeps moving later.`,
       stations: [{ id: String(st.properties.id), name, coord: st.geometry.coordinates as [number, number], label: "Held" }],
+      rank: RANK.delay,
+      trouble: "delay",
     } });
   }
   return out.sort((a, b) => a.since - b.since).map((x) => x.notice);
 }
 
-/** Everything the line sheet lists for a line, held trains first; the Lines list counts the same. */
-export function allLineNotices(route: string, held: Iterable<HeldTrain>, alerts: TransitAlert[], outages: Outage[], sys: StaticSystem | undefined): LineNotice[] {
-  return [...heldNotices(route, held, sys), ...lineNotices(route, alerts, outages, sys)];
+/** Everything the line sheet lists for a line, most disruptive first, a held train ahead of other delays; the Lines list counts the same. */
+export function allLineNotices(route: string, held: Iterable<HeldTrain>, alerts: TransitAlert[], outages: Outage[], sys: StaticSystem | undefined, nowS = Date.now() / 1000): LineNotice[] {
+  return byRank([...heldNotices(route, held, sys, nowS), ...lineNotices(route, alerts, outages, sys, nowS)], nowS);
 }

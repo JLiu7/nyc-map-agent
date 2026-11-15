@@ -279,14 +279,3 @@ function suspension(g: AlertGeometry, sys: StaticSystem, route: string, [from, t
 export function endLabel(station: string, buses: string[], route: string): string {
   return buses.length ? `Transfer to the ${buses.join(" or ")} bus at ${station}` : `No ${route} past ${station}`;
 }
-
-/** Line status for the Lines drawer badge. */
-export type LineStatus = "Good service" | "Delays" | "Detour" | "Planned work";
-export function lineStatus(alerts: TransitAlert[], route: string): LineStatus {
-  const mine = alerts.filter((a) => a.routes.includes(route));
-  if (mine.some((a) => a.kind === "delay" && !/maintenance|track work/i.test(a.text))) return "Delays";
-  if (mine.some((a) => a.reroute)) return "Detour";
-  if (mine.some((a) => a.kind === "planned")) return "Planned work";
-  if (mine.some((a) => a.kind === "delay")) return "Delays";
-  return "Good service";
-}

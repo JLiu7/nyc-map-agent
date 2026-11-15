@@ -72,7 +72,7 @@
   {
     "name": "feature: transit layers (lazy)",
     "path": ".size-build/assets/layers-*.js",
-    "limit": "29.9 kB"
+    "limit": "31 kB"
   },
   {
     "name": "feature: line panel (lazy)",
@@ -102,7 +102,7 @@
   {
     "name": "feature: station walk (lazy, opens with Walk inside; Rapier physics inlines its WebAssembly)",
     "path": ".size-build/assets/StationWalkScene-*.js",
-    "limit": "709 kB"
+    "limit": "710 kB"
   },
   {
     "name": "feature: recorder page (lazy, loaded only at /record)",
