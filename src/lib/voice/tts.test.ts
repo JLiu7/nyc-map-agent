@@ -55,6 +55,9 @@ describe("voiceFor", () => {
     expect(voiceFor(v, "Toma el tren A.", "es-ES").voice?.name).toBe("Monica");
     expect(voiceFor(v, "Take the A train.").voice?.name).toBe("Samantha");
   });
+  it("reads an English answer that names a Chinese button in the English voice", () => {
+    expect(voiceFor(v, "I need a starting point. Tap 使用我的位置 under my reply.", "en-US")).toEqual({ voice: v[0], lang: "en-US" });
+  });
 });
 
 describe("speakQueued", () => {

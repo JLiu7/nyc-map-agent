@@ -1,3 +1,4 @@
+import { mainScript } from "./tts";
 /**
  * The answer read aloud by Kokoro through POST /api/tts (#37), instead of the browser's own voice.
  * The server streams 16-bit mono PCM; each piece is queued on a Web Audio clock as it arrives, so
@@ -9,14 +10,14 @@
 
 /** The app's languages Kokoro has a voice for (the server's TTS_LANGS). */
 const LANGS = new Set(["en", "es", "fr", "zh"]);
-const OTHER_SCRIPT = /[ऀ-ॿঀ-৿؀-ۿ가-힯Ѐ-ӿ]/;
 const RETRY_AFTER_MS = 60_000;
 let downUntil = 0;
 
 /** The Kokoro language to say `text` in, or null when the browser voice should (another script, or a language Kokoro lacks). Pure. */
 export function kokoroLang(text: string, lang?: string | null): string | null {
-  if (OTHER_SCRIPT.test(text)) return null;
-  if (/[一-鿿]/.test(text)) return "zh";
+  // The text's main writing system decides, not one stray word in another (see mainScript).
+  const script = mainScript(text);
+  if (script) return script.borrow === "zh-CN" ? "zh" : null;
   const base = (lang || (typeof navigator === "undefined" ? "en" : navigator.language) || "en").slice(0, 2).toLowerCase();
   return LANGS.has(base) ? base : null;
 }

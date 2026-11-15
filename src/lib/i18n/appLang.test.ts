@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appLangOf, resolveAppLang, tr } from "./appLang";
+import { appLangOf, getAppLang, leaveAskedScript, resolveAppLang, setAskedLang, tr } from "./appLang";
 
 describe("app language", () => {
   it("takes the base of a browser tag the app has text for", () => {
@@ -22,5 +22,17 @@ describe("app language", () => {
       expect(tr(lang, "getOffAt")).toContain("{s}");
       expect(tr(lang, "nStops")).toContain("{n}");
     }
+  });
+  it("lets go of a Chinese question's language when the next question is English", () => {
+    setAskedLang("zh");
+    leaveAskedScript("从富尔顿街怎么去59街");
+    expect(getAppLang()).toBe("zh");
+    leaveAskedScript("How do I get to 59 St from Fulton St?");
+    expect(getAppLang()).not.toBe("zh");
+  });
+  it("keeps Spanish when the next question is in plain letters", () => {
+    setAskedLang("es");
+    leaveAskedScript("Como llego a 59 St");
+    expect(getAppLang()).toBe("es");
   });
 });

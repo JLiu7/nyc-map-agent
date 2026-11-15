@@ -10,6 +10,9 @@ describe("kokoro", () => {
     expect(kokoroLang("Pran tren 4 la.", "ht")).toBeNull();
     expect(kokoroLang("Садитесь на поезд 4.", "ru")).toBeNull();
     expect(kokoroLang("4번 열차를 타세요.", "en")).toBeNull();
+    // An English answer naming a Chinese button stays English; a Chinese one naming a station stays Chinese.
+    expect(kokoroLang("I need a starting point. Tap 使用我的位置 under my reply, or type the address.", "en-US")).toBe("en");
+    expect(kokoroLang("从 Fulton St 站坐 A 线往上城方向，到 59 St-Columbus Circle 下车。", "en-US")).toBe("zh");
   });
 
   it("turns 16-bit little-endian samples into floats and drops an odd last byte", () => {

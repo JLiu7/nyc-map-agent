@@ -30,6 +30,19 @@ export function setAskedLang(lang: AppLang): void {
   for (const l of listeners) l();
 }
 
+/**
+ * A question plainly in the Latin alphabet after one in Chinese, Russian, Bengali or Korean: that
+ * language no longer holds, so the app goes back to the browser's (owner's partner, 2026-11-12: an
+ * English question after a Chinese one was answered with Chinese buttons and a Chinese voice).
+ */
+export function leaveAskedScript(question: string): void {
+  if (!asked || !NON_LATIN.has(asked) || !/[A-Za-z]{2,}/.test(question) || /[\u0400-\u04FF\u0980-\u09FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(question)) return;
+  asked = null;
+  try { globalThis.localStorage?.removeItem(ASKED_KEY); } catch { /* storage blocked */ }
+  for (const l of listeners) l();
+}
+const NON_LATIN = new Set<AppLang>(["zh", "ru", "bn", "ko"]);
+
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
 const browser = () => appLangOf(typeof navigator === "undefined" ? undefined : navigator.language);
 

@@ -22,7 +22,7 @@ export function spokenSummary(text: string, max = 240): string {
   }
   // The pointer to the screen is English: a Nepali or Arabic answer read by a borrowed voice would end in
   // English it cannot say, so those answers stop at the summary (owner report, 2026-10-27).
-  const otherScript = SCRIPTS.some((s) => s.re.test(out));
+  const otherScript = mainScript(out) !== null;
   return out.length < plain.length - 5 && !otherScript ? `${out} The details are on screen.` : out;
 }
 
@@ -34,14 +34,32 @@ export const pickVoice = (v: SpeechSynthesisVoice[], lang = "en-US") => {
 };
 
 /** Writing systems a voice must read, and the language whose voice to borrow when none speaks the text's own. */
-const SCRIPTS: Array<{ re: RegExp; langs: string[]; borrow: string }> = [
+const SCRIPTS: Array<{ re: RegExp; langs: string[]; borrow: string; dense?: boolean }> = [
   { re: /[\u0900-\u097F]/, langs: ["hi", "ne", "mr"], borrow: "hi-IN" },
   { re: /[\u0980-\u09FF]/, langs: ["bn"], borrow: "bn-IN" },
   { re: /[\u0600-\u06FF]/, langs: ["ar", "ur", "fa"], borrow: "ar-SA" },
-  { re: /[\uAC00-\uD7AF]/, langs: ["ko"], borrow: "ko-KR" },
-  { re: /[\u4E00-\u9FFF]/, langs: ["zh", "ja"], borrow: "zh-CN" },
+  { re: /[\uAC00-\uD7AF]/, langs: ["ko"], borrow: "ko-KR", dense: true },
+  { re: /[\u4E00-\u9FFF]/, langs: ["zh", "ja"], borrow: "zh-CN", dense: true },
   { re: /[\u0400-\u04FF]/, langs: ["ru", "uk"], borrow: "ru-RU" },
 ];
+
+/**
+ * The writing system most of `text` is in, when it is not the Latin alphabet; null for Latin text.
+ * An English answer that names a Chinese button ("Tap 使用我的位置") was read whole by the Chinese
+ * voice (owner's partner, 2026-11-12), so one stray word no longer decides. A Chinese or Korean
+ * character is about a word, so those count against Latin words; other scripts against Latin letters.
+ */
+export function mainScript(text: string): (typeof SCRIPTS)[number] | null {
+  const letters = (text.match(/[A-Za-z\u00C0-\u024F]/g) ?? []).length;
+  const words = (text.match(/[A-Za-z\u00C0-\u024F]+/g) ?? []).length;
+  let best: (typeof SCRIPTS)[number] | null = null, lead = 0;
+  for (const s of SCRIPTS) {
+    const n = (text.match(new RegExp(s.re.source, "g")) ?? []).length;
+    const over = n / Math.max(s.dense ? words : letters, 1);
+    if (n > 0 && over >= 1 && over > lead) { best = s; lead = over; }
+  }
+  return best;
+}
 
 /**
  * The voice and language to say `text` in (owner, 2026-10-26). A Nepali answer was read by the English voice:
@@ -50,7 +68,7 @@ const SCRIPTS: Array<{ re: RegExp; langs: string[]; borrow: string }> = [
  * borrowed: Hindi reads Nepali and Marathi, which share Devanagari.
  */
 export function voiceFor(v: SpeechSynthesisVoice[], text: string, lang = "en-US"): { voice?: SpeechSynthesisVoice; lang: string } {
-  const script = SCRIPTS.find((s) => s.re.test(text));
+  const script = mainScript(text);
   const base = lang.split("-")[0].toLowerCase();
   const tag = script && !script.langs.includes(base) ? script.borrow : lang;
   const voice = pickVoice(v, tag);

@@ -80,7 +80,7 @@ import { useStationHelpVisible } from "@/lib/underground/stationHelp";
 import { noteTrip, openLostHelper, sendToLost, useLostHelper } from "@/lib/underground/lostHelper";
 import { applyStep, statusLine, type AgentStep } from "./agentSteps";
 import { detectLang, speechTag, statusLang } from "./statusLines";
-import { getAppLang, setAskedLang, tr, useAppLang } from "@/lib/i18n/appLang";
+import { getAppLang, leaveAskedScript, setAskedLang, tr, useAppLang } from "@/lib/i18n/appLang";
 import { languageList, languagePrompt, matchSpokenLanguage } from "@/lib/voice/languagePrompt";
 import { needsSharedOrigin, ORIGIN_PROMPT, replyAsksForOrigin } from "./needsOrigin";
 import { framePadding, frameRestrooms } from "@/lib/map/mapCover";
@@ -263,7 +263,9 @@ export default function AgentOverlay() {
       setLangAsked(false);
       void send(t);
     },
-    lang: home ? lang : undefined,
+    // The mic listens in the app's language: picked, else the one last asked in, else the browser's.
+    // It used only the picked one, so Chinese said after a Chinese question was heard as English (2026-11-12).
+    lang: home ? speechTag(appLang, lang) : undefined,
     // No language picked: detect it from the voice, so anyone can just speak (2026-10-25).
     detectLang: home && storedLang === null,
   });
@@ -470,6 +472,7 @@ export default function AgentOverlay() {
     // A question clearly in another language switches the app's own text to it (unless one is picked in the menu).
     const asked = heard ?? detectLang(q);
     if (asked) setAskedLang(asked);
+    else leaveAskedScript(q);
     const statusTimer = home && byVoice ? window.setTimeout(() => speech.speak(statusLine(stepsRef.current, sayIn), { lang: speechTag(sayIn, lang) }), STATUS_AFTER_MS) : undefined;
     try {
       const memory = home ? memorySummary() : null;
@@ -517,7 +520,7 @@ export default function AgentOverlay() {
     }
     // Short spoken answer; the full detail stays on screen. In hands-free the
     // person can talk over it to interrupt.
-    if (spoken) speech.speak(spokenSummary(nameLocationButton(nameRemindButton(spoken, replyActions, tr(getAppLang(), "remindMe")), offersLocation, tr(getAppLang(), "useMyLocation"))), { bargeIn: handsFree, ...(heard ? { lang: heard } : {}) });
+    if (spoken) speech.speak(spokenSummary(nameLocationButton(nameRemindButton(spoken, replyActions, tr(getAppLang(), "remindMe")), offersLocation, tr(getAppLang(), "useMyLocation"))), { bargeIn: handsFree, lang: heard ?? speechTag(getAppLang(), lang) });
   }, [mode, setChatOpen, speech, askReq, handsFree, closeAll, home, lang, stopPlayer]);
 
   /** Exit: the answer stops where it is. No more text, map moves, trip or speech from it (owner, 2026-10-27). */
