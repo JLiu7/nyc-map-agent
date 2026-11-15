@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandLabel, byPlatform, clock, directions, dowOf, grid, percent, routeTotals, schedOf, short, stretches, type CoverageRow, type Segment } from "./summary";
+import { bandLabel, byPlatform, clock, directions, dowOf, grid, percent, routeTotals, schedOf, short, stationLines, stationTotals, complexes, spanLearned, hoursOf, stretches, type CoverageRow, type Segment, type StationInfo } from "./summary";
 
 const row = (system: "subway" | "bus", route: string, sched: number, band: number, segments: number, solid: number, samples: number): CoverageRow => ({ system, route, sched, band, segments, used: segments, solid, samples });
 const ROWS = [
@@ -73,5 +73,54 @@ describe("labels", () => {
     expect([percent(0.678), percent(null)]).toEqual(["68%", "–"]);
     expect([bandLabel([0, 4]), bandLabel([20, 23])]).toEqual(["00–05", "20–24"]);
     expect([schedOf(3), schedOf(6), schedOf(7), dowOf(1), dowOf(6)]).toEqual([1, 6, 7, 3, 6]);
+  });
+});
+
+describe("stations", () => {
+  const t = (_line: string, dir: number, from: string, to: string, n: number, median = 90): Segment => ({ dir, from, to, kind: "travel", n, median });
+  const st = (id: string, name: string, lon: number, lat = 40.75): StationInfo => ({ id, name, lon, lat, routes: [] });
+
+  it("groups stations of one name that stand together, and keeps far ones apart", () => {
+    const key = complexes([st("R16", "Times Sq-42 St", -73.9868), st("127", "Times Sq-42 St", -73.9875), st("725", "Times Sq-42 St", -73.9877), st("A27", "42 St-Port Authority", -73.9897), st("626", "86 St", -73.9558, 40.7795), st("121", "86 St", -73.9763, 40.7888)]);
+    expect([key.get("127"), key.get("725"), key.get("R16")]).toEqual(["127", "127", "127"]);
+    expect([key.get("A27"), key.get("626"), key.get("121")]).toEqual(["A27", "626", "121"]);
+  });
+
+  it("gives each line and direction its dwell and the stretches in and out, keeping the best-sampled", () => {
+    const rows = {
+      "1": [t("1", 0, "126N", "127N", 40, 86), t("1", 0, "127N", "128N", 38, 147), { dir: 0, from: "127N", to: "127N", kind: "dwell" as const, n: 30, median: 45 }, t("1", 1, "128S", "127S", 3)],
+      "2": [t("2", 0, "123N", "127N", 12, 200), t("2", 0, "120N", "127N", 4, 300), t("2", 0, "200N", "201N", 9)],
+    };
+    const lines = stationLines(rows, (s) => s.startsWith("127"));
+    expect(lines).toEqual([
+      { route: "1", dir: 0, stop: "127N", prev: { stop: "126N", median: 86, n: 40 }, next: { stop: "128N", median: 147, n: 38 }, dwell: { median: 45, n: 30 } },
+      { route: "1", dir: 1, stop: "127S", prev: { stop: "128S", median: 90, n: 3 } },
+      { route: "2", dir: 0, stop: "127N", prev: { stop: "123N", median: 200, n: 12 } },
+    ]);
+  });
+
+  it("lists stations least-learned first, with a station that has nothing at the top", () => {
+    const rows = { "1": [t("1", 0, "126N", "127N", 40), t("1", 0, "127N", "128N", 3), t("1", 1, "128S", "127S", 2)] };
+    const stations = ["126", "127", "128", "129"].map((id) => ({ key: id, name: `St ${id}`, routes: ["1"] }));
+    const out = stationTotals(rows, stations, (s) => s.replace(/[NS]$/, ""));
+    expect(out.map((s) => [s.key, s.lines, s.thin, s.samples])).toEqual([["129", 0, 0, 0], ["128", 2, 2, 5], ["126", 1, 0, 40], ["127", 2, 2, 45]]);
+  });
+});
+
+describe("spanLearned", () => {
+  const t = (dir: number, from: string, to: string, n: number, median: number): Segment => ({ dir, from, to, kind: "travel", n, median });
+  it("adds our stretches from one timepoint to the next, and reports the thinnest", () => {
+    const segs = [t(0, "1", "2", 9, 60), t(0, "2", "3", 3, 70), t(0, "3", "4", 8, 80), t(0, "2", "4", 1, 500), t(1, "4", "3", 9, 75)];
+    expect(spanLearned(segs, "1", "4")).toEqual({ seconds: 210, stretches: 3, least: 3 });
+    expect(spanLearned(segs, "4", "3")).toEqual({ seconds: 75, stretches: 1, least: 9 });
+  });
+  it("is undefined when the chain breaks or loops before the target", () => {
+    expect(spanLearned([t(0, "1", "2", 9, 60), t(0, "3", "4", 9, 60)], "1", "4")).toBeUndefined();
+    expect(spanLearned([t(0, "1", "2", 9, 60), t(0, "2", "1", 9, 60)], "1", "4")).toBeUndefined();
+  });
+  it("fills a schedule's 24 hours", () => {
+    const h = hoursOf([{ sched: 1, hour: 8, segments: 60, solid: 50, enough: 44, samples: 900 }], 1);
+    expect(h).toHaveLength(24);
+    expect([h[8].samples, h[9].samples]).toEqual([900, 0]);
   });
 });

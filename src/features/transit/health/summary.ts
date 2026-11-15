@@ -109,3 +109,125 @@ export function short(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 export const percent = (x: number | null | undefined) => (x == null ? "–" : `${Math.round(x * 100)}%`);
+
+export type StationInfo = { id: string; name: string; lon: number; lat: number; routes: string[] };
+const metres = (a: StationInfo, b: StationInfo) => Math.hypot((a.lon - b.lon) * 111_320 * Math.cos((a.lat * Math.PI) / 180), (a.lat - b.lat) * 111_320);
+
+/**
+ * Stations grouped into complexes: the same name within 400 m is one place (Times Sq-42 St is four
+ * station ids). The same name further apart (the many "86 St") stays separate. Returns each
+ * station id's group key, the lowest id in its group.
+ */
+export function complexes(stations: StationInfo[]): Map<string, string> {
+  const key = new Map<string, string>();
+  const sorted = [...stations].sort((a, b) => a.id.localeCompare(b.id));
+  for (const s of sorted) {
+    const mate = sorted.find((o) => key.has(o.id) && o.name === s.name && metres(o, s) < 400);
+    key.set(s.id, mate ? key.get(mate.id)! : s.id);
+  }
+  return key;
+}
+
+type Timed = { stop: string; median: number; n: number };
+/** One line and direction at a station: the dwell there, and the stretch in from the previous stop and out to the next. */
+export type StationLine = { route: string; dir: number; stop: string; dwell?: { median: number; n: number }; prev?: Timed; next?: Timed };
+
+/**
+ * What is learned at a station, per line and direction. `here` says whether a stop id belongs to the
+ * station. With several stretches into or out of it on one line (express and local), the best-sampled is kept.
+ */
+export function stationLines(byRoute: Record<string, Segment[]>, here: (stop: string) => boolean): StationLine[] {
+  const out = new Map<string, StationLine>();
+  const line = (route: string, dir: number, stop: string) => {
+    const k = `${route}|${dir}`;
+    let l = out.get(k);
+    if (!l) out.set(k, (l = { route, dir, stop }));
+    return l;
+  };
+  for (const [route, rows] of Object.entries(byRoute)) {
+    for (const s of rows) {
+      if (s.kind === "dwell") {
+        if (here(s.from)) line(route, s.dir, s.from).dwell = { median: s.median, n: s.n };
+        continue;
+      }
+      if (here(s.to) && !here(s.from)) {
+        const l = line(route, s.dir, s.to);
+        if (!l.prev || s.n > l.prev.n) l.prev = { stop: s.from, median: s.median, n: s.n };
+      }
+      if (here(s.from) && !here(s.to)) {
+        const l = line(route, s.dir, s.from);
+        if (!l.next || s.n > l.next.n) l.next = { stop: s.to, median: s.median, n: s.n };
+      }
+    }
+  }
+  return [...out.values()].sort((a, b) => a.route.localeCompare(b.route, "en", { numeric: true }) || a.dir - b.dir);
+}
+
+export type StationTotal = { key: string; name: string; routes: string[]; lines: number; thin: number; samples: number };
+/**
+ * Every station with how much is learned there, least first, so stations with little or no data
+ * lead the list. `lines` counts line-directions with a learned stretch; `thin` those with a
+ * stretch in or out that has under 5 samples; `samples` adds the stretches in and out.
+ */
+export function stationTotals(byRoute: Record<string, Segment[]>, stations: Array<{ key: string; name: string; routes: string[] }>, keyOf: (stop: string) => string | undefined): StationTotal[] {
+  const totals = new Map<string, StationTotal>(stations.map((s) => [s.key, { key: s.key, name: s.name, routes: s.routes, lines: 0, thin: 0, samples: 0 }]));
+  const least = new Map<string, number>();
+  for (const [route, rows] of Object.entries(byRoute)) {
+    for (const s of rows) {
+      if (s.kind !== "travel") continue;
+      for (const key of new Set([keyOf(s.from), keyOf(s.to)])) {
+        const t = key === undefined ? undefined : totals.get(key);
+        if (!t) continue;
+        t.samples += s.n;
+        const k = `${key}|${route}|${s.dir}`;
+        least.set(k, Math.min(least.get(k) ?? Infinity, s.n));
+      }
+    }
+  }
+  for (const [k, n] of least) {
+    const t = totals.get(k.split("|")[0])!;
+    t.lines++;
+    if (n < 5) t.thin++;
+  }
+  return [...totals.values()].sort((a, b) => a.samples - b.samples || b.thin - a.thin || a.name.localeCompare(b.name));
+}
+
+export type Span = { seconds: number; stretches: number; least: number };
+/**
+ * Our learned time from one stop to a later one, by following the best-sampled stretch out of
+ * each stop until the target (at most 80 hops). Undefined when the chain does not reach it. Used
+ * to set our stop-to-stop times beside the MTA's timepoint-to-timepoint average, which spans
+ * several stops. Both count the time spent at the stops in between.
+ */
+export function spanLearned(segments: Segment[], from: string, to: string): Span | undefined {
+  const out = new Map<string, Segment>();
+  for (const s of segments) {
+    if (s.kind !== "travel") continue;
+    const cur = out.get(`${s.dir}|${s.from}`);
+    if (!cur || s.n > cur.n) out.set(`${s.dir}|${s.from}`, s);
+  }
+  let best: Span | undefined;
+  for (const dir of directions(segments)) {
+    let at = from, seconds = 0, least = Infinity;
+    const seen = new Set<string>();
+    for (let hops = 1; hops <= 80; hops++) {
+      const s = out.get(`${dir}|${at}`);
+      if (!s || seen.has(at)) break;
+      seen.add(at);
+      seconds += s.median;
+      least = Math.min(least, s.n);
+      if (s.to === to) {
+        if (!best || hops < best.stretches) best = { seconds, stretches: hops, least };
+        break;
+      }
+      at = s.to;
+    }
+  }
+  return best;
+}
+
+export type HourCell = { sched: number; hour: number; segments: number; solid: number; enough: number; samples: number };
+/** Every hour of a schedule, with zeros where the endpoint had no row. */
+export function hoursOf(cells: HourCell[], sched: number): HourCell[] {
+  return Array.from({ length: 24 }, (_, hour) => cells.find((c) => c.sched === sched && c.hour === hour) ?? { sched, hour, segments: 0, solid: 0, enough: 0, samples: 0 });
+}
