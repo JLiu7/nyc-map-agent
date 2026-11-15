@@ -1,4 +1,16 @@
+import { formatStreetText } from "@/lib/streetName";
 import type { TransitAlert } from "./hooks";
+
+/**
+ * The followed bus's next stop, by name, for the mini map. The trip's own first call when it has
+ * loaded (the stop the follow card shows), else the route's stop with the id the live feed gives
+ * ("405056" in the feed, "MTA_405056" on the route). Null when neither names it: never a bare id.
+ */
+export function busNextName(firstCall: string | undefined, stops: ReadonlyArray<{ id: string; name: string }> | undefined, next: string | undefined): string | null {
+  const bare = (id: string) => id.replace(/^MTA_/, "");
+  const name = firstCall || (next ? stops?.find((st) => bare(st.id) === bare(next))?.name : undefined);
+  return name ? formatStreetText(name) : null;
+}
 
 /** Delays and notices for one route. A detour that is not planned work counts as a delay. */
 export function classifyRouteAlerts(alerts: TransitAlert[], route: string): { delays: TransitAlert[]; notices: TransitAlert[] } {

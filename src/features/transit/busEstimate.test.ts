@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BusEstimator, buildShape, deadReckon, legMotion, pointAt, project, slerpBearing, speedFromTravel, type LonLat, type RouteGeom } from "./busEstimate";
+import { BusEstimator, buildShape, deadReckon, legMotion, pointAt, project, slerpBearing, speedFromTravel, type BusReport, type LonLat, type RouteGeom } from "./busEstimate";
+import layover from "./busLayover.fixture.json";
 
 // A straight 2 km line heading north along a meridian, stops every 400 m.
 const LAT0 = 40.7, LON0 = -73.99, M = 1 / 111_320;
@@ -86,18 +87,18 @@ describe("BusEstimator", () => {
     for (let i = 1; i < s.length; i++) expect(s[i]).toBeGreaterThanOrEqual(s[i - 1] - 1e-6);
   });
 
-  it("fades and jumps when more than 150 m ahead of a report", () => {
+  it("turns round, without a jump, when the bus really goes back the way it came", () => {
     const e = mk();
     e.report({ id: "b", route: "M1", ...at(1000), bearing: 0, t: 0 }, 0);
-    e.frame("b", 0);
-    e.report({ id: "b", route: "M1", ...at(700), bearing: 0, t: 1 }, 1);
-    e.frame("b", 1.2);
-    const f1 = e.frame("b", 1.3)!;
-    expect(f1.alpha).toBeLessThan(1);
-    let f = f1;
-    for (let t = 1.3; t < 3; t += 1 / 15) f = e.frame("b", t)!;
-    expect(sOf(f.lat)).toBeLessThan(800);
-    expect(f.alpha).toBeGreaterThan(0.5);
+    const before = sim(e, "b", 0, 30).pop()!;
+    e.report({ id: "b", route: "M1", ...at(700), bearing: 0, t: 30 }, 30);
+    const s = [before, ...sim(e, "b", 30, 90)];
+    for (let i = 1; i < s.length; i++) {
+      expect(s[i]).toBeLessThanOrEqual(s[i - 1] + 1e-6); // heading south now
+      expect(s[i - 1] - s[i]).toBeLessThan(3);
+    }
+    expect(s[s.length - 1]).toBeLessThan(700);
+    expect(e.frame("b", 90)!.alpha).toBe(1);
   });
 
   it("estimates speed from the last two reports, clamped", () => {
@@ -123,10 +124,115 @@ describe("BusEstimator", () => {
     expect(sOf(e.frame("s", 10)!.lat)).toBeLessThan(1000);
   });
 
+  it("turns a bus the right way once it moves, when the feed's bearing had it backward", () => {
+    const e = mk();
+    // The feed says south; the bus creeps north, 25 m a report.
+    for (let i = 0; i < 6; i++) e.report({ id: "b", route: "M1", ...at(1000 + 25 * i), bearing: 180, t: 30 * i }, 30 * i);
+    const s = sim(e, "b", 150, 170);
+    expect(s[s.length - 1]).toBeGreaterThan(1100);
+    expect(e.frame("b", 170)!.bearing).toBeCloseTo(0, 0);
+  });
+
   it("falls back (undefined) for routes without a shape", () => {
     const e = mk();
     expect(e.report({ id: "x", route: "Q99", ...at(0), bearing: 0, t: 0 })).toBe(false);
     expect(e.frame("x")).toBeUndefined();
+  });
+});
+
+// What the app drew for a real bus: its frames between the times its reports arrived.
+type Seen = BusReport & { seen: number };
+type Drawn = { t: number; lon: number; lat: number; bearing: number; alpha: number; shape: number; disp: number };
+function replay(reports: Seen[], id: string, until = Infinity): Drawn[] {
+  const e = new BusEstimator();
+  e.setRoute(layover.route as RouteGeom);
+  const mine = reports.filter((r) => r.id === id && r.t <= until);
+  const out: Drawn[] = [];
+  mine.forEach((r, i) => {
+    e.report(r, r.seen);
+    const end = i + 1 < mine.length ? mine[i + 1].seen : r.seen + 20;
+    for (let t = r.seen; t < end; t += 0.2) {
+      const f = e.frame(id, t)!;
+      const st = (e as unknown as { state: Map<string, { shape: number; disp: number }> }).state.get(id)!;
+      out.push({ t, ...f, shape: st.shape, disp: st.disp });
+    }
+  });
+  return out;
+}
+const gap = (a: { lon: number; lat: number }, b: { lon: number; lat: number }) => Math.hypot((a.lon - b.lon) * 111_320 * Math.cos((40.715 * Math.PI) / 180), (a.lat - b.lat) * 111_320);
+
+describe("a bus waiting at its terminal (M22 at Battery Park City, recorded 2026-11-14)", () => {
+  const reports = layover.reports as Seen[];
+  const WAITING = "MTA NYCT_9673", LEFT_AT = 1794708032; // its last report before it pulled out
+  const ARRIVING = "MTA NYCT_7585";
+
+  it("holds the waiting bus near where it is parked, whatever its compass says", () => {
+    const fixes = reports.filter((r) => r.id === WAITING && r.t <= LEFT_AT);
+    expect(fixes.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(fixes.map((r) => Math.round(r.bearing ?? 0))).size).toBeGreaterThan(1); // the bearing swings while parked
+    for (const f of replay(reports, WAITING, LEFT_AT)) {
+      expect(f.alpha).toBe(1);
+      expect(f.shape).toBe(0);
+      expect(Math.min(...fixes.map((r) => gap(f, r)))).toBeLessThan(90);
+    }
+  });
+
+  it("never draws the bus jumping, or going back along its route, from the wait through pulling out", () => {
+    const frames = replay(reports, WAITING);
+    expect(frames.length).toBeGreaterThan(2000);
+    let seen = frames[0];
+    for (const f of frames.slice(1)) {
+      if (f.alpha < 0.05) continue;
+      // Between two frames the rider can see, the bus covers at most what a bus could drive.
+      expect(gap(f, seen)).toBeLessThan(5 + 30 * (f.t - seen.t));
+      if (f.shape === seen.shape) expect(f.disp).toBeGreaterThanOrEqual(seen.disp - 1e-6);
+      seen = f;
+    }
+    // It did pull out: it ends well up the route from the terminal.
+    expect(gap(frames[frames.length - 1], frames[0])).toBeGreaterThan(400);
+  });
+
+  it("faces the arriving bus the way it drives round the loop, not the way its compass points", () => {
+    // On Murray Street the bus drives east; the feed's bearing said north (3 and 353 degrees).
+    const frames = replay(reports, ARRIVING);
+    const MURRAY_EAST = 22; // the loop piece (line 11), in the order the bus drives it
+    expect(frames[frames.length - 1].shape).toBe(MURRAY_EAST);
+    const onMurray = frames.find((f) => f.shape === MURRAY_EAST && f.alpha === 1)!;
+    expect(onMurray.bearing).toBeGreaterThan(60);
+    expect(onMurray.bearing).toBeLessThan(140);
+  });
+});
+
+describe("a route that comes back down the street it went up", () => {
+  // North 500 m, round a small block, then south again along the same street.
+  const P = (x: number, y: number): LonLat => [LON0 + x / (111_320 * Math.cos((LAT0 * Math.PI) / 180)), LAT0 + y * M];
+  const loop: LonLat[] = [...Array.from({ length: 6 }, (_, i) => P(0, i * 100)), P(60, 500), P(60, 560), P(0, 560), ...Array.from({ length: 6 }, (_, i) => P(0, 500 - i * 100))];
+  const g: RouteGeom = { route: "M9", lines: [loop], stops: [] };
+  const fix = (x: number, y: number) => { const [lon, lat] = P(x, y); return { lon, lat }; };
+
+  it("keeps a bus on the pass it is driving: distance along the route never falls", () => {
+    const e = new BusEstimator();
+    e.setRoute(g);
+    const path: Array<[number, number]> = [[2, 200], [2, 350], [3, 480], [58, 530], [20, 562], [-2, 450], [-2, 300], [-3, 150], [-2, 40]];
+    const along: number[] = [], drawn: number[] = [];
+    path.forEach(([x, y], i) => {
+      e.report({ id: "b", route: "M9", ...fix(x, y), bearing: null, t: i * 30 }, i * 30);
+      const st = (e as unknown as { state: Map<string, { shape: number; s: number; disp: number }> }).state;
+      expect(st.get("b")!.shape).toBe(0);
+      along.push(st.get("b")!.s);
+      for (let t = i * 30; t < i * 30 + 30; t += 0.2) { e.frame("b", t); drawn.push(st.get("b")!.disp); }
+    });
+    for (let i = 1; i < along.length; i++) expect(along[i]).toBeGreaterThan(along[i - 1]);
+    for (let i = 1; i < drawn.length; i++) expect(drawn[i]).toBeGreaterThanOrEqual(drawn[i - 1] - 1e-6);
+    expect(along[along.length - 1]).toBeGreaterThan(1100); // on the way back, not at 40 m on the way out
+  });
+
+  it("project() prefers the pass nearest to where the bus was", () => {
+    const sh = buildShape(loop);
+    const { lon, lat } = fix(0, 300);
+    expect(project(sh, lon, lat).s).toBeCloseTo(300, 0);
+    expect(project(sh, lon, lat, 250).s).toBeCloseTo(300, 0);
+    expect(project(sh, lon, lat, 800).s).toBeCloseTo(sh.len - 300, 0);
   });
 });
 

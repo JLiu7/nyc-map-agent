@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertTimeLabel, classifyRouteAlerts, skipNamesFor, upcomingStops } from "./followInfo";
+import { alertTimeLabel, busNextName, classifyRouteAlerts, skipNamesFor, upcomingStops } from "./followInfo";
 import type { TransitAlert } from "./hooks";
 
 const alert = (p: Partial<TransitAlert>): TransitAlert => ({ id: "a", kind: "notice", type: "", reroute: false, text: "", agency: "", routes: [], stops: [], ...p });
@@ -43,5 +43,21 @@ describe("follow card stops", () => {
   it("falls back to the times without a next stop", () => {
     expect(upcomingStops(trip, undefined, 180).map(([id]) => id)).toEqual(["B", "C", "D"]);
     expect(upcomingStops(trip, "Z", 180).map(([id]) => id)).toEqual(["B", "C", "D"]);
+  });
+});
+
+describe("the mini map's next bus stop", () => {
+  const stops = [{ id: "MTA_405056", name: "NORTH END AV/WARREN ST" }];
+  it("uses the trip's first call, the stop the follow card shows", () => {
+    expect(busNextName("VESEY ST/NORTH END AV", stops, "405056")).toBe("Vesey Street/North End Avenue");
+  });
+  it("names the feed's stop id from the route until the trip has loaded", () => {
+    expect(busNextName(undefined, stops, "405056")).toBe("North End Avenue/Warren Street");
+    expect(busNextName(undefined, stops, "MTA_405056")).toBe("North End Avenue/Warren Street");
+  });
+  it("shows nothing rather than a bare stop id", () => {
+    expect(busNextName(undefined, stops, "999999")).toBeNull();
+    expect(busNextName(undefined, undefined, "405056")).toBeNull();
+    expect(busNextName(undefined, stops, undefined)).toBeNull();
   });
 });

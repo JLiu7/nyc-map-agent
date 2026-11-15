@@ -21,7 +21,7 @@ import {
   type SystemId,
   type Vehicle,
 } from "./model";
-import { alertedRoutes, type BusArrival, fetchBusCatalog, fetchBusRoutesNear, routesForPage, useAlerts, useBusLines, useBusRoute, useBusSegmentHistory, useBusShapes, useBuses, useStarred, useTransitData, useTransitMeta, useTransitToggles, useXrayData, useSegmentHistory } from "./hooks";
+import { alertedRoutes, type BusArrival, fetchBusCatalog, fetchBusRoutesNear, routesForPage, useAlerts, useBusLines, useBusRoute, useBusSegmentHistory, useBusShapes, useBusTrip, useBuses, useStarred, useTransitData, useTransitMeta, useTransitToggles, useXrayData, useSegmentHistory } from "./hooks";
 import { sharedCoords } from "@/lib/geo/sharedLocation";
 import { useXray, xrayPrims } from "./xray";
 import { useMapState } from "@/lib/store/MapStateContext";
@@ -49,6 +49,7 @@ import { readMap } from "@/lib/map/mapRead";
 import { showView } from "@/lib/map/viewChange";
 import { FollowCard, SkipDetails, StationDetails, stopName } from "./TransitCard";
 import { FollowMiniMap } from "./FollowMiniMap";
+import { busNextName } from "./followInfo";
 import { TransitStatusDetails } from "./TransitStatus";
 import { alertGeometry, endLabel, setAlertFocus, shuttleFeatures, stationChanges, useAlertFocus, useShuttleFocus, useWalkFocus } from "./alertFocus";
 import { LinesDrawer } from "./LinesDrawer";
@@ -1108,7 +1109,11 @@ export default function TransitLayer() {
     return { type: "FeatureCollection", features: st ? st.lines.features.filter((f) => String(f.properties.route) === route) : [] };
   }, [followRoute, staticKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const followStop = followed?.stopped?.kind === "at" ? followed.stopped.stop : followed?.nextStop;
-  const followNext = followed ? (stopName(data, followed.system, followStop) ?? null) : null;
+  // A bus's stop is named by its trip (what the follow card shows), else by its route; the feed gives only an id.
+  const followBusTrip = useBusTrip(followed?.system === "bus" ? followed.key.slice(4) : undefined);
+  const followNext = !followed ? null
+    : followed.system === "bus" ? busNextName(followBusTrip.data?.calls?.[0]?.name, busShapes.find((g) => g.route === followed.route)?.stops, followStop)
+    : (stopName(data, followed.system, followStop) ?? null);
   // A trip preview's rider gets the same mini map, on every part of the trip and in every view. Only with the
   // chat-bar home, whose corner it is laid out for: the older home keeps its compass and X-ray buttons there.
   const tripMini = usePreviewMini();

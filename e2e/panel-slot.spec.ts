@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectLayout } from "./layout";
 import { mockNetwork } from "./mocks";
 import { slow } from "./slow";
 
@@ -21,7 +22,7 @@ function latAbove(dy: number) {
 // One live bus parked in the strip of map the open drawer leaves free.
 const BUS = { id: "MTA_1234", route: "B62", dir: 0, lon: HOME.lon, lat: latAbove(PHONE.height * (0.5 - BUS_Y)), bearing: 90, next: "Greenpoint Av", t: 0 };
 
-async function open(page: Page, size = PHONE) {
+async function open(page: Page, size = PHONE, url = "/?flags=-agentHome&transit=bus&busPage=brooklyn-1") {
   await page.setViewportSize(size);
   await mockNetwork(page);
   await page.route("**/api/transit", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ bus: true }) }));
@@ -37,7 +38,7 @@ async function open(page: Page, size = PHONE) {
   });
   // Neighbourhood outlines arrive early; the crime and noise summaries load only with an analytics layer on.
   const areas = page.waitForResponse((r) => r.url().includes("/api/areas"));
-  await page.goto("/?flags=-agentHome&transit=bus&busPage=brooklyn-1");
+  await page.goto(url);
   await expect(page.locator("canvas.maplibregl-canvas").first()).toBeVisible();
   await areas;
 }
@@ -199,4 +200,29 @@ test("follow card stays clear of Layers and Lines stays on the action row", asyn
   await expectFollowChromeClear(page);
   await page.setViewportSize({ width: 1280, height: 800 });
   await expectFollowChromeClear(page);
+});
+
+test("the follow mini map names the bus's next stop, never its stop id", async ({ page }) => {
+  // The chat-bar home, whose corner the mini map is laid out for.
+  await open(page, PHONE, "/?transit=bus&busPage=brooklyn-1");
+  // The live feed names the next stop by id only; the bus's own trip has its name.
+  await page.route(/\/api\/transit\/bus$|\/api\/transit\/bus\?/, (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ at: Math.floor(Date.now() / 1000), buses: [{ ...BUS, next: "305423", t: Math.floor(Date.now() / 1000) }] }) }));
+  await page.route(/\/api\/transit\/bus-trip/, (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ found: true, route: "B62", destination: "DOWNTOWN BKLYN", dir: "0", calls: [{ id: "MTA_305423", name: "GREENPOINT AV/MANHATTAN AV", eta: Math.floor(Date.now() / 1000) + 240, away: "2 stops away" }] }) }));
+  // One tap at a time: with its stops listed the card is tall enough to sit under a second tap.
+  const card = page.getByTestId("follow-card");
+  await expect.poll(async () => {
+    if (await card.count()) return 1;
+    await tapMap(page, 0.5, BUS_Y);
+    await page.waitForTimeout(500);
+    return card.count();
+  }, { timeout: slow(30_000) }).toBeGreaterThan(0);
+  await page.getByTestId("view-button").click();
+  await page.getByTestId("follow-view-menu").getByRole("menuitemradio", { name: /Chase/ }).click();
+  const mini = page.getByTestId("follow-minimap");
+  await expect(mini).toContainText("Next: Greenpoint Avenue/Manhattan Avenue", { timeout: slow(15_000) });
+  await expect(mini).not.toContainText("305423");
+  await expectLayout(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(mini).toContainText("Next: Greenpoint Avenue/Manhattan Avenue");
+  await expectLayout(page);
 });

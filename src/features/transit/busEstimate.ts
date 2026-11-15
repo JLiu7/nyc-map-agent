@@ -7,17 +7,26 @@
  *     (last two reports, clamped, blended with a route default, or with the
  *     learned stop-to-stop speed for this hour of the week when there is one), easing into stops for a typical dwell;
  *   - a new report never teleports it: the displayed position speed-adjusts
- *     toward the new estimate over ~4 s and never moves backward, unless it
- *     is more than 150 m ahead of (or very far behind) the estimate, in which
- *     case it fades out, jumps and fades back in;
- *   - a report older than 2 minutes freezes and fades the bus.
+ *     toward the new estimate over ~4 s and never moves backward. When it is
+ *     ahead of the estimate it waits there for the real bus. Only a real
+ *     disagreement (more than 400 m ahead, or very far behind) is shown as a
+ *     fade out, a jump and a fade back in;
+ *   - a report older than 2 minutes freezes and fades the bus;
+ *   - a bus that is not known to be moving is never driven ahead: on first
+ *     sight it may run at most 60 m past its report, and one that has stood
+ *     still for two reports (a layover at a terminal) is held where it is;
+ *   - which way a bus faces comes from how it actually moved and from the
+ *     stop it reports as next. The feed's compass bearing is only a first
+ *     guess: it swings while a bus is parked, and a swing must not turn the
+ *     bus round.
  *
  * Pure TypeScript, no map dependency, so it is unit-tested directly.
  */
 export type LonLat = [number, number];
 /** `offsets[i][j]`: metres right of vertex j to the travel lane (street-centerline snapped shapes). */
 export type RouteGeom = { route: string; lines: LonLat[][]; offsets?: number[][]; stops: Array<{ id: string; lon: number; lat: number }> };
-export type BusReport = { id: string; route: string; lon: number; lat: number; bearing: number | null; t: number };
+/** `next` is the feed's next stop id, with or without the Bus Time "MTA_" prefix. */
+export type BusReport = { id: string; route: string; lon: number; lat: number; bearing: number | null; t: number; next?: string | null };
 export type BusFrame = { lon: number; lat: number; bearing: number; alpha: number };
 /**
  * Learned times from /api/transit-bus-segments; either may be missing, then defaults apply.
@@ -44,7 +53,7 @@ export function speedFromTravel(L: number, seconds: number, dwell: number): numb
 const stopKey = (id: string) => id.replace(/^MTA_/, "");
 
 export const BLEND_S = 4;
-export const BACKWARD_FADE_M = 150;
+export const BACKWARD_FADE_M = 400;
 export const FORWARD_FADE_M = 600;
 export const STALE_S = 120;
 export const DEAD_RECKON_MAX_S = 90;
@@ -56,6 +65,22 @@ const FADE_S = 0.6;
 const SNAP_MAX_M = 80;
 const STOP_SNAP_M = 35;
 const STALE_ALPHA = 0.25;
+/** How far a bus may be drawn past its last report before a report shows it moving (m). */
+const UNSURE_LEAD_M = 60;
+/** Slower than this between two reports (m/s over the ground) is standing still: a parked bus's GPS wanders about 20 m. */
+const STILL_MPS = 1;
+/** A bus must have moved this far (m) since its shape was chosen before the choice is reopened. */
+const MOVED_M = 40;
+/** Falling this far (m) back along its shape, while heading against it, means the bus is on the wrong shape. */
+const BACK_M = 20;
+/** Two passes of one shape this close (m) to a fix are told apart by where the bus was, not by which is nearer. */
+const LOOP_TIE_M = 20;
+/** A bus changing to another piece of its route carries on without a fade when that piece is this close (m) to where it is drawn. */
+const JOIN_M = 15;
+/** A moving bus stays on its piece of the route while its fix is within this (m) of it. */
+const STAY_M = 25;
+/** How far a moving bus may be drawn past its last report (m). Reports are often 30 s old and the next is 30 s away. */
+const MOVING_LEAD_M = 300;
 
 /** Cruise speed (m/s, excluding stops) by route kind. */
 export function defaultSpeed(route: string): number {
@@ -86,19 +111,33 @@ export function buildShape(line: LonLat[], stops: RouteGeom["stops"] = [], offse
   return shape;
 }
 
-/** Nearest point on the shape: distance along it, perpendicular distance, local bearing. */
-export function project(sh: Shape, lon: number, lat: number): { s: number; d: number; bearing: number } {
+/**
+ * Nearest point on the shape: distance along it, perpendicular distance, local bearing.
+ * A shape that loops or doubles back passes some streets twice; with `near` (where the
+ * bus last was, metres along the shape) the pass closest to that wins over the one that
+ * happens to be a metre nearer, so a bus on the way out is not put on the way back.
+ */
+export function project(sh: Shape, lon: number, lat: number, near?: number): { s: number; d: number; bearing: number } {
   const px = (lon - sh.lon0) * sh.kx, py = (lat - sh.lat0) * KY;
   let best = { s: 0, d: Infinity, bearing: 0 };
+  const all: Array<typeof best> = [];
   for (let i = 1; i < sh.x.length; i++) {
     const ax = sh.x[i - 1], ay = sh.y[i - 1], dx = sh.x[i] - ax, dy = sh.y[i] - ay;
     const l2 = dx * dx + dy * dy;
     const u = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
     const d = Math.hypot(ax + u * dx - px, ay + u * dy - py);
-    if (d < best.d) best = { s: sh.cum[i - 1] + u * Math.sqrt(l2), d, bearing: (Math.atan2(dx, dy) * 180) / Math.PI };
+    const c = { s: sh.cum[i - 1] + u * Math.sqrt(l2), d, bearing: (Math.atan2(dx, dy) * 180) / Math.PI };
+    if (d < best.d) best = c;
+    if (near !== undefined) all.push(c);
   }
-  best.bearing = (best.bearing + 360) % 360;
-  return best;
+  if (near !== undefined) {
+    // Going back counts double: a bus is far more likely a little ahead of where it was than behind it.
+    const far = (c: { s: number }) => (c.s >= near ? c.s - near : 2 * (near - c.s));
+    let pick = best;
+    for (const c of all) if (c.d <= best.d + LOOP_TIE_M && far(c) < far(pick)) pick = c;
+    best = pick;
+  }
+  return { ...best, bearing: (best.bearing + 360) % 360 };
 }
 
 function xyAt(sh: Shape, s: number): [number, number, number] {
@@ -183,7 +222,17 @@ function dwellAt(hist: BusHistory | undefined, route: string, stop: string, def:
 type State = {
   route: string; shape: number; s: number; t: number; v: number; moving: boolean; dwellLeft: number;
   disp: number; at: number; alpha: number; fade: "none" | "out" | "in"; hdg?: number;
+  /** The last fix, and the fix (with its distance along the shape) at which the shape was last chosen. */
+  lon: number; lat: number; alon: number; alat: number; as: number;
+  /** Reports in a row that showed the bus standing still. */
+  still: number;
+  /** How far past `s` the bus may be drawn (m): more once a report shows it moving. */
+  lead: number;
 };
+const KX40 = KY * Math.cos((40.7 * Math.PI) / 180);
+const metres = (lon1: number, lat1: number, lon2: number, lat2: number) => Math.hypot((lon2 - lon1) * KX40, (lat2 - lat1) * KY);
+const courseOf = (lon1: number, lat1: number, lon2: number, lat2: number) => ((Math.atan2((lon2 - lon1) * KX40, (lat2 - lat1) * KY) * 180) / Math.PI + 360) % 360;
+const turn = (a: number, b: number) => 60 * (1 - Math.cos(((a - b) * Math.PI) / 180));
 
 export class BusEstimator {
   private shapes = new Map<string, Shape[]>();
@@ -203,42 +252,84 @@ export class BusEstimator {
     this.shapes.set(g.route, out);
   }
 
-  /** Feed a GPS report (duplicates of the last timestamp are ignored). Returns false if it could not be snapped. */
+  /** Feed a GPS report (duplicates of the last timestamp, and older ones, are ignored). Returns false if it could not be snapped. */
   report(b: BusReport, nowS = Date.now() / 1000): boolean {
     const shapes = this.shapes.get(b.route);
     if (!shapes?.length) return false;
     const prev = this.state.get(b.id);
-    if (prev && prev.route === b.route && b.t <= prev.t) return true;
+    const same = prev && prev.route === b.route ? prev : undefined;
+    if (same && b.t <= same.t) return true;
+    const dt = same ? b.t - same.t : 0;
+    // Metres over the ground since the last report, and since the shape was last chosen.
+    const hop = same ? metres(same.lon, same.lat, b.lon, b.lat) : 0;
+    const moved = same ? metres(same.alon, same.alat, b.lon, b.lat) >= MOVED_M : false;
+    const onPrev = same ? project(shapes[same.shape], b.lon, b.lat, same.s) : undefined;
     let best = -1, bestCost = Infinity, bestP = { s: 0, d: Infinity, bearing: 0 };
-    for (let i = 0; i < shapes.length; i++) {
-      const p = project(shapes[i], b.lon, b.lat);
-      if (p.d > SNAP_MAX_M) continue;
-      let cost = p.d;
-      if (b.bearing !== null) cost += 60 * (1 - Math.cos(((p.bearing - b.bearing) * Math.PI) / 180));
-      else if (prev && prev.route === b.route && prev.shape === i) cost -= p.s >= prev.s - 20 ? 25 : -25;
-      if (prev && prev.route === b.route && prev.shape === i) cost -= 10; // hysteresis
-      if (cost < bestCost) { bestCost = cost; best = i; bestP = p; }
+    // Which way it is heading: how it moved when it has, else the feed's bearing as a first guess.
+    const heading = !same ? b.bearing : moved ? courseOf(same.alon, same.alat, b.lon, b.lat) : null;
+    // Driving back down its shape: it is on the wrong shape, most often the right piece the wrong way round.
+    const fellBack = Boolean(same && onPrev && heading !== null && moved && onPrev.s < same.as - BACK_M && turn(onPrev.bearing, heading) > 60);
+    if (same && onPrev && (moved
+      // Moving along its piece of the route: it stays on it until the piece ends or the bus leaves it.
+      ? onPrev.d <= STAY_M && !fellBack && heading !== null && turn(onPrev.bearing, heading) < 30
+      // Parked, or creeping: it stays on its shape, facing the way it was. Its compass bearing is noise.
+      : onPrev.d <= SNAP_MAX_M)) {
+      best = same.shape; bestP = onPrev;
+    } else {
+      const next = b.next ? stopKey(b.next) : undefined;
+      for (let i = 0; i < shapes.length; i++) {
+        const mine = same?.shape === i;
+        // The same piece the other way round: only when the bus really went back along it.
+        if (same && i === (same.shape ^ 1) && !fellBack) continue;
+        const p = mine && onPrev ? onPrev : project(shapes[i], b.lon, b.lat);
+        if (p.d > SNAP_MAX_M) continue;
+        let cost = p.d;
+        if (heading !== null) cost += turn(p.bearing, heading);
+        // The stop it reports as next lies ahead of it on the right shape, behind it on the reverse.
+        const ns = next ? shapes[i].stops.find((st) => stopKey(st.id) === next) : undefined;
+        if (ns) cost += ns.s >= p.s - STOP_SNAP_M ? -60 : 60;
+        if (mine) cost += fellBack ? 60 : -10; // hysteresis, unless it is running backward on this one
+        if (cost < bestCost) { bestCost = cost; best = i; bestP = p; }
+      }
     }
     if (best < 0) { this.state.delete(b.id); return false; }
     const sh = shapes[best];
+    const kept = same && same.shape === best ? same : undefined;
     const def = defaultSpeed(b.route);
-    let v = def, moving = true, dwellLeft = 0;
-    if (prev && prev.route === b.route && prev.shape === best) {
-      const dt = b.t - prev.t, ds = bestP.s - prev.s;
-      if (dt >= 5 && dt <= 180) {
-        const obs = ds / dt;
-        if (obs < 0.4) moving = false;
-        else v = clamp(0.6 * clamp(obs * 1.35, MIN_SPEED, MAX_SPEED) + 0.4 * def, MIN_SPEED, MAX_SPEED);
+    // Until a report shows the bus moving, it may only be drawn a little past where it was seen.
+    let v = def, moving = true, dwellLeft = 0, still = 0, lead = UNSURE_LEAD_M;
+    if (same && dt >= 5 && dt <= 180) {
+      const over = hop / dt, along = kept ? (bestP.s - kept.s) / dt : over;
+      if (over < STILL_MPS || along < 0.4) {
+        moving = false; still = same.still + 1;
+        // Twice in a row is a layover or a jam, not a pause: hold it exactly there.
+        if (still >= 2) lead = 0;
+      } else {
+        v = clamp(0.6 * clamp(along * 1.35, MIN_SPEED, MAX_SPEED) + 0.4 * def, MIN_SPEED, MAX_SPEED);
+        lead = MOVING_LEAD_M;
       }
+    } else if (kept && dt < 5) {
+      v = kept.v; moving = kept.moving; still = kept.still; lead = kept.lead;
     }
     const atStop = sh.stops.find((st) => Math.abs(st.s - bestP.s) < 20);
     if (atStop && !moving) dwellLeft = dwellAt(this.hist, b.route, atStop.id, DWELL_S) / 2;
-    const fresh: State = { route: b.route, shape: best, s: bestP.s, t: b.t, v, moving, dwellLeft, disp: bestP.s, at: nowS, alpha: 1, fade: "none" };
-    if (prev && prev.route === b.route && prev.shape === best) {
-      fresh.disp = prev.disp; fresh.at = prev.at; fresh.alpha = prev.alpha; fresh.fade = prev.fade; fresh.hdg = prev.hdg;
+    const anchor = kept && !moved ? { alon: kept.alon, alat: kept.alat, as: kept.as } : { alon: b.lon, alat: b.lat, as: bestP.s };
+    const fresh: State = { route: b.route, shape: best, s: bestP.s, t: b.t, v, moving, dwellLeft, disp: bestP.s, at: nowS, alpha: 1, fade: "none", lon: b.lon, lat: b.lat, ...anchor, still, lead };
+    if (kept) {
+      fresh.disp = kept.disp; fresh.at = kept.at; fresh.alpha = kept.alpha; fresh.fade = kept.fade; fresh.hdg = kept.hdg;
     } else if (prev) {
-      fresh.disp = prev.disp; fresh.at = prev.at; fresh.alpha = prev.alpha; fresh.fade = "out"; // switched shape: fade across
-      (fresh as State & { oldShape?: [string, number] }).oldShape = [prev.route, prev.shape];
+      fresh.at = prev.at; fresh.alpha = prev.alpha;
+      // A route arrives in pieces. When the bus moves to a piece that meets the one it was on, it carries on
+      // from where it is drawn; only a piece somewhere else (or another route) is crossed with a fade.
+      const from = same ? this.shapes.get(same.route)?.[same.shape] : undefined;
+      const here = from && prev.fade !== "out" ? pointAt(from, prev.disp) : undefined;
+      const join = here ? project(sh, here.lon, here.lat) : undefined;
+      if (join && join.d <= JOIN_M) {
+        fresh.disp = join.s; fresh.fade = prev.fade; fresh.hdg = prev.hdg;
+      } else {
+        fresh.disp = prev.disp; fresh.fade = "out";
+        (fresh as State & { oldShape?: [string, number] }).oldShape = (prev as State & { oldShape?: [string, number] }).oldShape ?? [prev.route, prev.shape];
+      }
     }
     this.state.set(b.id, fresh);
     return true;
@@ -263,7 +354,7 @@ export class BusEstimator {
     const dt = Math.max(0, Math.min(1, nowS - st.at));
     st.at = nowS;
     const age = nowS - st.t;
-    const ideal = (t: number) => deadReckon(sh, st.route, st.s, st.v, st.moving, t - st.t, st.dwellLeft, this.hist);
+    const ideal = (t: number) => Math.min(deadReckon(sh, st.route, st.s, st.v, st.moving, t - st.t, st.dwellLeft, this.hist), st.s + st.lead);
     if (st.fade === "out") {
       st.alpha = Math.max(0, st.alpha - dt / FADE_S);
       if (st.alpha === 0) { st.disp = ideal(nowS); st.fade = "in"; delete st.oldShape; }
