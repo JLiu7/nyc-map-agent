@@ -17,6 +17,7 @@ import { HourQuery as WeatherHourQuery, Query as WeatherQuery } from "./features
 import { AllQuery as AllSegmentsQuery, AllResponse as AllSegmentsResponse, Query as SegmentsQuery, Response_ as SegmentsResponse } from "./features/transit/segments";
 import { Query as LiveQuery } from "./features/transit/live";
 import { Query as BusSegmentsQuery, Response_ as BusSegmentsResponse } from "./features/transit/busSegments";
+import { AccuracyResponse as HealthAccuracyResponse, CoverageResponse as HealthCoverageResponse } from "./features/transit/health";
 import { EventsResponse, Query as EventsQuery } from "./features/events/schema";
 import { PlaceToiletsResponse } from "./features/place-toilets/schema";
 import { RestroomsResponse } from "./features/restrooms/schema";
@@ -264,6 +265,18 @@ export const ROUTES = {
     summary: "Learned bus stop-to-stop travel and stop dwell times (median seconds) for a route at an hour of the week",
     request: { query: BusSegmentsQuery },
     responses: { 200: { description: "OK", content: { "application/json": { schema: BusSegmentsResponse } } }, ...errors },
+  }),
+  "/api/transit-health/coverage": createRoute({
+    method: "get",
+    path: "/api/transit-health/coverage",
+    summary: "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them",
+    responses: { 200: { description: "OK (ready: false until the observer has built the view)", content: { "application/json": { schema: HealthCoverageResponse } } }, ...errors },
+  }),
+  "/api/transit-health/accuracy": createRoute({
+    method: "get",
+    path: "/api/transit-health/accuracy",
+    summary: "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without",
+    responses: { 200: { description: "OK (ready: false until the observer has built the views)", content: { "application/json": { schema: HealthAccuracyResponse } } }, ...errors },
   }),
   "/api/transit-live": createRoute({
     method: "get",

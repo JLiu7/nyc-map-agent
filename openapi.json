@@ -3782,6 +3782,746 @@
         }
       }
     },
+    "/api/v1/transit-health/coverage": {
+      "get": {
+        "summary": "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them",
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "refreshedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "bands": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "band": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "used": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "sched",
+                          "band",
+                          "segments",
+                          "used",
+                          "solid",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "refreshedAt",
+                    "bands",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/coverage": {
+      "get": {
+        "summary": "How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them (alias of /api/v1/transit-health/coverage)",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the view)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "refreshedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "bands": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "sched": {
+                            "type": "integer"
+                          },
+                          "band": {
+                            "type": "integer"
+                          },
+                          "segments": {
+                            "type": "integer"
+                          },
+                          "used": {
+                            "type": "integer"
+                          },
+                          "solid": {
+                            "type": "integer"
+                          },
+                          "samples": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "sched",
+                          "band",
+                          "segments",
+                          "used",
+                          "solid",
+                          "samples"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "refreshedAt",
+                    "bands",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transit-health/accuracy": {
+      "get": {
+        "summary": "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without",
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the views)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "route",
+                              "band",
+                              "lead",
+                              "samples"
+                            ]
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
+                    },
+                    "thin": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "dir": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "learnedN": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "dir",
+                          "from",
+                          "to",
+                          "n",
+                          "learnedN",
+                          "maeModel",
+                          "maeBase"
+                        ]
+                      }
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "runs": {
+                            "type": "integer"
+                          },
+                          "opened": {
+                            "type": "integer"
+                          },
+                          "resolved": {
+                            "type": "integer"
+                          },
+                          "unresolved": {
+                            "type": "integer"
+                          },
+                          "stored": {
+                            "type": "integer"
+                          },
+                          "first": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "runs",
+                          "opened",
+                          "resolved",
+                          "unresolved",
+                          "stored",
+                          "first",
+                          "last"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "rows",
+                    "thin",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transit-health/accuracy": {
+      "get": {
+        "summary": "How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without (alias of /api/v1/transit-health/accuracy)",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "OK (ready: false until the observer has built the views)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "dim": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "route",
+                              "band",
+                              "lead",
+                              "samples"
+                            ]
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "maeBase": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Model": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "w60Base": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "learned": {
+                            "type": "object",
+                            "properties": {
+                              "n": {
+                                "type": "integer"
+                              },
+                              "maeModel": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "maeBase": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Model": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "w60Base": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "n",
+                              "maeModel",
+                              "maeBase",
+                              "w60Model",
+                              "w60Base"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "dim",
+                          "key",
+                          "n",
+                          "maeModel",
+                          "maeBase",
+                          "w60Model",
+                          "w60Base",
+                          "learned"
+                        ]
+                      }
+                    },
+                    "thin": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "route": {
+                            "type": "string"
+                          },
+                          "dir": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "learnedN": {
+                            "type": "integer"
+                          },
+                          "maeModel": {
+                            "type": "number"
+                          },
+                          "maeBase": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "route",
+                          "dir",
+                          "from",
+                          "to",
+                          "n",
+                          "learnedN",
+                          "maeModel",
+                          "maeBase"
+                        ]
+                      }
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "system": {
+                            "type": "string",
+                            "enum": [
+                              "subway",
+                              "bus"
+                            ]
+                          },
+                          "runs": {
+                            "type": "integer"
+                          },
+                          "opened": {
+                            "type": "integer"
+                          },
+                          "resolved": {
+                            "type": "integer"
+                          },
+                          "unresolved": {
+                            "type": "integer"
+                          },
+                          "stored": {
+                            "type": "integer"
+                          },
+                          "first": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "system",
+                          "runs",
+                          "opened",
+                          "resolved",
+                          "unresolved",
+                          "stored",
+                          "first",
+                          "last"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "rows",
+                    "thin",
+                    "runs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream (Octo / R2) error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent/health": {
       "get": {
         "summary": "The default model profile and each smart provider's last health probe (no keys)",

@@ -1914,6 +1914,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/transit-health/accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without (alias of /api/v1/transit-health/accuracy)
+         * @deprecated
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK (ready: false until the observer has built the views) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ready: boolean;
+                            rows: {
+                                /** @enum {string} */
+                                dim: "all" | "route" | "band" | "lead" | "samples";
+                                key: string;
+                                learned: {
+                                    maeBase: number | null;
+                                    maeModel: number | null;
+                                    n: number;
+                                    w60Base: number | null;
+                                    w60Model: number | null;
+                                };
+                                maeBase: number | null;
+                                maeModel: number | null;
+                                n: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                w60Base: number | null;
+                                w60Model: number | null;
+                            }[];
+                            runs: {
+                                first: string | null;
+                                last: string | null;
+                                opened: number;
+                                resolved: number;
+                                runs: number;
+                                stored: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                unresolved: number;
+                            }[];
+                            thin: {
+                                dir: number;
+                                from: string;
+                                learnedN: number;
+                                maeBase: number;
+                                maeModel: number;
+                                n: number;
+                                route: string;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                to: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Upstream (Octo / R2) error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/transit-health/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them (alias of /api/v1/transit-health/coverage)
+         * @deprecated
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK (ready: false until the observer has built the view) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            bands: [
+                                number,
+                                number
+                            ][];
+                            ready: boolean;
+                            refreshedAt: string | null;
+                            rows: {
+                                band: number;
+                                route: string;
+                                samples: number;
+                                sched: number;
+                                segments: number;
+                                solid: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                used: number;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Upstream (Octo / R2) error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transit-live": {
         parameters: {
             query?: never;
@@ -4074,6 +4250,176 @@ export interface paths {
                                 median: number;
                                 n: number;
                                 to: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Upstream (Octo / R2) error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transit-health/accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How far off the tracker's arrival predictions were: median absolute error and share within a minute, by line, time-of-day band, lead time and sample count, with learned times and without */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK (ready: false until the observer has built the views) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ready: boolean;
+                            rows: {
+                                /** @enum {string} */
+                                dim: "all" | "route" | "band" | "lead" | "samples";
+                                key: string;
+                                learned: {
+                                    maeBase: number | null;
+                                    maeModel: number | null;
+                                    n: number;
+                                    w60Base: number | null;
+                                    w60Model: number | null;
+                                };
+                                maeBase: number | null;
+                                maeModel: number | null;
+                                n: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                w60Base: number | null;
+                                w60Model: number | null;
+                            }[];
+                            runs: {
+                                first: string | null;
+                                last: string | null;
+                                opened: number;
+                                resolved: number;
+                                runs: number;
+                                stored: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                unresolved: number;
+                            }[];
+                            thin: {
+                                dir: number;
+                                from: string;
+                                learnedN: number;
+                                maeBase: number;
+                                maeModel: number;
+                                n: number;
+                                route: string;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                to: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Upstream (Octo / R2) error */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transit-health/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much the live tracker has learned: per subway line and bus route, schedule and time-of-day band, the stop-to-stop stretches with learned times and the samples behind them */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK (ready: false until the observer has built the view) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            bands: [
+                                number,
+                                number
+                            ][];
+                            ready: boolean;
+                            refreshedAt: string | null;
+                            rows: {
+                                band: number;
+                                route: string;
+                                samples: number;
+                                sched: number;
+                                segments: number;
+                                solid: number;
+                                /** @enum {string} */
+                                system: "subway" | "bus";
+                                used: number;
                             }[];
                         };
                     };
