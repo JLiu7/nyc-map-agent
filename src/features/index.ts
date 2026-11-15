@@ -27,3 +27,6 @@ export const loadRecordPage = () => import("./recorder/record/RecordPage");
 
 /** The 3D preview page at /station-3d (#186), its own chunk; App routes to it by address. */
 export const loadStationCloudPage = () => import("./recorder/cloud/StationCloudPage");
+
+/** The tracker health page at /tracker-health (#11), its own chunk; App routes to it by address. */
+export const loadTrackerHealthPage = () => import("./transit/health/TrackerHealthPage");

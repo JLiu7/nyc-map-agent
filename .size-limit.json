@@ -7,7 +7,7 @@
   {
     "name": "app (boot chunk, loaded after the first paint)",
     "path": ".size-build/assets/boot-*.js",
-    "limit": "294 kB"
+    "limit": "294.5 kB"
   },
   {
     "name": "map library (maplibre-gl, its own chunk so it stays cached across deploys)",
@@ -113,6 +113,11 @@
     "name": "feature: station 3D preview page (lazy, loaded only at /station-3d)",
     "path": ".size-build/assets/StationCloudPage-*.js",
     "limit": "3.2 kB"
+  },
+  {
+    "name": "feature: tracker health page (lazy, loaded only at /tracker-health)",
+    "path": ".size-build/assets/TrackerHealthPage-*.js",
+    "limit": "6.2 kB"
   },
   {
     "name": "all JS except the station walk",
