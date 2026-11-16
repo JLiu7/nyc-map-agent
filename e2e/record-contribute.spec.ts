@@ -58,6 +58,25 @@ test("switch camera: a second camera can be chosen, and one camera shows no cont
   await expect(one.getByTestId("switch-camera")).toHaveCount(0);
 });
 
+test("switch camera: the chosen camera is named on screen and opened again on the next visit", async ({ page }) => {
+  await open(page, 2);
+  await toCamera(page);
+  test.skip(!(await built(page, "switch-camera")), "piece 1 of #223 is not built yet");
+  await page.getByTestId("switch-camera").click();
+  await expect(page.getByTestId("camera-name")).toHaveText(/(Front|Back) camera/, { timeout: slow(5_000) });
+  const chosen = (await page.getByTestId("camera-name").textContent())!.startsWith("Back") ? "cam1" : "cam0";
+  await page.reload();
+  await expect(page.getByTestId("record-page")).toBeVisible({ timeout: slow(15_000) });
+  await toCamera(page);
+  const first = await page.evaluate(() => JSON.stringify((window as unknown as { __cameraAsked: unknown[] }).__cameraAsked[0]));
+  expect(first).toContain(chosen);
+  await expect(page.getByTestId("camera-name")).toHaveText(chosen === "cam1" ? "Back camera" : "Front camera");
+  // The control is for before recording: it steps away while a recording runs.
+  await page.getByRole("button", { name: "Record", exact: true }).click();
+  await expect(page.getByTestId("record-timer")).toBeVisible({ timeout: slow(10_000) });
+  await expect(page.getByTestId("switch-camera")).toHaveCount(0);
+});
+
 test("first-time screens: shown once before the camera, and a control brings them back", async ({ page }) => {
   await open(page, 2);
   test.skip(!(await built(page, "record-intro")), "piece 2 of #223 is not built yet");

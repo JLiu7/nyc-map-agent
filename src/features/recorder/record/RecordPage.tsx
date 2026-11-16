@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SwitchCamera } from "lucide-react";
 import { removeShell } from "@/lib/shellDraft";
 import { MARK_KINDS, type MarkKind } from "../format";
-import { openBackCamera, stopStream } from "./camera";
+import { cameraName, listCameras, nextCamera, openCamera, rememberCamera, rememberedCamera, stopStream, type Camera } from "./camera";
 import Review, { type Take } from "./Review";
 import { askMotion, keepAwake, motionNeedsAsking, watchSensors } from "./sensors";
 import { clock, createCollector, deviceName, fileStem, motionRow, pickVideoType, videoExt, type Collector } from "./session";
@@ -23,7 +24,8 @@ type MotionState = "unknown" | "ok" | "none" | "blocked";
 
 /**
  * The recorder page at /record (#185): the back camera full screen with one
- * red Record button. No map and no chat bar here; the page is reached by its
+ * red Record button, and beside it a switch control when the device has more
+ * than one camera (#223). No map and no chat bar here; the page is reached by its
  * address only and changes nothing on the map page.
  */
 export default function RecordPage() {
@@ -38,6 +40,9 @@ export default function RecordPage() {
   const [startedAt, setStartedAt] = useState(0);
   const [now, setNow] = useState(0);
   const [marks, setMarks] = useState(0);
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [cameraId, setCameraId] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     if (phase !== "recording") return;
@@ -45,18 +50,39 @@ export default function RecordPage() {
     return () => window.clearInterval(tick);
   }, [phase]);
 
-  const startCamera = useCallback(async () => {
+  /** Opens the camera if none is live. With `want`, closes the live one and opens that camera instead. */
+  const startCamera = useCallback(async (want?: string) => {
     setCamError(null);
-    if (stream.current?.active) return stream.current;
-    const cam = await openBackCamera();
-    if (!cam.ok) { setCamError(cam.why); return null; }
+    if (!want && stream.current?.active) return stream.current;
+    // Many phones cannot hold two cameras open, so the live one closes before the next opens.
+    stopStream(stream.current);
+    stream.current = null;
+    const chosen = want ?? rememberedCamera();
+    let cam = await openCamera(chosen);
+    // The camera asked for has gone (unplugged, or the browser gave its cameras new ids): open the back camera.
+    if (!cam.ok && chosen) {
+      if (!want) rememberCamera(null);
+      cam = await openCamera();
+    }
+    if (!cam.ok) { setCamError(cam.why); setCameraId(null); return null; }
+    if (want && cam.deviceId === want) rememberCamera(want);
     stream.current = cam.stream;
+    setCameraId(cam.deviceId);
+    // Cameras have ids and names only once one is allowed, so the list is read after each open.
+    void listCameras().then(setCameras);
     if (video.current) {
       video.current.srcObject = cam.stream;
       await video.current.play().catch(() => undefined);
     }
     return cam.stream;
   }, []);
+
+  const switchCamera = () => {
+    const next = nextCamera(cameras, cameraId);
+    if (!next || switching) return;
+    setSwitching(true);
+    void startCamera(next).finally(() => setSwitching(false));
+  };
 
   useEffect(() => {
     // The static chat bar in index.html is the map page's; it never belongs here.
@@ -72,7 +98,11 @@ export default function RecordPage() {
       window.addEventListener("devicemotion", onMotion);
       wait = window.setTimeout(() => setMotion((m) => (m === "unknown" ? (seen ? "ok" : "none") : m)), MOTION_WAIT_MS);
     }
+    // A camera plugged in or pulled out changes whether there is anything to switch to.
+    const onDevices = () => { void listCameras().then(setCameras); };
+    navigator.mediaDevices?.addEventListener?.("devicechange", onDevices);
     return () => {
+      navigator.mediaDevices?.removeEventListener?.("devicechange", onDevices);
       window.removeEventListener("devicemotion", onMotion);
       window.clearTimeout(wait);
       document.title = title;
@@ -191,9 +221,20 @@ export default function RecordPage() {
             <span className="h-8 w-8 rounded-md bg-red-600" />
           </button>
         ) : (
-          <button type="button" aria-label="Record" data-testid="record-button" onClick={record} disabled={phase === "starting"} className="grid h-20 w-20 place-items-center rounded-full border-4 border-white bg-transparent disabled:opacity-60">
-            <span className="h-14 w-14 rounded-full bg-red-600" />
-          </button>
+          <div className="relative">
+            <button type="button" aria-label="Record" data-testid="record-button" onClick={record} disabled={phase === "starting" || switching} className="grid h-20 w-20 place-items-center rounded-full border-4 border-white bg-transparent disabled:opacity-60">
+              <span className="h-14 w-14 rounded-full bg-red-600" />
+            </button>
+            {/* Before recording only: changing camera mid-recording would cut the video. */}
+            {phase === "idle" && cameras.length > 1 && (
+              <div className="absolute left-full top-1/2 ml-4 flex w-24 -translate-y-1/2 flex-col items-center gap-1">
+                <button type="button" aria-label="Switch camera" data-testid="switch-camera" onClick={switchCamera} disabled={switching} className="grid h-12 w-12 place-items-center rounded-full border-2 border-white bg-black/60 backdrop-blur active:bg-white active:text-black disabled:opacity-60">
+                  <SwitchCamera aria-hidden className="h-6 w-6" />
+                </button>
+                {cameraName(cameras, cameraId) && <span data-testid="camera-name" aria-live="polite" className="max-w-full truncate rounded-full bg-black/60 px-2 text-xs leading-5 backdrop-blur">{cameraName(cameras, cameraId)}</span>}
+              </div>
+            )}
+          </div>
         )}
       </div>}
     </main>
