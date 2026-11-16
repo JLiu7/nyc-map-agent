@@ -202,6 +202,31 @@ Do these in order, one commit each, with tests where logic is involved. After ea
     - Add the Playwright check for the focus and the clear strip at the six sizes.
     - *Done when:* that check passes at every size.
 
+## Rider walks: the second half of the product (added 2026-11-16)
+
+This file was written for the agent-first app: the map, the chat and its screens. Since the hackathon on 2026-11-14 the product has a second half that the sections above do not cover: riders record their walks through stations, and those walks become the data the guidance is built from. The loop is written out on issue #186; this section says where each part is specified, what is built, and what remains.
+
+**The loop.** A rider records a walk → it is sent to us → the backend cleans it (path, levels, snapped to fixed points) → it becomes checkpoints a rider can follow → each cleaned walk is a versioned dataset the AI's answers are checked against, and open data → walks build the station in 3D → the next rider gets a preview before the trip and guidance in the station.
+
+| Part | Where it is specified | State on 2026-11-16 |
+| --- | --- | --- |
+| Recorder (`/record`) and the Record button on home | #185; `src/features/recorder/record/`; `docs/RECORDING_FORMAT.md` | Built and live. Saves to the rider's phone; nothing is uploaded |
+| Switch camera, first-time screens and consent, Up or Down on marks, Send in one tap | #223; `docs/specs/RECORDER_CONTRIBUTIONS.md` with its contract tests; pictures in `docs/specs/recorder-screens/` | Not built. The collaborator's work; the checks switch on as each piece lands |
+| A small app that adds the barometer | #223, piece 5 | Not built. Needs an Apple Developer account |
+| Clean-up of a recording into a path with levels | `docs/HACKATHON_GEOAI_2026.md`, "Data and method" | Functions exist with tests; run by hand on one walk |
+| Walk guide and replay of the one filmed trip | `src/features/walkguide/`, `src/features/recorder/replay/` (flags `walkGuide`, `stationReplay`) | Built for Cortlandt St to 14 St-Union Sq |
+| Datasets and checking the AI | #186 | One dataset uploaded by hand to Phoenix; agent traces are live; no comparison runs yet |
+| Publishing walks as open data | #186 | Not built. Needs decisions on faces in video, consent and licence |
+| 3D station from walk video | #186 (the mentor's tools) | Not built |
+| Preview before the trip, camera guidance in the station | #186; `public/coming-soon.html` shows the intended look | Preview exists for the one trip; camera guidance with arrows is not built |
+| Follow a phone without GPS | #196; `public/live/` | Built and live; not walked with on a real phone |
+
+**Also built since this file was written, and specified elsewhere:** the tracker health page and prediction scoring (#11), the spoken notice walks, their sorting and their speech cache (#198, #206, #208, #218), and the what-is-coming page.
+
+**Design rules for this half** (`docs/DESIGN_RULES.md` still binds): a rider sees only what they need; the recorder's screens use pictures and a few words; nothing recorded by a rider is published without their agreement, and video is not published until faces are blurred.
+
+**Remaining work, in order:** the four pieces on #223, then storage for uploads once the owner picks it, then automatic clean-up of an arriving walk, then the barometer app.
+
 ## Checking
 
 Run from the preview worktree. CI requires check, lint, api, e2e, deps, size and gitleaks to pass before `main` accepts a merge. The commands are in `package.json` and `.github/workflows/ci.yml`:
