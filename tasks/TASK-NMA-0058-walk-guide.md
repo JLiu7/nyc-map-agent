@@ -660,6 +660,29 @@ Blocked/uncertain:
 Next:
 - The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223
 
+### 2026-11-16 07:29:29 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The product document covered only the map and chat; it now has a section on rider walks that says where each part of the loop is specified, what is built and what remains (pull request 224)"],"decisions":["no new decisions"],"evidence":["The section was written from issues 186 and 223 and the code on main; the document's older sections were not re-checked against today's code"],"next_action":"The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-16T07:29:29Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c25f67ff6d23d658e308e1089657f96e7f2b1753f3f9ed626a43b623112672d3","request_id":"40c2f424fa584464a5eb8d927417c86f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The product document covered only the map and chat; it now has a section on rider walks that says where each part of the loop is specified, what is built and what remains (pull request 224)
+
+Evidence:
+- The section was written from issues 186 and 223 and the code on main; the document's older sections were not re-checked against today's code
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
