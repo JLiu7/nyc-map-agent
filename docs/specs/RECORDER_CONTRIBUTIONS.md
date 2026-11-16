@@ -77,6 +77,7 @@ Left is the live recorder at phone size on 2026-11-16 (the camera picture is a s
 
 | Piece | Picture |
 | --- | --- |
+| Where the recorder is | ![The home screen with the red Record button circled, and the recorder it opens](recorder-screens/0-where-record-is.png) |
 | 1 Switch camera | ![Switch camera: now and when done](recorder-screens/1-switch-camera.png) |
 | 2 First-time screens | ![First-time screens: now and when done](recorder-screens/2-first-time-screens.png) |
 | 3 Up or down | ![Up or down: now and when done](recorder-screens/3-up-or-down.png) |
