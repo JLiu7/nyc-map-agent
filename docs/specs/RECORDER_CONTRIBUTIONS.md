@@ -70,3 +70,14 @@ These hold for any input, so the tests generate inputs instead of listing cases.
 ## What these checks do not cover
 
 A real phone's cameras and sensors, a real dropped connection, how the upload behaves with a large video, and whether the screens read well. The owner checks those by hand on each pull request.
+
+## Pictures: the live screen, and the screen when each piece is done
+
+Left is the live recorder at phone size on 2026-11-16 (the camera picture is a stand-in drawing). Right is the same screen with the requested control drawn on. Red circles mark where to look. The right-hand pictures are sketches of what is asked for, not designs to copy pixel for pixel.
+
+| Piece | Picture |
+| --- | --- |
+| 1 Switch camera | ![Switch camera: now and when done](recorder-screens/1-switch-camera.png) |
+| 2 First-time screens | ![First-time screens: now and when done](recorder-screens/2-first-time-screens.png) |
+| 3 Up or down | ![Up or down: now and when done](recorder-screens/3-up-or-down.png) |
+| 4 Send | ![Send: now and when done](recorder-screens/4-send.png) |
