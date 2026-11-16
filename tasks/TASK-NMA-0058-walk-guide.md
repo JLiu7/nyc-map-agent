@@ -614,6 +614,98 @@ Blocked/uncertain:
 Next:
 - When pull request 221 merges, tell the other sessions to merge main into their branches so their browser jobs stop failing on these two tests
 
+### 2026-11-16 07:09:46 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The collaborator's recorder work on issue 223 had no checks written ahead of it; pull request 224 adds a spec, 14 property tests and 4 browser scenarios that are skipped until each piece exists and then check it"],"decisions":["no new decisions"],"evidence":["The property tests pass against a throwaway implementation (15 of 15) and skip on main (1 passed, 14 skipped); lint and the type check are clean; the browser scenarios have not run against an implementation"],"next_action":"When pull request 224 merges, the collaborator starts piece 1 from issue 223 and the Your Part deck; the owner shares the deck with her","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-16T07:09:46Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"024ef08fc595ca6f6c409bdb6b5b628b3f7511ddbf4e952c34cd86096c87a006","request_id":"e1b6e297ba694826835437528bd5ee2f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The collaborator's recorder work on issue 223 had no checks written ahead of it; pull request 224 adds a spec, 14 property tests and 4 browser scenarios that are skipped until each piece exists and then check it
+
+Evidence:
+- The property tests pass against a throwaway implementation (15 of 15) and skip on main (1 passed, 14 skipped); lint and the type check are clean; the browser scenarios have not run against an implementation
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- When pull request 224 merges, the collaborator starts piece 1 from issue 223 and the Your Part deck; the owner shares the deck with her
+
+### 2026-11-16 07:23:24 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The collaborator's task had words but no pictures of the app; the spec, issue 223 and the Your Part deck now show the live home screen with the Record button circled and, for each of the four pieces, the live screen beside the screen expected when it is done"],"decisions":["no new decisions"],"evidence":["Screens captured from the live site at 390x844 on the MacBook Pro with a stand-in camera picture; the five composed pictures were looked at; the deck's slides were not seen rendered"],"next_action":"The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-16T07:23:24Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"3122a904387cf9cafd291da2c2a9e0f76ae9b615ec6d6fdc061fbde1cea925f0","request_id":"3706c20f761b4109aeddd81710922825","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The collaborator's task had words but no pictures of the app; the spec, issue 223 and the Your Part deck now show the live home screen with the Record button circled and, for each of the four pieces, the live screen beside the screen expected when it is done
+
+Evidence:
+- Screens captured from the live site at 390x844 on the MacBook Pro with a stand-in camera picture; the five composed pictures were looked at; the deck's slides were not seen rendered
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223
+
+### 2026-11-16 07:29:29 UTC — agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4
+
+<!-- continuity:checkpoint {"agent":"agent:claude-code/33171bab-fe2e-4484-b966-545a775331a4","blocked":[],"changed":["none"],"completed":["The product document covered only the map and chat; it now has a section on rider walks that says where each part of the loop is specified, what is built and what remains (pull request 224)"],"decisions":["no new decisions"],"evidence":["The section was written from issues 186 and 223 and the code on main; the document's older sections were not re-checked against today's code"],"next_action":"The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-16T07:29:29Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"c25f67ff6d23d658e308e1089657f96e7f2b1753f3f9ed626a43b623112672d3","request_id":"40c2f424fa584464a5eb8d927417c86f","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The product document covered only the map and chat; it now has a section on rider walks that says where each part of the loop is specified, what is built and what remains (pull request 224)
+
+Evidence:
+- The section was written from issues 186 and 223 and the code on main; the document's older sections were not re-checked against today's code
+
+Decisions:
+- no new decisions
+
+Changed:
+- none
+
+Blocked/uncertain:
+- none
+
+Next:
+- The owner shares the deck with the collaborator; when pull request 224 merges she starts piece 1 from issue 223
+
+### 2026-11-16 21:41:52 UTC — dsh
+
+<!-- continuity:checkpoint {"agent":"dsh","blocked":[],"changed":["src/features/recorder/record/RecordPage.tsx"],"completed":["The recorder page's camera switch is inside its size budget again, so the size check no longer fails every pull request (branch fix/225-camera-switch, pull request #226)."],"decisions":["no new decisions"],"evidence":["no external evidence recorded"],"next_action":"Merge #226 once the unit job's one timeout is retried.","protocol_version":"0.1.0-draft","schema":"project-continuity.checkpoint.v1","task_id":"NMA-0058","timestamp":"2026-11-16T21:41:52Z"} -->
+<!-- continuity:checkpoint-operation {"payload_sha256":"912fc79e6801134cd594baf3c5df64fdda6aabecb5d8dc09f3982aeab0c03f44","request_id":"12979b21980b424f836755d5ab96e6be","schema":"project-continuity.checkpoint-operation.v1","task_id":"NMA-0058"} -->
+
+Completed:
+- The recorder page's camera switch is inside its size budget again, so the size check no longer fails every pull request (branch fix/225-camera-switch, pull request #226).
+
+Evidence:
+- no external evidence recorded
+
+Decisions:
+- no new decisions
+
+Changed:
+- src/features/recorder/record/RecordPage.tsx
+
+Blocked/uncertain:
+- none
+
+Next:
+- Merge #226 once the unit job's one timeout is retried.
+
 ## Handoff
 
 Read PROJECT → CURRENT → this task → minimum relevant spec. Checkpoint before stopping.
