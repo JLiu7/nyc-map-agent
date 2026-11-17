@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseRecording } from "../format";
-import { clock, createCollector, deviceName, fileStem, gpsRow, headingRow, motionRow, pickVideoType, recordingJson, videoExt } from "./session";
+import { clock, createCollector, deviceName, fileStem, gpsRow, headingRow, motionRow, oversize, RECORD_SIZE, recorderOptions, recordingJson, videoBitrate, videoExt } from "./session";
 
 const T = 1_763_150_000_000;
 const phoneMotion = {
@@ -84,9 +84,9 @@ describe("names and labels", () => {
   });
 
   it("picks the first video type the browser can record and its extension", () => {
-    expect(pickVideoType((t) => t.startsWith("video/webm"))).toBe("video/webm;codecs=vp9");
-    expect(pickVideoType((t) => t === "video/mp4")).toBe("video/mp4");
-    expect(pickVideoType(() => false)).toBe("");
+    expect(recorderOptions((t) => t.startsWith("video/webm")).mimeType).toBe("video/webm;codecs=vp9");
+    expect(recorderOptions((t) => t === "video/mp4").mimeType).toBe("video/mp4");
+    expect(recorderOptions(() => false)).not.toHaveProperty("mimeType");
     expect(videoExt("video/mp4;codecs=avc1")).toBe("mp4");
     expect(videoExt("video/webm;codecs=vp8")).toBe("webm");
     expect(videoExt("")).toBe("webm");
@@ -96,5 +96,36 @@ describe("names and labels", () => {
     expect(clock(7_400)).toBe("0:07");
     expect(clock(750_000)).toBe("12:30");
     expect(clock(-5)).toBe("0:00");
+  });
+});
+
+describe("the size of the recorded video", () => {
+  it("keeps a walk at about a tenth of what the browser would pick by itself", () => {
+    // 1.2 Mbit/s at 720p is about 90 MB for ten minutes, against 450 MB at the 6 Mbit/s phones often choose.
+    const bits = videoBitrate(RECORD_SIZE.width, RECORD_SIZE.height);
+    const tenMinutes = (bits / 8) * 600;
+    expect(bits).toBeGreaterThanOrEqual(1_100_000);
+    expect(bits).toBeLessThanOrEqual(1_300_000);
+    expect(tenMinutes).toBeLessThan(100 * 1024 * 1024);
+  });
+
+  it("scales with the picture, and never to a rate no direction needs", () => {
+    const hd = videoBitrate(1280, 720);
+    expect(videoBitrate(640, 360)).toBeGreaterThanOrEqual(400_000);
+    expect(videoBitrate(640, 360)).toBeLessThan(hd);
+    expect(videoBitrate(64, 36)).toBe(400_000);
+  });
+
+  it("hands MediaRecorder the codec it can record and the rate, and nothing that changes the picture", () => {
+    const rate = videoBitrate(RECORD_SIZE.width, RECORD_SIZE.height);
+    expect(recorderOptions((t) => t === "video/mp4")).toEqual({ videoBitsPerSecond: rate, mimeType: "video/mp4" });
+    expect(recorderOptions(() => false)).toEqual({ videoBitsPerSecond: rate });
+  });
+
+  it("spots a camera that opened bigger than asked, and leaves a smaller one alone", () => {
+    expect(oversize(3840, 2160)).toBe(true);
+    expect(oversize(1281, 720)).toBe(true);
+    expect(oversize(1280, 720)).toBe(false);
+    expect(oversize(640, 480)).toBe(false);
   });
 });

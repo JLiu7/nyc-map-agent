@@ -27,6 +27,21 @@ const fakeCamera = (page: Page) =>
     if (!navigator.mediaDevices) Object.defineProperty(navigator, "mediaDevices", { value: md });
   });
 
+/** The MediaRecorder options the page asked for, kept so the check can read the bitrate it set. */
+const recordOptions = (page: Page) =>
+  page.addInitScript(() => {
+    const asked: unknown[] = [];
+    (window as unknown as { __recorderOptions: unknown[] }).__recorderOptions = asked;
+    const Real = window.MediaRecorder;
+    class Spy extends Real {
+      constructor(stream: MediaStream, options?: MediaRecorderOptions) {
+        asked.push(options ?? null);
+        super(stream, options);
+      }
+    }
+    (window as unknown as { MediaRecorder: typeof MediaRecorder }).MediaRecorder = Spy;
+  });
+
 const open = async (page: Page, size: { width: number; height: number }) => {
   await page.setViewportSize({ width: size.width, height: size.height });
   await mockNetwork(page);
@@ -125,4 +140,19 @@ test("the review draws the path from the location fixes", async ({ page, context
   await expect(page.getByTestId("path-note")).toHaveText("195 m, from 3 location fixes. North is up.");
   expect((await page.getByTestId("path-line").getAttribute("points"))!.split(" ")).toHaveLength(3);
   await expectLayout(page);
+});
+
+test("the recorded picture is kept small: a set bitrate, not the browser's own", async ({ page }) => {
+  await recordOptions(page);
+  await open(page, SIZES[2]);
+  await page.getByRole("button", { name: "Record" }).click();
+  await expect(page.getByTestId("record-timer")).toBeVisible({ timeout: slow(10_000) });
+  const asked = await page.evaluate(() => (window as unknown as { __recorderOptions: (MediaRecorderOptions | null)[] }).__recorderOptions);
+  expect(asked.length).toBeGreaterThan(0);
+  const options = asked[0] ?? {};
+  // 1.2 Mbit/s at 720p: a ten-minute walk stays near 90 MB instead of the browser's 450.
+  expect(options.videoBitsPerSecond).toBeGreaterThanOrEqual(1_100_000);
+  expect(options.videoBitsPerSecond).toBeLessThanOrEqual(1_300_000);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByTestId("record-review")).toBeVisible({ timeout: slow(10_000) });
 });

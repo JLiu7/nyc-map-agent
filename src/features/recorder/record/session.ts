@@ -130,9 +130,36 @@ export function videoExt(mime: string): "mp4" | "webm" {
   return /mp4/i.test(mime) ? "mp4" : "webm";
 }
 
-/** The first video type this browser can record, or "" to let it choose. */
-export function pickVideoType(isSupported: (type: string) => boolean): string {
-  return ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => isSupported(t)) ?? "";
+/** The picture the recorder keeps: 720p, the size it asks the camera for. */
+export const RECORD_SIZE = { width: 1280, height: 720 };
+
+/**
+ * How many bits a second this picture needs: 1.2 Mbit/s at 720p, about 90 MB for a
+ * ten-minute walk. Left to itself the browser picks several times as much (phones
+ * often 4 to 8 Mbit/s at this size), so a walk turns into about 450 MB of detail a
+ * sign, a stair or a corridor never needed. Pure, so the figure is checked without
+ * a phone.
+ */
+export function videoBitrate(width: number, height: number): number {
+  return Math.max(4e5, Math.round((width * height * 1.2e6) / 921600));
+}
+
+/**
+ * What to hand MediaRecorder: the first type this browser can record (none, to let
+ * it choose) and the rate above.
+ */
+export function recorderOptions(isSupported: (type: string) => boolean): MediaRecorderOptions {
+  const mimeType = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(isSupported) ?? "";
+  return { videoBitsPerSecond: videoBitrate(RECORD_SIZE.width, RECORD_SIZE.height), ...(mimeType && { mimeType }) };
+}
+
+/**
+ * True when the camera opened bigger than the recorder keeps, which some phones do
+ * whatever size was asked for (a 4K camera hands over 3840 px). That picture is
+ * drawn down to RECORD_SIZE before it is recorded. Pure.
+ */
+export function oversize(w: number, h: number): boolean {
+  return w > RECORD_SIZE.width || h > RECORD_SIZE.height;
 }
 
 /** The recording as the JSON file Save downloads. Throws if it would not pass the format's checker. */

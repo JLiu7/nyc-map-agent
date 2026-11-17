@@ -107,7 +107,7 @@
   {
     "name": "feature: recorder page (lazy, loaded only at /record)",
     "path": ".size-build/assets/RecordPage-*.js",
-    "limit": "6.5 kB"
+    "limit": "6.9 kB"
   },
   {
     "name": "feature: station 3D preview page (lazy, loaded only at /station-3d)",
@@ -125,6 +125,6 @@
       ".size-build/assets/*.js",
       "!.size-build/assets/StationWalkScene-*.js"
     ],
-    "limit": "1262 kB"
+    "limit": "1262.2 kB"
   }
 ]

@@ -4,7 +4,7 @@ import { MARK_KINDS, type MarkKind } from "../format";
 import { cameraName, listCameras, nextCamera, openCamera, rememberCamera, rememberedCamera, stopStream, type Camera } from "./camera";
 import Review, { type Take } from "./Review";
 import { askMotion, keepAwake, motionNeedsAsking, watchSensors } from "./sensors";
-import { clock, createCollector, deviceName, fileStem, motionRow, pickVideoType, videoExt, type Collector } from "./session";
+import { clock, createCollector, deviceName, fileStem, motionRow, oversize, RECORD_SIZE, recorderOptions, videoExt, type Collector } from "./session";
 
 interface Live {
   collector: Collector;
@@ -13,6 +13,49 @@ interface Live {
   videoStartedAt: number | null;
   stopSensors: () => void;
   letSleep: () => void;
+  /** What draws the downscaled copy, when the camera opened bigger than the recorded picture. */
+  fit: { stream: MediaStream; stop: () => void; next: () => void } | null;
+}
+
+/**
+ * The camera's picture drawn at RECORD_SIZE, and the stream the recorder writes.
+ * Some phones ignore the size the page asks for and hand over 4K; this keeps the
+ * file at the size a walk needs. The canvas is asked for no frames of its own: one
+ * is drawn when the recorder takes the one before (`next`), and the camera's own
+ * frames draw the rest, so the browser never holds frames the recorder is writing.
+ */
+function fitToSize(cam: MediaStream): NonNullable<Live["fit"]> {
+  const canvas = Object.assign(document.createElement("canvas"), RECORD_SIZE);
+  const g = canvas.getContext("2d")!;
+  const source = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: cam });
+  void source.play().catch(() => undefined);
+  const stream = canvas.captureStream(0);
+  const next = () => (stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack).requestFrame();
+  let open = true;
+  const draw = () => {
+    if (!open) return;
+    const w = source.videoWidth;
+    const h = source.videoHeight;
+    // Fill the frame and trim the surplus edge, as the page's own preview is cropped.
+    const k = Math.max(canvas.width / w, canvas.height / h);
+    if (w && h) {
+      g.drawImage(source, (canvas.width - w * k) / 2, (canvas.height - h * k) / 2, w * k, h * k);
+      next();
+    }
+    // The camera says when a frame is here; without that, 30 a second.
+    if (source.requestVideoFrameCallback) source.requestVideoFrameCallback(draw);
+    else setTimeout(draw, 33);
+  };
+  draw();
+  return {
+    stream,
+    next,
+    stop: () => {
+      open = false;
+      stopStream(source.srcObject as MediaStream);
+      stopStream(stream);
+    },
+  };
 }
 
 const MARK_LABEL: Record<MarkKind, string> = { sign: "Sign", stairs: "Stairs", elevator: "Elevator" };
@@ -108,6 +151,7 @@ export default function RecordPage() {
       live.current?.stopSensors();
       live.current?.letSleep();
       if (live.current?.recorder?.state === "recording") live.current.recorder.stop();
+      live.current?.fit?.stop();
       stopStream(stream.current);
       stream.current = null;
     };
@@ -123,20 +167,30 @@ export default function RecordPage() {
       const cam = await startCamera();
       const startedAt = Date.now();
       const collector = createCollector(startedAt, deviceName(navigator.userAgent));
-      const l: Live = { collector, recorder: null, chunks: [], videoStartedAt: null, stopSensors: () => undefined, letSleep: keepAwake() };
+      const l: Live = { collector, recorder: null, chunks: [], videoStartedAt: null, stopSensors: () => undefined, letSleep: keepAwake(), fit: null };
       live.current = l;
       l.stopSensors = watchSensors(collector, () => setLocationBlocked(true));
       if (!motionAllowed) setMotion("blocked");
       else window.setTimeout(() => { if (live.current === l) setMotion(collector.counts().motion ? "ok" : "none"); }, MOTION_WAIT_MS);
       if (cam && typeof MediaRecorder !== "undefined") {
-        const type = pickVideoType((t) => MediaRecorder.isTypeSupported(t));
+        // Some phones hand over a bigger picture than it was asked for; it is drawn at
+        // RECORD_SIZE before it is recorded, so the file does not carry extra pixels.
+        const { width = 0, height = 0 } = cam.getVideoTracks()[0]?.getSettings?.() ?? {};
+        const fitted = oversize(width, height) ? fitToSize(cam) : null;
         try {
-          const rec = new MediaRecorder(cam, type ? { mimeType: type } : undefined);
-          rec.ondataavailable = (e) => { if (e.data.size) l.chunks.push(e.data); };
+          const rec = new MediaRecorder(fitted?.stream ?? cam, recorderOptions((t) => MediaRecorder.isTypeSupported(t)));
+          rec.ondataavailable = (e) => {
+            if (e.data.size) {
+              l.chunks.push(e.data);
+              fitted?.next();
+            }
+          };
           rec.onstart = () => { l.videoStartedAt = Date.now(); };
           rec.start(1000);
           l.recorder = rec;
+          l.fit = fitted;
         } catch {
+          fitted?.stop();
           setCamError("This browser cannot record video here. Marks and sensors still record.");
         }
       }
@@ -160,6 +214,7 @@ export default function RecordPage() {
     l.stopSensors();
     l.letSleep();
     const finish = () => {
+      l.fit?.stop();
       const type = l.recorder?.mimeType || l.chunks[0]?.type || "";
       const blob = l.chunks.length ? new Blob(l.chunks, { type }) : null;
       const stem = fileStem(l.collector.recording.startedAt);
