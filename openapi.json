@@ -7436,6 +7436,607 @@
           }
         }
       }
+    },
+    "/api/v1/recordings": {
+      "post": {
+        "summary": "Start sending a station-walk recording: its JSON is read and checked, and the part size to send the video in comes back",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "json": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "The walk's JSON (docs/RECORDING_FORMAT.md). It must parse as a recording."
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "device",
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to send the parts, and how big to make them",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadId": {
+                      "type": "string"
+                    },
+                    "received": {
+                      "type": "integer"
+                    },
+                    "chunk": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "uploadId",
+                    "received",
+                    "chunk"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON does not parse as a recording",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video is over the size this server takes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "This device has sent its allowance of recordings today",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings": {
+      "post": {
+        "summary": "Start sending a station-walk recording: its JSON is read and checked, and the part size to send the video in comes back (alias of /api/v1/recordings)",
+        "deprecated": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "json": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "The walk's JSON (docs/RECORDING_FORMAT.md). It must parse as a recording."
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "device",
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to send the parts, and how big to make them",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadId": {
+                      "type": "string"
+                    },
+                    "received": {
+                      "type": "integer"
+                    },
+                    "chunk": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "uploadId",
+                    "received",
+                    "chunk"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON does not parse as a recording",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video is over the size this server takes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "This device has sent its allowance of recordings today",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recordings/{id}/part": {
+      "put": {
+        "summary": "One byte range of the video, as the raw bytes in the body; the answer is how many the server holds, so a phone that lost its signal resumes from there",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "6c1e2b3a-0f4d-4d7a-9e2c-1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,12}$",
+              "description": "The byte offset this part starts at",
+              "example": "0"
+            },
+            "required": true,
+            "description": "The byte offset this part starts at",
+            "name": "from",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept; `received` is the byte count the server now holds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No offset, or an empty part",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such upload is waiting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The offset is not where the server is; `received` says where that is",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The part is over 16 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/{id}/part": {
+      "put": {
+        "summary": "One byte range of the video, as the raw bytes in the body; the answer is how many the server holds, so a phone that lost its signal resumes from there (alias of /api/v1/recordings/{id}/part)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "6c1e2b3a-0f4d-4d7a-9e2c-1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,12}$",
+              "description": "The byte offset this part starts at",
+              "example": "0"
+            },
+            "required": true,
+            "description": "The byte offset this part starts at",
+            "name": "from",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept; `received` is the byte count the server now holds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No offset, or an empty part",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such upload is waiting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The offset is not where the server is; `received` says where that is",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The part is over 16 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recordings/{id}/finish": {
+      "post": {
+        "summary": "The parts joined, and the recording's JSON, handed to Octo files as walk-<startedAt>.mp4 and walk-<startedAt>-json.json in the recordings workspace",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "6c1e2b3a-0f4d-4d7a-9e2c-1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "file",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such upload is waiting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parts do not add up to the size the phone promised",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The recording store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No recording store is set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "no recording store"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/{id}/finish": {
+      "post": {
+        "summary": "The parts joined, and the recording's JSON, handed to Octo files as walk-<startedAt>.mp4 and walk-<startedAt>-json.json in the recordings workspace (alias of /api/v1/recordings/{id}/finish)",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "example": "6c1e2b3a-0f4d-4d7a-9e2c-1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "file",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such upload is waiting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parts do not add up to the size the phone promised",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The recording store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No recording store is set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "no recording store"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

@@ -8,7 +8,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { compress } from "hono/compress";
 import { apiRateLimit } from "./lib/apiRateLimit";
-import { AGENT_ROUTE, LIVE_STATE_ROUTE, LIVE_WATCH_ROUTE, SEE_SIGN_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
+import { AGENT_ROUTE, FINISH_ROUTE, LIVE_STATE_ROUTE, LIVE_WATCH_ROUTE, PART_ROUTE, SEE_SIGN_ROUTE, START_ROUTE, STT_ROUTE, TRANSLATE_ROUTE, TTS_ROUTE, API_INFO, ROUTES, legacyAlias, toV1, toV1Route } from "./openapi";
 import * as aggregate from "../api/aggregate";
 import * as area from "../api/area/[block]";
 import * as areas from "../api/areas";
@@ -38,6 +38,7 @@ import * as transitBusSpeeds from "./features/transit/busSpeeds";
 import * as events from "./features/events/routes";
 import * as placeToilets from "./features/place-toilets/routes";
 import * as storefronts from "./features/storefronts/routes";
+import * as recording from "./features/recordings/upload";
 import * as live from "./features/live/routes";
 
 type Handler = { GET: (request: Request) => Promise<Response> };
@@ -160,6 +161,26 @@ app.openapi(toV1Route(LIVE_WATCH_ROUTE), liveWatchHandler as never);
 app.openapi(legacyAlias(LIVE_WATCH_ROUTE), liveWatchHandler as never);
 // Keep the speech server on our stack so the first spoken answer is not the one that waits for a model swap.
 startVoiceKeeper();
+
+/**
+ * Station-walk uploads (#223): start, part, finish. The part body is raw bytes, so Hono's JSON body
+ * validator never reads it; each handler parses what it needs and answers with its own Response.
+ */
+// The route's body validator has read the body, so the handler gets a fresh Request rebuilt from Hono's cached JSON.
+const startHandler = async (c: Context) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  return recording.POST(new Request(c.req.url, { method: "POST", headers: c.req.raw.headers, body: JSON.stringify(body) }));
+};
+const partHandler = (c: Context) => recording.PUT(c);
+const finishHandler = (c: Context) => recording.FINISH(c);
+for (const [, s, h] of [
+  ["/api/recordings", START_ROUTE, startHandler],
+  ["/api/recordings/:id/part", PART_ROUTE, partHandler],
+  ["/api/recordings/:id/finish", FINISH_ROUTE, finishHandler],
+] as const) {
+  app.openapi(toV1Route(s), h as never);
+  app.openapi(legacyAlias(s), h as never);
+}
 
 const docConfig = { openapi: "3.1.0", info: API_INFO };
 app.doc31("/api/v1/openapi.json", docConfig);

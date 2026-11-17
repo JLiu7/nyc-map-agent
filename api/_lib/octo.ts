@@ -61,3 +61,11 @@ export async function octoQuery<T = Record<string, unknown>>(
   }
   throw lastError;
 }
+
+/** Octo's origin. OCTO_BASE_URL is sometimes written with its /api suffix, which is not part of the origin. */
+export function octoOrigin(env: Record<string, string | undefined> = process.env): string {
+  return (env.OCTO_BASE_URL ?? "https://octodb.design-bakery.com").replace(/\/+$/, "").replace(/\/api$/, "");
+}
+
+/** A vault working key (octo_tmp_…) is exchanged by Octo's relay for the real one, so this server never holds it. */
+export const isWorkingKey = (key: string): boolean => key.startsWith("octo_tmp_");

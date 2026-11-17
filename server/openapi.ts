@@ -213,6 +213,64 @@ export const AGENT_ROUTE = createRoute({
   },
 });
 
+/** The recording's own JSON, as src/features/recorder/format.ts reads it; the handler validates it with parseRecording. */
+const RecordingJson = z.record(z.string(), z.unknown()).openapi({ description: "The walk's JSON (docs/RECORDING_FORMAT.md). It must parse as a recording." });
+const RecordingId = z.object({ id: z.string().min(1).openapi({ param: { name: "id", in: "path" }, example: "6c1e2b3a-0f4d-4d7a-9e2c-1a2b3c4d5e6f" }) });
+
+/**
+ * A station walk sent from a phone in parts (#223): one call to start, one per byte range of the
+ * video, one to finish. Nothing here serves a recording back.
+ */
+export const START_ROUTE = createRoute({
+  method: "post",
+  path: "/api/recordings",
+  summary: "Start sending a station-walk recording: its JSON is read and checked, and the part size to send the video in comes back",
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: z.object({ device: z.string().min(1), json: RecordingJson, bytes: z.number().int().nonnegative().optional() }) } },
+    },
+  },
+  responses: {
+    200: { description: "Where to send the parts, and how big to make them", content: { "application/json": { schema: z.object({ uploadId: z.string(), received: z.number().int(), chunk: z.number().int() }) } } },
+    400: { description: "The JSON does not parse as a recording", content: { "application/json": { schema: ApiError } } },
+    413: { description: "The video is over the size this server takes", content: { "application/json": { schema: ApiError } } },
+    429: { description: "This device has sent its allowance of recordings today", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+export const PART_ROUTE = createRoute({
+  method: "put",
+  path: "/api/recordings/{id}/part",
+  summary: "One byte range of the video, as the raw bytes in the body; the answer is how many the server holds, so a phone that lost its signal resumes from there",
+  request: {
+    params: RecordingId,
+    query: z.object({ from: z.string().regex(/^\d{1,12}$/).openapi({ param: { name: "from", in: "query" }, description: "The byte offset this part starts at", example: "0" }) }),
+    body: { required: true, content: { "application/octet-stream": { schema: z.string().openapi({ format: "binary" }) } } },
+  },
+  responses: {
+    200: { description: "Kept; `received` is the byte count the server now holds", content: { "application/json": { schema: z.object({ received: z.number().int() }) } } },
+    400: { description: "No offset, or an empty part", content: { "application/json": { schema: ApiError } } },
+    404: { description: "No such upload is waiting", content: { "application/json": { schema: ApiError } } },
+    409: { description: "The offset is not where the server is; `received` says where that is", content: { "application/json": { schema: z.object({ received: z.number().int() }) } } },
+    413: { description: "The part is over 16 MB", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+export const FINISH_ROUTE = createRoute({
+  method: "post",
+  path: "/api/recordings/{id}/finish",
+  summary: "The parts joined, and the recording's JSON, handed to Octo files as walk-<startedAt>.mp4 and walk-<startedAt>-json.json in the recordings workspace",
+  request: { params: RecordingId },
+  responses: {
+    200: { description: "Stored", content: { "application/json": { schema: z.object({ ok: z.literal(true), file: z.string(), bytes: z.number().int() }) } } },
+    404: { description: "No such upload is waiting", content: { "application/json": { schema: ApiError } } },
+    409: { description: "The parts do not add up to the size the phone promised", content: { "application/json": { schema: ApiError } } },
+    502: { description: "The recording store failed", content: { "application/json": { schema: ApiError } } },
+    503: { description: "No recording store is set up", content: { "application/json": { schema: z.object({ error: z.literal("no recording store") }) } } },
+  },
+});
+
 /** Hono path (":block") -> route. Order matches server/app.ts. */
 export const ROUTES = {
   "/api/aggregate": jsonRoute("/api/aggregate", "Precomputed noise / crash rollup", AggregateQuery),
@@ -326,6 +384,9 @@ export const ROUTES = {
     summary: "Restaurants, cafés, bars and shops with a toilet, labelled anyone / customers only (OpenStreetMap, ODbL; GeoJSON, refreshed nightly)",
     responses: { 200: { description: "OK", content: { "application/json": { schema: PlaceToiletsResponse } } }, ...errors },
   }),
+  "/api/recordings": START_ROUTE,
+  "/api/recordings/:id/part": PART_ROUTE,
+  "/api/recordings/:id/finish": FINISH_ROUTE,
 } as const;
 
 /**

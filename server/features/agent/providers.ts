@@ -7,6 +7,8 @@
  * relay, which adds the real key, so this server never holds one. A plain key still works and is
  * sent straight to the provider, for local runs.
  */
+import { isWorkingKey, octoOrigin } from "../../../api/_lib/octo";
+
 export type Profile = "smart" | "dev";
 
 export interface Provider {
@@ -44,11 +46,6 @@ export function pickProfile(asked: Profile | undefined, env: Record<string, stri
   return want === "smart" && hasSmart ? "smart" : "dev";
 }
 
-/** Octo's origin. OCTO_BASE_URL is sometimes written with its /api suffix. */
-export const octoOrigin = (env: Record<string, string | undefined> = process.env): string =>
-  (env.OCTO_BASE_URL ?? "https://octodb.design-bakery.com").replace(/\/+$/, "").replace(/\/api$/, "");
-
-export const isWorkingKey = (key: string): boolean => key.startsWith("octo_tmp_");
 
 /** Where one call to `path` (e.g. "/chat/completions") goes, and the headers that reach it. */
 export function routeFor(p: Provider, path: string, env: Record<string, string | undefined> = process.env): { url: string; headers: Record<string, string> } {

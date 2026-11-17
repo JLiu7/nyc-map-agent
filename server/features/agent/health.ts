@@ -5,7 +5,8 @@
  * recovers. Once a day it renews each vault working key, which otherwise lapses after 30 days.
  * State is in memory: one Node process serves the deployment.
  */
-import { isWorkingKey, octoOrigin, routeFor, smartProviders, type Provider } from "./providers";
+import { isWorkingKey, octoOrigin } from "../../../api/_lib/octo";
+import { routeFor, smartProviders, type Provider } from "./providers";
 
 export interface Health {
   ok: boolean;
