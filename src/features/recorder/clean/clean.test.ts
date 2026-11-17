@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { BaroRow, HeadingRow, StepRow } from "../format";
+import type { BaroRow, HeadingRow, MotionRow, Recording, StepRow } from "../format";
 import { parseRecording } from "../format";
 import { END_S, filmAt, LEVELS, LINE, LINE_LEVELS, RIDE_AT, SIGNS, signTimes, T0 } from "@/features/recorder/replay/unionSq";
-import { chooseFixes, cleanWalk, deadReckon, distM, findRides, headingAt, levelAt, levelSpans, pathAt, pinPath, placeRaw, snapToLine, toXY, type Fix, type LonLat } from "./index";
+import { chooseFixes, cleanWalk, deadReckon, distM, findRides, headingAt, levelAt, levelSpans, pathAt, pinPath, placeRaw, snapToLine, steadyHeading, stepsFromMotion, toXY, type Fix, type LonLat } from "./index";
 
 const O: LonLat = [-73.99, 40.735];
 /** A place `e` metres east and `n` metres north of O. */
@@ -31,6 +31,58 @@ describe("dead reckoning", () => {
   it("does not guess a step it has no heading for", () => {
     const p = deadReckon([[0, 0], [3000, 3]], [[0, 0, 0, 0]], 1);
     expect(p[p.length - 1].at[1]).toBeCloseTo(2); // the third step, three seconds from any heading, does not move
+  });
+});
+
+describe("steps and turns from the motion sensors", () => {
+  /** A phone held upright, as when filming: gravity along -y, as an iPhone reads it. `bounce` is m/s² on top of gravity, `turn` deg/s about up. */
+  const walk = (secs: number, bounce: (s: number) => number, turn: (s: number) => number = () => 0): MotionRow[] =>
+    Array.from({ length: secs * 100 }, (_, i): MotionRow => {
+      const s = i / 100;
+      return [s * 1000, 0, -(9.81 + bounce(s)), 0, 0, turn(s), 0];
+    });
+  const stride = (s: number) => 1.5 * Math.sin(2 * Math.PI * 1.8 * s); // 1.8 steps a second
+
+  it("counts one step per bounce, and none while standing", () => {
+    const steps = stepsFromMotion(walk(10, stride));
+    expect(steps[0]).toEqual([0, 0]);
+    expect(steps.length - 1).toBeGreaterThanOrEqual(17);
+    expect(steps.length - 1).toBeLessThanOrEqual(18);
+    expect(stepsFromMotion(walk(10, (s) => 0.1 * Math.sin(2 * Math.PI * 7 * s)))).toEqual([[0, 0]]);
+  });
+
+  it("does not care which way the phone reports gravity", () => {
+    const flipped = walk(10, stride).map(([t, ax, ay, az, ...r]): MotionRow => [t, -ax, -ay, -az, ...r]);
+    expect(stepsFromMotion(flipped).length).toBe(stepsFromMotion(walk(10, stride)).length);
+  });
+
+  it("follows the gyroscope through the jump an iPhone makes when it finds north", () => {
+    const motion = walk(3, () => 0, (s) => (s < 1 ? 90 : 0)); // a quarter turn anticlockwise in the first second
+    const heading: HeadingRow[] = [0, 500, 1000, 1500, 2000, 2500].map((t): HeadingRow => [t, t < 1500 ? 10 + Math.min(t / 1000, 1) * 90 : 220, 90, 0]);
+    const steady = steadyHeading(motion, heading);
+    expect(steady[0][1]).toBeCloseTo(10);
+    expect(steady[2][1]).toBeCloseTo(100, 0);
+    expect(steady[4][1]).toBeCloseTo(100, 0); // the phone's own alpha says 220 here
+    expect(headingAt(steady, 2000)).toBeCloseTo(260, 0);
+    expect(steady[4].slice(2)).toEqual([90, 0]);
+  });
+
+  it("leaves the heading as it is when there is no motion", () => {
+    const heading: HeadingRow[] = [[0, 40, 10, 5]];
+    expect(steadyHeading([], heading)).toEqual(heading);
+  });
+
+  it("walks a recording with no step counter, and says the steps were counted", () => {
+    const rec: Recording = {
+      v: 1, startedAt: 0, device: "test", marks: [], baro: [], steps: [],
+      motion: walk(10, stride),
+      heading: Array.from({ length: 21 }, (_, k): HeadingRow => [k * 500, 0, 90, 0]),
+      gps: [[0, O[1], O[0], 5], [9_900, east(0, 12)[1], east(0, 12)[0], 5]],
+    };
+    const c = cleanWalk(rec, { levels: ["street"], rideAt: [], line: [], snapFrom: 0, snapTo: 0 });
+    expect(c.gaps.some((g) => g.includes("counted from the accelerometer"))).toBe(true);
+    expect(c.raw.length).toBeGreaterThan(15);
+    near(pathAt(c.pinned, 9_900), east(0, 12), 1);
   });
 });
 

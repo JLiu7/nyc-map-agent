@@ -11,7 +11,8 @@
  *   Orientation.csv                qx,qy,qz,qw               -> heading alpha,beta,gamma (deg)
  *   Location.csv                   latitude,longitude,horizontalAccuracy -> gps (absent when GPS was off)
  *   Barometer.csv                  relativeAltitude (m)      -> baro
- *   Pedometer.csv                  steps (cumulative)        -> steps
+ *   Pedometer.csv                  steps (cumulative)        -> steps (absent on some iPhones: cleaning then
+ *                                                               counts steps from the accelerometer)
  *   Metadata.csv                   recording epoch time (ms), device name
  * The calibrated Accelerometer.csv is not used: it is not the raw reading
  * (its magnitude is ~2 m/s² while walking, not ~9.8). Annotation.csv has no
@@ -140,6 +141,8 @@ export function convert(files: Record<string, string>, opts: Options = {}): { re
   if (ped) {
     const [t, s] = ["time", "steps"].map((n) => column(ped, n, "Pedometer.csv"));
     steps = ped.rows.map((x) => [nsToMs(x[t]), x[s]]);
+  } else {
+    warnings.push("No Pedometer.csv: steps is empty, so cleaning will count steps from the accelerometer.");
   }
 
   const ann = opt("Annotation.csv");

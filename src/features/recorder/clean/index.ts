@@ -3,6 +3,8 @@
  * path on the map, in four pure steps:
  *
  * 1. deadReckon: steps plus heading make a raw path (metres, the phone's own frame).
+ *    The turns come from the gyroscope when the recording has motion (steadyHeading),
+ *    and the steps from the accelerometer when it has no step counter (stepsFromMotion).
  * 2. pinPath: the raw path is pinned to fixed points (good location fixes and
  *    known checkpoints such as an elevator found in the barometer).
  * 3. snapToLine: inside the station it is snapped to the walk line, unless it is far off it.
@@ -12,12 +14,14 @@ import type { Recording } from "../format";
 import { deadReckon, STEP_M } from "./deadReckon";
 import type { LonLat, Timed } from "./geo";
 import { findRides, levelAt, levelSpans, type Ride, type Span } from "./levels";
+import { steadyHeading, stepsFromMotion } from "./motion";
 import { chooseFixes, gpsFixes, pinPath, placeRaw, type Fix } from "./pin";
 import { snapToLine, type Snapped } from "./snap";
 
 export { deadReckon, headingAt, STEP_M } from "./deadReckon";
 export { distM, pathAt, toLonLat, toXY, type LonLat, type Timed, type XY } from "./geo";
 export { findRides, levelAt, levelSpans, type Ride, type Span } from "./levels";
+export { steadyHeading, stepsFromMotion } from "./motion";
 export { chooseFixes, gpsFixes, pinPath, placeRaw, type Fix } from "./pin";
 export { snapToLine, type SnapOptions, type Snapped } from "./snap";
 
@@ -60,7 +64,9 @@ export function cleanWalk(rec: Recording, opts: CleanOptions): Cleaned {
   const gps = gpsFixes(rec.gps, opts.maxAccuracyM);
   if (!rec.gps.length) gaps.push("No location fixes in this recording.");
   const fixes = chooseFixes([...checkpoints, ...gps]);
-  const steps = deadReckon(rec.steps, rec.heading, STEP_M);
+  const counted = !rec.steps.length && rec.motion.length ? stepsFromMotion(rec.motion) : null;
+  if (counted) gaps.push(`No step counter in this recording, so ${counted.length - 1} steps were counted from the accelerometer.`);
+  const steps = deadReckon(counted ?? rec.steps, steadyHeading(rec.motion, rec.heading), STEP_M);
   if (!rec.heading.length) gaps.push("No heading in this recording, so there is no raw path from steps and turns.");
   if (!steps.length || !fixes.length) {
     if (!fixes.length) gaps.push("No fixed points to pin the path to.");

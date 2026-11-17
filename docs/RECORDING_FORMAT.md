@@ -22,6 +22,8 @@ Every `t` is epoch milliseconds. Every list can be empty: a phone browser has no
 
 - **Acceleration sign.** The converter keeps the iPhone's own sign: a phone lying face up reads about -9.8 on `az`. A browser on Android reports the opposite sign, so the reader should check the sign of gravity before using it.
 - **Heading has no north.** `alpha` is measured from wherever the phone's reference frame started, not from magnetic north.
+- **Alpha can jump.** An iPhone corrects its orientation towards north once it trusts the compass, often on the way up to the street, and `alpha` then swings by 100 degrees or more while the walker goes straight. When `motion` is there, cleaning counts turns from the gyroscope instead (`steadyHeading` in `src/features/recorder/clean/motion.ts`).
+- **Steps can be empty.** Sensor Logger on some iPhones writes no `Pedometer.csv`. Cleaning then counts steps from the accelerometer (`stepsFromMotion`).
 - **Orientation range.** When the phone is tipped past upright, `beta` can pass 90 and `gamma` stays within -90 to 90, like the browser's own values.
 
 ## Converting a Sensor Logger export
