@@ -65,7 +65,7 @@ These hold for any input, so the tests generate inputs instead of listing cases.
 
 **Up or down.** Given a recording in progress, when the rider taps Stairs, then Up and Down are offered; when they tap Down, then the saved recording's stairs mark says down.
 
-**Send.** Given a finished recording, when the rider presses Send, then the recording's JSON is the first thing uploaded, and the screen says it was sent. Given the server refuses, then the screen says so and the recording is still there to send again or save.
+**Send.** Given a finished recording, when the rider presses Send, then the recording's JSON is the first thing uploaded, and the screen says it was sent. Given the server refuses, then the screen says so and the recording is still there to send again or save. The browser check presses Save before it looks for the file links: "or save" means the button is there to press, not that a refusal saves by itself.
 
 ## What these checks do not cover
 

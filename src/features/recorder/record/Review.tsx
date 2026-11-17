@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarkKind, Recording } from "../format";
 import { fitPath, walkPath } from "./path";
 import { clock, recordingJson } from "./session";
+import type { SendProgress, SendResult } from "./upload";
 
 /** What Stop hands on: the recording and its video. */
 export interface Take {
@@ -17,6 +18,16 @@ interface Files {
   error: string | null;
 }
 
+/** Where the Send has got to. "refused" keeps the recording on screen to send again or save. */
+type Sending =
+  | { at: "idle" }
+  | { at: "sending"; done: number; part: "data" | "video" }
+  | { at: "sent"; file: string; bytes: number }
+  | { at: "refused"; why: string };
+
+/** The phone's own store; a private tab or a full disk reads as nothing, never an error. */
+const store = (): Storage | null => { try { return globalThis.localStorage; } catch { return null; } };
+
 const MARK_LABEL: Record<MarkKind, string> = { sign: "Sign", stairs: "Stairs", elevator: "Elevator" };
 
 function download(href: string, name: string): void {
@@ -31,14 +42,29 @@ function download(href: string, name: string): void {
 
 /**
  * The review screen after Stop (#185): the video, the marks, how many rows
- * each sensor gave, and Delete or Save. Save downloads two files to the
- * device, the recording JSON and the video; nothing is uploaded. A phone may
- * let only one download through per tap, so each file also has its own link.
+ * each sensor gave, and Delete, Send or Save (#223). Send is the one tap that
+ * puts the walk on the server: its data first, then the video in parts. Save
+ * downloads the two files to the device instead. Nothing goes anywhere until
+ * one of them is pressed. A phone may let only one download through per tap,
+ * so each file also has its own link.
  */
 export default function Review({ take, onDelete }: { take: Take; onDelete: () => void }) {
   const [files, setFiles] = useState<Files>({ json: null, video: null, error: null });
   const [sure, setSure] = useState(false);
   const [saved, setSaved] = useState(false);
+  // The Send's code is its own chunk (#223) and is fetched as soon as the review opens: it is not needed until Stop
+  // has been pressed, so it must not sit in the recorder page's own budget. A press waits for it if it is late.
+  const sendCode = useRef<Promise<typeof import("./upload")> | null>(null);
+  const [sendModule, setSendModule] = useState<typeof import("./upload") | null>(null);
+  useEffect(() => {
+    sendCode.current ??= import("./upload");
+    void sendCode.current.then(setSendModule, () => undefined);
+  }, []);
+  const [sending, setSending] = useState<Sending>({ at: "idle" });
+  const [remaining, setRemaining] = useState<number | null>(null);
+  // The links are rebuilt whenever `files` changes (a Save shows the download links). A send in flight holds
+  // the bytes it took at the press, never the ones being rebuilt under it.
+  const sendingNow = useRef(false);
   const rec = take.recording;
 
   useEffect(() => {
@@ -58,6 +84,11 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
     };
   }, [rec, take.video]);
 
+  // The screen's copy of the server's daily limit, once the Send's code has arrived to read it.
+  useEffect(() => {
+    if (sendModule) setRemaining(Math.max(0, sendModule.PER_DAY - sendModule.readCount(store(), rec.device, Date.now()).sent));
+  }, [rec.device, sendModule]);
+
   const rows = useMemo(() => [
     ["Motion", rec.motion.length],
     ["Orientation", rec.heading.length],
@@ -70,6 +101,10 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
     return { ...p, drawn: fitPath(p.points, 300, 160, 16) };
   }, [rec]);
 
+  // "3 of 14 fixes were too rough to use", or nothing when every fix was used. Short enough to be written here
+  // rather than waited for with the path reader.
+  const dropped = path && path.rough ? `${path.rough} of ${path.fixes} fixes were too rough to use.` : null;
+
   const save = () => {
     if (files.json) download(files.json, take.jsonFile);
     // One after the other: two downloads started in the same instant are often cut to one.
@@ -80,6 +115,40 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
     setSaved(true);
   };
 
+  const pressSend = async () => {
+    if (sendingNow.current) return;
+    // The day's limit is checked with the button, not only written under it: a screen that says "no sends left" must not send.
+    if (refuse) return setSending({ at: "refused", why: `Not sent. ${refuse} The recording is still on this phone.` });
+    sendingNow.current = true;
+    const s = sendModule ?? (await sendCode.current!);
+    setSending({ at: "sending", done: 0, part: "data" });
+    // Counted here and not on the answer: the server counts a refused upload too, and a phone that loses the
+    // answer mid-send would otherwise send one more than the day allows.
+    setRemaining(Math.max(0, s.PER_DAY - s.addCount(store(), rec.device, Date.now()).sent));
+    try {
+      const result: SendResult = await s.send({
+        recording: rec,
+        json: recordingJson(rec),
+        video: take.video,
+        name: s.safeName(s.uploadName(rec.startedAt)),
+        onProgress: (p: SendProgress) => setSending({ at: "sending", done: p.done, part: p.part }),
+      });
+      setSending(result.ok ? { at: "sent", file: result.file, bytes: result.bytes } : { at: "refused", why: result.why });
+    } catch (e) {
+      setSending({ at: "refused", why: `Not sent. ${e instanceof Error ? e.message : "Sending stopped."} The recording is still on this phone.` });
+    } finally {
+      sendingNow.current = false;
+    }
+  };
+
+  /** The Send's own refusal sentence, or the limits' when they say no before anything is sent. */
+  const refuse = useMemo(() => {
+    if (!files.json) return "This recording could not be written, so there is nothing to send.";
+    if (!sendModule) return null;
+    return sendModule.checkUpload({ bytes: files.json.length + (take.video?.size ?? 0), sentToday: sendModule.PER_DAY - (remaining ?? sendModule.PER_DAY) }, { maxBytes: sendModule.MAX_BYTES, perDay: sendModule.PER_DAY });
+  }, [files.json, take.video, remaining, sendModule]);
+
+  const busy = sending.at === "sending";
   const link = "flex min-h-11 items-center justify-center rounded-full border border-white/40 px-4 text-sm font-semibold";
   return (
     <section data-testid="record-review" aria-label="Review the recording" className="absolute inset-0 z-10 overflow-y-auto bg-black">
@@ -117,15 +186,36 @@ export default function Review({ take, onDelete }: { take: Take; onDelete: () =>
               <p data-testid="path-note" className="text-center text-white/80">{Math.round(path.lengthM)} m, from {path.points.length} location fixes. North is up.</p>
             </>
           )}
+          {dropped && <p data-testid="path-dropped" className="text-center text-xs text-white/60">{dropped}</p>}
         </div>
         {files.error && <p role="alert" className="text-sm text-red-400">{files.error}</p>}
         <div className="mt-auto flex gap-3 pt-2">
-          <button type="button" data-testid="delete-button" onClick={() => (sure ? onDelete() : setSure(true))} className="min-h-12 flex-1 rounded-full border border-white/40 px-4 text-sm font-semibold">
+          <button type="button" data-testid="delete-button" onClick={() => (sure ? onDelete() : setSure(true))} disabled={busy} className="min-h-12 flex-1 rounded-full border border-white/40 px-4 text-sm font-semibold disabled:opacity-50">
             {sure ? "Delete for good" : "Delete"}
           </button>
-          <button type="button" data-testid="save-button" onClick={save} disabled={!files.json && !files.video} className="min-h-12 flex-1 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-50">
+          <button type="button" data-testid="save-button" onClick={save} disabled={busy || (!files.json && !files.video)} className="min-h-12 flex-1 rounded-full border border-white/40 px-4 text-sm font-semibold disabled:opacity-50">
             Save
           </button>
+          <button type="button" data-testid="review-send" aria-label="Send" onClick={() => void pressSend()} disabled={busy} className="min-h-12 flex-1 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-50">
+            {busy ? "Sending" : "Send"}
+          </button>
+        </div>
+        {/* Not a live region: the limit below it is long and would be read out on every open of the screen; the button's own state and the progress line already say what is happening. */}
+        <div data-testid="send-status" className="text-center text-sm">
+          {sending.at === "sending" && (
+            <div className="space-y-1">
+              <p>{sending.part === "data" ? "Sending the data" : "Sending the video"} {Math.round(sending.done * 100)}%</p>
+              <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                <div data-testid="send-progress" className="h-full bg-white" style={{ width: `${Math.round(sending.done * 100)}%` }} />
+              </div>
+              <p className="text-white/60">Keep this screen open.</p>
+            </div>
+          )}
+          {sending.at === "sent" && <p className="text-green-400">Sent.{sending.file ? ` ${sending.file},` : ""} {Math.round(sending.bytes / 1000)} kB.</p>}
+          {sending.at === "refused" && <p className="text-red-400">{sending.why}</p>}
+          {/* The limits are said before the button is pressed, not after the server refuses. */}
+          {sending.at !== "sending" && refuse && <p data-testid="send-limit" className="text-white/80">{refuse}</p>}
+          {sending.at === "sent" && <p className="text-white/60">{remaining} sends left today.</p>}
         </div>
         {saved && (
           <div data-testid="review-files" className="space-y-2">

@@ -110,7 +110,9 @@ export default defineConfig(({ mode }) => {
           // The map library is half the first download and changes far less often than the app,
           // so it gets its own file that phones keep cached across our deploys.
           // The sign reader gets its own name: left alone it is emitted as index-*.js and counted against the app entry's size limit.
-          manualChunks: (id) => (id.includes("/node_modules/maplibre-gl/") ? "maplibre" : /\/node_modules\/(tesseract\.js|regenerator-runtime|is-url|node-fetch|bmp-js|idb-keyval|wasm-feature-detect|zlibjs)\//.test(id) ? "signReader" : undefined),
+          // The recorder's Send (upload.ts, #223) is only needed once Stop has been pressed, so it gets its own chunk
+          // instead of the recorder page's own small budget; see the note by "./record/upload.ts" in the recorder page.
+          manualChunks: (id) => (id.includes("/node_modules/maplibre-gl/") ? "maplibre" : /\/node_modules\/(tesseract\.js|regenerator-runtime|is-url|node-fetch|bmp-js|idb-keyval|wasm-feature-detect|zlibjs)\//.test(id) ? "signReader" : id.endsWith("/recorder/record/upload.ts") ? "recordSend" : undefined),
         },
       },
     },

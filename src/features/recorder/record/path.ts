@@ -3,6 +3,10 @@
  * ../clean builds a path from the step counter and pins it to location fixes.
  * A browser has no step counter, so a recording made on this page has only
  * the fixes: the ones good enough to pin to, joined in the order they came.
+ *
+ * A walk through a street with tall buildings gives a phone some fixes it is
+ * unsure of and some it is sure of. The unsure ones are left out and the sure
+ * ones are drawn (#223); only a recording with no sure fix at all has no path.
  */
 import type { Recording } from "../format";
 import { distM, gpsFixes, toXY, type XY } from "../clean";
@@ -16,20 +20,30 @@ export interface WalkPath {
   lengthM: number;
   /** Why there is no path, in plain words; null when there is one. */
   why: string | null;
+  /** The fixes left out because they were too rough, and how many the phone gave in all. */
+  rough: number;
+  fixes: number;
+}
+
+/** "3 of 14 fixes were too rough to use", or nothing when every fix was used. */
+export function roughNote(p: WalkPath): string | null {
+  if (!p.rough) return null;
+  return `${p.rough} of ${p.fixes} ${p.fixes === 1 ? "fix was" : "fixes were"} too rough to use.`;
 }
 
 export function walkPath(rec: Recording): WalkPath {
   const fixes = gpsFixes(rec.gps, PATH_MAX_ACCURACY_M).sort((a, b) => a.t - b.t);
+  const counts = { rough: rec.gps.length - fixes.length, fixes: rec.gps.length };
   const places = fixes.map((f) => f.at).filter((p, i, all) => i === 0 || distM(all[i - 1], p) >= 0.5);
   if (places.length < 2) {
     const why = !rec.gps.length ? "No location in this recording, so there is no path to draw."
       : !fixes.length ? "The location was too rough to draw a path."
         : "The location did not move, so there is no path to draw.";
-    return { points: [], lengthM: 0, why };
+    return { points: [], lengthM: 0, why, ...counts };
   }
   let lengthM = 0;
   for (let i = 1; i < places.length; i++) lengthM += distM(places[i - 1], places[i]);
-  return { points: places.map((p) => toXY(places[0], p)), lengthM, why: null };
+  return { points: places.map((p) => toXY(places[0], p)), lengthM, why: null, ...counts };
 }
 
 /** The points as an SVG polyline inside a w by h box with a margin, north up, one scale both ways. */

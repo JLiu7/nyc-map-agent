@@ -130,6 +130,9 @@ test("send: the recording's data goes up first, the screen says it was sent, and
   refuse = true;
   await page.getByTestId("review-send").click();
   await expect(page.getByTestId("send-status")).toContainText(/not sent|could not|too large|try again/i, { timeout: slow(15_000) });
+  // The scenario's "or save": the recording is still on screen, and Save still hands it over.
+  await expect(page.getByTestId("record-review")).toBeVisible();
+  await page.getByTestId("save-button").click();
   await expect(page.getByTestId("file-json")).toBeVisible();
 
   refuse = false;
